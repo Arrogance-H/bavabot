@@ -78,6 +78,11 @@ async def p_start(_, msg):
                                            f"请点击 /start 重新召唤面板"))
             return
         name, lv, ex, us, embyid, pwd2 = data
+        # Get raw user level from database
+        from bot.sql_helper.sql_emby import sql_get_emby
+        user_data = sql_get_emby(msg.from_user.id)
+        user_lv = user_data.lv if user_data else None
+        
         stat, all_user, tem, timing = await open_check()
         text = f"▎__欢迎进入用户面板！{msg.from_user.first_name}__\n\n" \
                f"**· 🆔 用户のID** | `{msg.from_user.id}`\n" \
@@ -88,12 +93,12 @@ async def p_start(_, msg):
                f"**· 🎟️ 可注册席位** | {all_user - tem}\n"
         if not embyid:
             await asyncio.gather(deleteMessage(msg),
-                                 sendPhoto(msg, bot_photo, caption=text, buttons=judge_start_ikb(is_admin, False)))
+                                 sendPhoto(msg, bot_photo, caption=text, buttons=judge_start_ikb(is_admin, False, user_lv)))
         else:
             await asyncio.gather(deleteMessage(msg),
                                  sendPhoto(msg, bot_photo,
                                            f"**✨ 只有你想见我的时候我们的相遇才有意义**\n\n🍉__你好鸭 [{msg.from_user.first_name}](tg://user?id={msg.from_user.id}) 请选择功能__👇",
-                                           buttons=judge_start_ikb(is_admin, True)))
+                                           buttons=judge_start_ikb(is_admin, True, user_lv)))
 
 
 # 返回面板
@@ -101,10 +106,15 @@ async def p_start(_, msg):
 async def b_start(_, call):
     if await user_in_group_filter(_, call):
         is_admin = judge_admins(call.from_user.id)
+        # Get user level for back_start
+        from bot.sql_helper.sql_emby import sql_get_emby
+        user_data = sql_get_emby(call.from_user.id)
+        user_lv = user_data.lv if user_data else None
+        
         await asyncio.gather(callAnswer(call, "⭐ 返回start"),
                              editMessage(call,
                                          text=f"**✨ 只有你想见我的时候我们的相遇才有意义**\n\n🍉__你好鸭 [{call.from_user.first_name}](tg://user?id={call.from_user.id}) 请选择功能__👇",
-                                         buttons=judge_start_ikb(is_admin, account=True)))
+                                         buttons=judge_start_ikb(is_admin, account=True, user_lv=user_lv)))
     elif not await user_in_group_filter(_, call):
         await asyncio.gather(callAnswer(call, "⭐ 返回start"),
                              editMessage(call, text='💢 拜托啦！请先点击下面加入我们的群组和频道，然后再 /start 一下好吗？\n\n'

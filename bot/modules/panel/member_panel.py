@@ -93,6 +93,12 @@ async def members(_, call):
         return await callAnswer(call, '⚠️ 数据库没有你，请重新 /start录入', True)
     await callAnswer(call, f"✅ 用户界面")
     name, lv, ex, us, embyid, pwd2 = data
+    
+    # Get raw user level from database
+    from bot.sql_helper.sql_emby import sql_get_emby
+    user_data = sql_get_emby(call.from_user.id)
+    user_lv = user_data.lv if user_data else None
+    
     text = f"▎__欢迎进入用户面板！{call.from_user.first_name}__\n\n" \
            f"**· 🆔 用户のID** | `{call.from_user.id}`\n" \
            f"**· 📊 当前状态** | {lv}\n" \
@@ -101,9 +107,9 @@ async def members(_, call):
            f"**· 🚨 到期时间** | {ex}"
     if not embyid:
         is_admin = judge_admins(call.from_user.id)
-        await editMessage(call, text, members_ikb(is_admin, False))
+        await editMessage(call, text, members_ikb(is_admin, False, user_lv))
     else:
-        await editMessage(call, text, members_ikb(account=True))
+        await editMessage(call, text, members_ikb(account=True, user_lv=user_lv))
 
 
 # 创建账户

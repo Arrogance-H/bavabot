@@ -13,7 +13,7 @@ cache = Cache()
 """start面板 ↓"""
 
 
-def judge_start_ikb(is_admin: bool, account: bool) -> InlineKeyboardMarkup:
+def judge_start_ikb(is_admin: bool, account: bool, user_lv: str = None) -> InlineKeyboardMarkup:
     """
     start面板按钮
     """
@@ -29,7 +29,9 @@ def judge_start_ikb(is_admin: bool, account: bool) -> InlineKeyboardMarkup:
     else:
         d = [['️👥 用户功能', 'members'], ['🌐 服务器', 'server']]
         if schedall.check_ex: d.append(['🎟️ 使用续期码', 'exchange'])
-    if _open.checkin: d.append([f'🎯 签到', 'checkin'])
+    # Only show check-in for levels 'a' (whitelist) and 'b' (normal users)
+    if _open.checkin and user_lv in ['a', 'b']: 
+        d.append([f'🎯 签到', 'checkin'])
     lines = array_chunk(d, 2)
     if is_admin: lines.append([['👮🏻‍♂️ admin', 'manage']])
     keyword = ikb(lines)
@@ -46,7 +48,7 @@ judge_group_ikb = ikb([[('🌟 频道入口 ', f't.me/{chanel}', 'url'),
 """members ↓"""
 
 
-def members_ikb(is_admin: bool = False, account: bool = False) -> InlineKeyboardMarkup:
+def members_ikb(is_admin: bool = False, account: bool = False, user_lv: str = None) -> InlineKeyboardMarkup:
     """
     判断用户面板
     """
@@ -60,7 +62,7 @@ def members_ikb(is_admin: bool = False, account: bool = False) -> InlineKeyboard
         normal.append([('♻️ 主界面', 'back_start')])
         return ikb(normal)
     else:
-        return judge_start_ikb(is_admin, account)
+        return judge_start_ikb(is_admin, account, user_lv)
         # return ikb(
         #     [[('👑 创建账户', 'create')], [('⭕ 换绑TG', 'changetg'), ('🔍 绑定TG', 'bindtg')],
         #      [('♻️ 主界面', 'back_start')]])
