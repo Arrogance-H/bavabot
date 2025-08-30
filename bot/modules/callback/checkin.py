@@ -19,6 +19,9 @@ async def user_in_checkin(_, call):
         if not e:
             await callAnswer(call, '🧮 未查询到数据库', True)
 
+        elif e.lv not in ['a', 'b']:
+            await callAnswer(call, '❌ 签到功能仅对白名单和注册用户开放', True)
+
         elif not e.ch or e.ch.strftime("%Y-%m-%d") < today:
             reward = random.randint(_open.checkin_reward[0], _open.checkin_reward[1])
             s = e.iv + reward
