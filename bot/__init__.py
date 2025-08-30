@@ -81,6 +81,7 @@ admin_p = user_p + [
     BotCommand("kk", "管理用户 [管理]"),
     BotCommand("score", "加/减积分 [管理]"),
     BotCommand("coins", f"加/减{sakura_b} [管理]"),
+    BotCommand("lottery", "创建抽奖活动 [管理]"),
     BotCommand("deleted", f"清理死号 [管理]"),
     BotCommand("kick_not_emby", f"踢出当前群内无号崽 [管理]"),
     BotCommand("renew", "调整到期时间 [管理]"),
