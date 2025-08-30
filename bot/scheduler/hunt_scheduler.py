@@ -28,7 +28,7 @@ async def cleanup_expired_hunts():
 
 
 # 注册定时任务
-if schedall.get('hunt_cleanup', True):  # 默认启用
+if getattr(schedall, 'hunt_cleanup', True):  # 默认启用
     from apscheduler.schedulers.asyncio import AsyncIOScheduler
     import atexit
     
