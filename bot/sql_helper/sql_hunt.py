@@ -1,5 +1,5 @@
 """
-寻宝游戏数据库操作
+车库游戏数据库操作
 """
 import datetime
 from bot.sql_helper import Base, Session, engine
@@ -10,7 +10,7 @@ from bot import LOGGER
 
 class Hunt(Base):
     """
-    寻宝游戏会话表
+    车库游戏会话表
     """
     __tablename__ = 'hunt'
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -19,158 +19,201 @@ class Hunt(Base):
     end_time = Column(DateTime, nullable=True)  # 游戏结束时间
     game_date = Column(String(10), nullable=False)  # 游戏日期 YYYY-MM-DD
     is_active = Column(Boolean, default=True)  # 游戏是否进行中
-    fragments_found = Column(Integer, default=0)  # 找到的碎片数量
+    equipment_found = Column(Integer, default=0)  # 找到的装备数量
     coins_spent = Column(Integer, default=0)  # 消耗的金币数量
-    last_hunt_time = Column(DateTime, nullable=True)  # 上次寻宝时间
+    last_hunt_time = Column(DateTime, nullable=True)  # 上次寻找时间
 
 
-class Fragment(Base):
+class Equipment(Base):
     """
-    宝物碎片表
+    装备表
     """
-    __tablename__ = 'fragment'
+    __tablename__ = 'equipment'
     id = Column(Integer, primary_key=True, autoincrement=True)
     tg = Column(BigInteger, nullable=False)  # 用户telegram id
-    fragment_id = Column(Integer, nullable=False)  # 碎片id (1-6)
+    equipment_id = Column(Integer, nullable=False)  # 装备id
     obtained_date = Column(String(10), nullable=False)  # 获得日期 YYYY-MM-DD
     obtained_time = Column(DateTime, nullable=False)  # 获得时间
-    hunt_session_id = Column(Integer, nullable=False)  # 对应的寻宝会话id
+    hunt_session_id = Column(Integer, nullable=False)  # 对应的车库会话id
 
 
-class Treasure(Base):
+class Car(Base):
     """
-    宝物配置表
+    汽车配置表
     """
-    __tablename__ = 'treasure'
+    __tablename__ = 'car'
     id = Column(Integer, primary_key=True, autoincrement=True)
-    treasure_name = Column(String(50), nullable=False)  # 宝物名称
-    fragment_ids = Column(String(20), nullable=False)  # 需要的碎片id，逗号分隔
-    description = Column(Text, nullable=True)  # 宝物描述
+    car_name = Column(String(50), nullable=False)  # 汽车名称
+    equipment_ids = Column(String(200), nullable=False)  # 需要的装备id，逗号分隔
+    description = Column(Text, nullable=True)  # 汽车描述
 
 
-class FragmentDefinition(Base):
+class EquipmentDefinition(Base):
     """
-    碎片定义表
+    装备定义表
     """
-    __tablename__ = 'fragment_definition'
-    fragment_id = Column(Integer, primary_key=True)  # 碎片id
-    fragment_name = Column(String(50), nullable=False)  # 碎片名称
-    description = Column(Text, nullable=True)  # 碎片描述
+    __tablename__ = 'equipment_definition'
+    equipment_id = Column(Integer, primary_key=True)  # 装备id
+    equipment_name = Column(String(100), nullable=False)  # 装备名称
+    description = Column(Text, nullable=True)  # 装备描述
+    category = Column(String(20), nullable=False)  # 装备类别 (blue/green/gold/purple)
+    rarity_weight = Column(Integer, nullable=False, default=1)  # 稀有度权重，数值越大越容易获得
 
 
-class DailyTreasure(Base):
+class DailyCar(Base):
     """
-    每日宝物表
+    每日汽车表
     """
-    __tablename__ = 'daily_treasure'
+    __tablename__ = 'daily_car'
     date = Column(String(10), primary_key=True)  # 日期 YYYY-MM-DD
-    treasure_id = Column(Integer, nullable=False)  # 当日宝物id
+    car_id = Column(Integer, nullable=False)  # 当日汽车id
+
+
+# 为了向后兼容，保留旧表结构但标记为废弃
+Fragment = Equipment  # 别名，向后兼容
+Treasure = Car  # 别名，向后兼容  
+FragmentDefinition = EquipmentDefinition  # 别名，向后兼容
+DailyTreasure = DailyCar  # 别名，向后兼容
 
 
 # 创建表
 Hunt.__table__.create(bind=engine, checkfirst=True)
-Fragment.__table__.create(bind=engine, checkfirst=True)
-FragmentDefinition.__table__.create(bind=engine, checkfirst=True)
-Treasure.__table__.create(bind=engine, checkfirst=True)
-DailyTreasure.__table__.create(bind=engine, checkfirst=True)
+Equipment.__table__.create(bind=engine, checkfirst=True)
+EquipmentDefinition.__table__.create(bind=engine, checkfirst=True)
+Car.__table__.create(bind=engine, checkfirst=True)
+DailyCar.__table__.create(bind=engine, checkfirst=True)
 
 
-def init_treasures():
-    """初始化宝物配置"""
+def init_cars_and_equipment():
+    """初始化汽车配置和装备定义"""
     with Session() as session:
         try:
             # 检查是否已经初始化
-            existing = session.query(Treasure).first()
+            existing = session.query(Car).first()
             if existing:
                 return
             
-            # 首先添加碎片定义
-            fragment_definitions = [
-                FragmentDefinition(fragment_id=1, fragment_name="红色碎片", description="神秘的红色宝物碎片"),
-                FragmentDefinition(fragment_id=2, fragment_name="蓝色碎片", description="神秘的蓝色宝物碎片"),
-                FragmentDefinition(fragment_id=3, fragment_name="绿色碎片", description="神秘的绿色宝物碎片"),
-                FragmentDefinition(fragment_id=4, fragment_name="金色碎片", description="传说的金色宝物碎片"),
-                FragmentDefinition(fragment_id=5, fragment_name="银色碎片", description="传说的银色宝物碎片"),
-                FragmentDefinition(fragment_id=6, fragment_name="紫色碎片", description="传说的紫色宝物碎片")
+            # 首先添加装备定义
+            equipment_definitions = [
+                # 紫色装备 (最稀有) - 专属车漆
+                EquipmentDefinition(equipment_id=1, equipment_name="赞德福特蓝车漆", description="赞德福特蓝M2专属车漆", category="purple", rarity_weight=1),
+                EquipmentDefinition(equipment_id=2, equipment_name="曼岛绿车漆", description="曼岛绿M3专属车漆", category="purple", rarity_weight=1),
+                EquipmentDefinition(equipment_id=3, equipment_name="圣保罗黄车漆", description="圣保罗黄M4专属车漆", category="purple", rarity_weight=1),
+                EquipmentDefinition(equipment_id=4, equipment_name="风暴灰车漆", description="风暴灰M5专属车漆", category="purple", rarity_weight=1),
+                
+                # 金色装备 (高级组件)
+                EquipmentDefinition(equipment_id=5, equipment_name="S58发动机", description="高性能S58双涡轮增压发动机", category="gold", rarity_weight=3),
+                EquipmentDefinition(equipment_id=6, equipment_name="赤金色轮毂", description="限量版赤金色轮毂", category="gold", rarity_weight=3),
+                EquipmentDefinition(equipment_id=7, equipment_name="xDrive智能全轮驱动系统", description="BMW xDrive智能全轮驱动系统", category="gold", rarity_weight=3),
+                EquipmentDefinition(equipment_id=8, equipment_name="碳纤维赛道桶椅", description="轻量化碳纤维赛道桶椅", category="gold", rarity_weight=3),
+                EquipmentDefinition(equipment_id=9, equipment_name="主动M差速器", description="M主动差速器", category="gold", rarity_weight=3),
+                EquipmentDefinition(equipment_id=10, equipment_name="V8双涡轮增压发动机", description="强劲的V8双涡轮增压发动机", category="gold", rarity_weight=3),
+                EquipmentDefinition(equipment_id=11, equipment_name="自适应M运动悬架", description="可调节自适应M运动悬架", category="gold", rarity_weight=3),
+                EquipmentDefinition(equipment_id=12, equipment_name="碳陶瓷刹车系统", description="高性能碳陶瓷刹车系统", category="gold", rarity_weight=3),
+                EquipmentDefinition(equipment_id=13, equipment_name="M精英驾驶模式", description="M精英驾驶模式系统", category="gold", rarity_weight=3),
+                EquipmentDefinition(equipment_id=14, equipment_name="整体主动转向系统", description="BMW整体主动转向系统", category="gold", rarity_weight=3),
+                
+                # 绿色装备 (车漆变体)
+                EquipmentDefinition(equipment_id=15, equipment_name="磨砂纯灰车漆", description="高档磨砂纯灰车漆", category="green", rarity_weight=6),
+                EquipmentDefinition(equipment_id=16, equipment_name="布鲁克林灰车漆", description="经典布鲁克林灰车漆", category="green", rarity_weight=6),
+                EquipmentDefinition(equipment_id=17, equipment_name="多伦多红车漆", description="亮丽多伦多红车漆", category="green", rarity_weight=6),
+                EquipmentDefinition(equipment_id=18, equipment_name="海滨湾蓝车漆", description="深邃海滨湾蓝车漆", category="green", rarity_weight=6),
+                
+                # 蓝色装备 (常见物品)
+                EquipmentDefinition(equipment_id=19, equipment_name="98#汽油", description="高品质98号汽油", category="blue", rarity_weight=10),
+                EquipmentDefinition(equipment_id=20, equipment_name="玻璃水", description="汽车玻璃清洗液", category="blue", rarity_weight=10),
+                EquipmentDefinition(equipment_id=21, equipment_name="车钥匙", description="汽车遥控钥匙", category="blue", rarity_weight=10),
+                EquipmentDefinition(equipment_id=22, equipment_name="漏气的轮胎", description="需要修理的轮胎", category="blue", rarity_weight=10),
+                EquipmentDefinition(equipment_id=23, equipment_name="空气", description="轮胎充气用空气", category="blue", rarity_weight=10),
+                EquipmentDefinition(equipment_id=24, equipment_name="空调滤芯", description="汽车空调滤芯", category="blue", rarity_weight=10),
+                EquipmentDefinition(equipment_id=25, equipment_name="刹车盘", description="汽车刹车盘", category="blue", rarity_weight=10),
             ]
             
-            for fragment_def in fragment_definitions:
-                session.add(fragment_def)
+            for equipment_def in equipment_definitions:
+                session.add(equipment_def)
             
-            # 然后添加宝物配置
-            treasures = [
-                Treasure(treasure_name="m", fragment_ids="1,2,3", description="神秘宝物m"),
-                Treasure(treasure_name="l", fragment_ids="4,5,6", description="传说宝物l")
+            # 然后添加汽车配置
+            cars = [
+                Car(car_name="赞德福特蓝M2", equipment_ids="5,12,6,15,1", description="BMW M2 Competition 赞德福特蓝限量版"),
+                Car(car_name="曼岛绿M3", equipment_ids="5,7,8,2,16", description="BMW M3 Competition 曼岛绿限量版"),
+                Car(car_name="圣保罗黄M4", equipment_ids="5,9,13,3,17", description="BMW M4 Competition 圣保罗黄限量版"),
+                Car(car_name="风暴灰M5", equipment_ids="10,11,14,4,18", description="BMW M5 Competition 风暴灰限量版")
             ]
             
-            for treasure in treasures:
-                session.add(treasure)
+            for car in cars:
+                session.add(car)
             
             session.commit()
-            LOGGER.info("宝物配置和碎片定义初始化完成")
+            LOGGER.info("汽车配置和装备定义初始化完成")
         except Exception as e:
             session.rollback()
-            LOGGER.error(f"初始化宝物配置失败: {e}")
+            LOGGER.error(f"初始化汽车配置失败: {e}")
 
 
-def add_treasure_with_fragments(treasure_name: str, fragment_ids: str, description: str = None, fragment_definitions: list = None):
-    """添加宝物并确保相应的碎片定义存在"""
+def add_car_with_equipment(car_name: str, equipment_ids: str, description: str = None, equipment_definitions: list = None):
+    """添加汽车并确保相应的装备定义存在"""
     with Session() as session:
         try:
-            # 解析需要的碎片ID
-            required_fragment_ids = [int(x.strip()) for x in fragment_ids.split(',')]
+            # 解析需要的装备ID
+            required_equipment_ids = [int(x.strip()) for x in equipment_ids.split(',')]
             
-            # 确保所有需要的碎片定义都存在
-            for fragment_id in required_fragment_ids:
-                existing_fragment = session.query(FragmentDefinition).filter(
-                    FragmentDefinition.fragment_id == fragment_id
+            # 确保所有需要的装备定义都存在
+            for equipment_id in required_equipment_ids:
+                existing_equipment = session.query(EquipmentDefinition).filter(
+                    EquipmentDefinition.equipment_id == equipment_id
                 ).first()
                 
-                if not existing_fragment:
-                    # 如果提供了碎片定义，使用提供的；否则创建默认的
-                    if fragment_definitions:
-                        fragment_def = next((f for f in fragment_definitions if f['id'] == fragment_id), None)
-                        if fragment_def:
-                            new_fragment = FragmentDefinition(
-                                fragment_id=fragment_id,
-                                fragment_name=fragment_def['name'],
-                                description=fragment_def.get('description', f"碎片 {fragment_id}")
+                if not existing_equipment:
+                    # 如果提供了装备定义，使用提供的；否则创建默认的
+                    if equipment_definitions:
+                        equipment_def = next((e for e in equipment_definitions if e['id'] == equipment_id), None)
+                        if equipment_def:
+                            new_equipment = EquipmentDefinition(
+                                equipment_id=equipment_id,
+                                equipment_name=equipment_def['name'],
+                                description=equipment_def.get('description', f"装备 {equipment_id}"),
+                                category=equipment_def.get('category', 'blue'),
+                                rarity_weight=equipment_def.get('rarity_weight', 5)
                             )
                         else:
-                            new_fragment = FragmentDefinition(
-                                fragment_id=fragment_id,
-                                fragment_name=f"碎片 {fragment_id}",
-                                description=f"碎片 {fragment_id} 的描述"
+                            new_equipment = EquipmentDefinition(
+                                equipment_id=equipment_id,
+                                equipment_name=f"装备 {equipment_id}",
+                                description=f"装备 {equipment_id} 的描述",
+                                category='blue',
+                                rarity_weight=5
                             )
                     else:
-                        new_fragment = FragmentDefinition(
-                            fragment_id=fragment_id,
-                            fragment_name=f"碎片 {fragment_id}",
-                            description=f"碎片 {fragment_id} 的描述"
+                        new_equipment = EquipmentDefinition(
+                            equipment_id=equipment_id,
+                            equipment_name=f"装备 {equipment_id}",
+                            description=f"装备 {equipment_id} 的描述",
+                            category='blue',
+                            rarity_weight=5
                         )
                     
-                    session.add(new_fragment)
-                    LOGGER.info(f"添加碎片定义: {fragment_id}")
+                    session.add(new_equipment)
+                    LOGGER.info(f"添加装备定义: {equipment_id}")
             
-            # 添加宝物
-            treasure = Treasure(
-                treasure_name=treasure_name,
-                fragment_ids=fragment_ids,
-                description=description or f"宝物 {treasure_name}"
+            # 添加汽车
+            car = Car(
+                car_name=car_name,
+                equipment_ids=equipment_ids,
+                description=description or f"汽车 {car_name}"
             )
-            session.add(treasure)
+            session.add(car)
             
             session.commit()
-            LOGGER.info(f"成功添加宝物 {treasure_name} 及其碎片定义")
+            LOGGER.info(f"成功添加汽车 {car_name} 及其装备定义")
             return True
         except Exception as e:
             session.rollback()
-            LOGGER.error(f"添加宝物失败: {e}")
+            LOGGER.error(f"添加汽车失败: {e}")
             return False
 
 
 def sql_start_hunt(tg: int) -> int:
-    """开始寻宝游戏"""
+    """开始车库游戏"""
     with Session() as session:
         try:
             today = datetime.datetime.now().strftime("%Y-%m-%d")
@@ -212,36 +255,66 @@ def sql_start_hunt(tg: int) -> int:
             return hunt.id
         except Exception as e:
             session.rollback()
-            LOGGER.error(f"开始寻宝失败: {e}")
+            LOGGER.error(f"开始车库游戏失败: {e}")
             return 0
 
 
-def sql_get_fragment_definition(fragment_id: int):
-    """获取碎片定义"""
+def sql_get_equipment_definition(equipment_id: int):
+    """获取装备定义"""
     with Session() as session:
         try:
-            fragment_def = session.query(FragmentDefinition).filter(
-                FragmentDefinition.fragment_id == fragment_id
+            equipment_def = session.query(EquipmentDefinition).filter(
+                EquipmentDefinition.equipment_id == equipment_id
             ).first()
-            return fragment_def
+            return equipment_def
         except Exception as e:
-            LOGGER.error(f"获取碎片定义失败: {e}")
+            LOGGER.error(f"获取装备定义失败: {e}")
             return None
 
 
-def sql_get_all_fragment_definitions():
-    """获取所有碎片定义"""
+def sql_get_all_equipment_definitions():
+    """获取所有装备定义"""
     with Session() as session:
         try:
-            fragment_defs = session.query(FragmentDefinition).order_by(FragmentDefinition.fragment_id).all()
-            return fragment_defs
+            equipment_defs = session.query(EquipmentDefinition).order_by(EquipmentDefinition.equipment_id).all()
+            return equipment_defs
         except Exception as e:
-            LOGGER.error(f"获取所有碎片定义失败: {e}")
+            LOGGER.error(f"获取所有装备定义失败: {e}")
             return []
 
 
+def sql_get_equipment_by_category(category: str):
+    """根据类别获取装备定义"""
+    with Session() as session:
+        try:
+            equipment_defs = session.query(EquipmentDefinition).filter(
+                EquipmentDefinition.category == category
+            ).all()
+            return equipment_defs
+        except Exception as e:
+            LOGGER.error(f"获取{category}类别装备失败: {e}")
+            return []
+
+
+def sql_count_user_equipment(tg: int, today_only: bool = True) -> int:
+    """统计用户装备数量"""
+    with Session() as session:
+        try:
+            query = session.query(Equipment).filter(Equipment.tg == tg)
+            
+            if today_only:
+                today = datetime.datetime.now().strftime("%Y-%m-%d")
+                query = query.filter(Equipment.obtained_date == today)
+            
+            count = query.count()
+            return count
+        except Exception as e:
+            LOGGER.error(f"统计用户装备数量失败: {e}")
+            return 0
+
+
 def sql_end_hunt(hunt_id: int) -> bool:
-    """结束寻宝游戏"""
+    """结束车库游戏"""
     with Session() as session:
         try:
             hunt = session.query(Hunt).filter(Hunt.id == hunt_id).first()
@@ -253,12 +326,12 @@ def sql_end_hunt(hunt_id: int) -> bool:
             return False
         except Exception as e:
             session.rollback()
-            LOGGER.error(f"结束寻宝失败: {e}")
+            LOGGER.error(f"结束车库游戏失败: {e}")
             return False
 
 
 def sql_get_active_hunt(tg: int):
-    """获取用户当前进行中的寻宝游戏"""
+    """获取用户当前进行中的车库游戏"""
     with Session() as session:
         try:
             hunt = session.query(Hunt).filter(
@@ -266,30 +339,35 @@ def sql_get_active_hunt(tg: int):
             ).first()
             return hunt
         except Exception as e:
-            LOGGER.error(f"获取活跃寻宝会话失败: {e}")
+            LOGGER.error(f"获取活跃车库会话失败: {e}")
             return None
 
 
-def sql_add_fragment(tg: int, hunt_session_id: int, fragment_id: int) -> bool:
-    """添加碎片"""
+def sql_add_equipment(tg: int, hunt_session_id: int, equipment_id: int) -> bool:
+    """添加装备 - 检查背包容量限制"""
     with Session() as session:
         try:
             today = datetime.datetime.now().strftime("%Y-%m-%d")
             current_time = datetime.datetime.now()
             
-            fragment = Fragment(
+            # 检查用户今日装备数量是否已达到30个上限
+            current_count = sql_count_user_equipment(tg, today_only=True)
+            if current_count >= 30:
+                return False  # 背包已满
+            
+            equipment = Equipment(
                 tg=tg,
-                fragment_id=fragment_id,
+                equipment_id=equipment_id,
                 obtained_date=today,
                 obtained_time=current_time,
                 hunt_session_id=hunt_session_id
             )
-            session.add(fragment)
+            session.add(equipment)
             
-            # 更新hunt会话的碎片计数和最后寻宝时间
+            # 更新hunt会话的装备计数和最后寻找时间
             hunt = session.query(Hunt).filter(Hunt.id == hunt_session_id).first()
             if hunt:
-                hunt.fragments_found += 1
+                hunt.equipment_found += 1
                 hunt.coins_spent += 1
                 hunt.last_hunt_time = current_time
             
@@ -297,29 +375,29 @@ def sql_add_fragment(tg: int, hunt_session_id: int, fragment_id: int) -> bool:
             return True
         except Exception as e:
             session.rollback()
-            LOGGER.error(f"添加碎片失败: {e}")
+            LOGGER.error(f"添加装备失败: {e}")
             return False
 
 
-def sql_get_user_fragments(tg: int, today_only: bool = True):
-    """获取用户碎片"""
+def sql_get_user_equipment(tg: int, today_only: bool = True):
+    """获取用户装备"""
     with Session() as session:
         try:
-            query = session.query(Fragment).filter(Fragment.tg == tg)
+            query = session.query(Equipment).filter(Equipment.tg == tg)
             
             if today_only:
                 today = datetime.datetime.now().strftime("%Y-%m-%d")
-                query = query.filter(Fragment.obtained_date == today)
+                query = query.filter(Equipment.obtained_date == today)
             
-            fragments = query.all()
-            return fragments
+            equipment_list = query.all()
+            return equipment_list
         except Exception as e:
-            LOGGER.error(f"获取用户碎片失败: {e}")
+            LOGGER.error(f"获取用户装备失败: {e}")
             return []
 
 
 def sql_get_today_hunt_count(tg: int) -> int:
-    """获取今日寻宝次数"""
+    """获取今日车库游戏次数"""
     with Session() as session:
         try:
             today = datetime.datetime.now().strftime("%Y-%m-%d")
@@ -328,100 +406,100 @@ def sql_get_today_hunt_count(tg: int) -> int:
             ).count()
             return count
         except Exception as e:
-            LOGGER.error(f"获取今日寻宝次数失败: {e}")
+            LOGGER.error(f"获取今日车库游戏次数失败: {e}")
             return 0
 
 
-def sql_get_daily_treasure(date: str = None):
-    """获取每日宝物"""
+def sql_get_daily_car(date: str = None):
+    """获取每日汽车"""
     if not date:
         date = datetime.datetime.now().strftime("%Y-%m-%d")
     
     with Session() as session:
         try:
-            daily_treasure = session.query(DailyTreasure).filter(
-                DailyTreasure.date == date
+            daily_car = session.query(DailyCar).filter(
+                DailyCar.date == date
             ).first()
             
-            if not daily_treasure:
-                # 随机选择一个宝物作为今日宝物
+            if not daily_car:
+                # 随机选择一个汽车作为今日汽车
                 import random
-                treasures = session.query(Treasure).all()
-                if treasures:
-                    selected_treasure = random.choice(treasures)
-                    daily_treasure = DailyTreasure(
+                cars = session.query(Car).all()
+                if cars:
+                    selected_car = random.choice(cars)
+                    daily_car = DailyCar(
                         date=date,
-                        treasure_id=selected_treasure.id
+                        car_id=selected_car.id
                     )
-                    session.add(daily_treasure)
+                    session.add(daily_car)
                     session.commit()
-                    return selected_treasure
+                    return selected_car
             else:
-                treasure = session.query(Treasure).filter(
-                    Treasure.id == daily_treasure.treasure_id
+                car = session.query(Car).filter(
+                    Car.id == daily_car.car_id
                 ).first()
-                return treasure
+                return car
             
             return None
         except Exception as e:
             session.rollback()
-            LOGGER.error(f"获取每日宝物失败: {e}")
+            LOGGER.error(f"获取每日汽车失败: {e}")
             return None
 
 
-def sql_check_treasure_synthesis(tg: int, treasure_id: int) -> bool:
-    """检查是否可以合成宝物"""
+def sql_check_car_assembly(tg: int, car_id: int) -> bool:
+    """检查是否可以组装汽车"""
     with Session() as session:
         try:
             today = datetime.datetime.now().strftime("%Y-%m-%d")
             
-            # 获取宝物所需碎片
-            treasure = session.query(Treasure).filter(Treasure.id == treasure_id).first()
-            if not treasure:
+            # 获取汽车所需装备
+            car = session.query(Car).filter(Car.id == car_id).first()
+            if not car:
                 return False
             
-            required_fragments = [int(x) for x in treasure.fragment_ids.split(',')]
+            required_equipment = [int(x) for x in car.equipment_ids.split(',')]
             
-            # 检查用户是否拥有所需碎片
-            user_fragments = session.query(Fragment).filter(
-                and_(Fragment.tg == tg, Fragment.obtained_date == today)
+            # 检查用户是否拥有所需装备
+            user_equipment = session.query(Equipment).filter(
+                and_(Equipment.tg == tg, Equipment.obtained_date == today)
             ).all()
             
-            user_fragment_counts = {}
-            for frag in user_fragments:
-                user_fragment_counts[frag.fragment_id] = user_fragment_counts.get(frag.fragment_id, 0) + 1
+            user_equipment_counts = {}
+            for equip in user_equipment:
+                user_equipment_counts[equip.equipment_id] = user_equipment_counts.get(equip.equipment_id, 0) + 1
             
-            # 检查是否有足够的碎片
-            for required_id in required_fragments:
-                if user_fragment_counts.get(required_id, 0) < 1:
+            # 检查是否有足够的装备
+            for required_id in required_equipment:
+                if user_equipment_counts.get(required_id, 0) < 1:
                     return False
             
             return True
         except Exception as e:
-            LOGGER.error(f"检查宝物合成失败: {e}")
+            LOGGER.error(f"检查汽车组装失败: {e}")
             return False
 
 
-def sql_synthesize_treasure(tg: int, treasure_id: int) -> bool:
-    """合成宝物"""
+def sql_assemble_car(tg: int, car_id: int) -> bool:
+    """组装汽车"""
     with Session() as session:
         try:
             today = datetime.datetime.now().strftime("%Y-%m-%d")
             
-            # 获取宝物所需碎片
-            treasure = session.query(Treasure).filter(Treasure.id == treasure_id).first()
-            if not treasure:
+            # 获取汽车所需装备
+            car = session.query(Car).filter(Car.id == car_id).first()
+            if not car:
                 return False
             
-            required_fragments = [int(x) for x in treasure.fragment_ids.split(',')]
+            required_equipment = [int(x) for x in car.equipment_ids.split(',')]
             
-            # 删除用户的对应碎片
-            for required_id in required_fragments:
-                fragment = session.query(Fragment).filter(
-                    and_(Fragment.tg == tg, Fragment.fragment_id == required_id, Fragment.obtained_date == today)
+            # 删除用户的对应装备
+            for required_id in required_equipment:
+                equipment = session.query(Equipment).filter(
+                    and_(Equipment.tg == tg, Equipment.equipment_id == required_id, Equipment.obtained_date == today)
                 ).first()
-                if fragment:
-                    session.delete(fragment)
+                if equipment:
+                    session.delete(equipment)
                 else:
                     session.rollback()
                     return False
@@ -430,26 +508,26 @@ def sql_synthesize_treasure(tg: int, treasure_id: int) -> bool:
             return True
         except Exception as e:
             session.rollback()
-            LOGGER.error(f"合成宝物失败: {e}")
+            LOGGER.error(f"组装汽车失败: {e}")
             return False
 
 
-def sql_cleanup_expired_fragments():
-    """清理过期碎片"""
+def sql_cleanup_expired_equipment():
+    """清理过期装备"""
     with Session() as session:
         try:
             today = datetime.datetime.now().strftime("%Y-%m-%d")
-            deleted = session.query(Fragment).filter(Fragment.obtained_date != today).delete()
+            deleted = session.query(Equipment).filter(Equipment.obtained_date != today).delete()
             session.commit()
             if deleted > 0:
-                LOGGER.info(f"清理了 {deleted} 个过期碎片")
+                LOGGER.info(f"清理了 {deleted} 个过期装备")
         except Exception as e:
             session.rollback()
-            LOGGER.error(f"清理过期碎片失败: {e}")
+            LOGGER.error(f"清理过期装备失败: {e}")
 
 
 def sql_cleanup_timed_out_hunts():
-    """清理超时的寻宝游戏"""
+    """清理超时的车库游戏"""
     with Session() as session:
         try:
             current_time = datetime.datetime.now()
@@ -468,11 +546,99 @@ def sql_cleanup_timed_out_hunts():
             
             if updated_count > 0:
                 session.commit()
-                LOGGER.info(f"清理了 {updated_count} 个超时的寻宝游戏")
+                LOGGER.info(f"清理了 {updated_count} 个超时的车库游戏")
         except Exception as e:
             session.rollback()
             LOGGER.error(f"清理超时游戏失败: {e}")
 
 
-# 初始化宝物配置
-init_treasures()
+def sql_random_equipment_by_rarity():
+    """根据稀有度权重随机选择装备"""
+    with Session() as session:
+        try:
+            equipment_defs = session.query(EquipmentDefinition).all()
+            if not equipment_defs:
+                return None
+            
+            # 创建权重列表
+            weighted_equipment = []
+            for equip_def in equipment_defs:
+                # 根据权重添加多份到列表中
+                for _ in range(equip_def.rarity_weight):
+                    weighted_equipment.append(equip_def.equipment_id)
+            
+            # 随机选择
+            import random
+            if weighted_equipment:
+                selected_id = random.choice(weighted_equipment)
+                return selected_id
+            
+            return None
+        except Exception as e:
+            LOGGER.error(f"随机选择装备失败: {e}")
+            return None
+
+
+def sql_discard_equipment(tg: int, equipment_id: int, today_only: bool = True) -> bool:
+    """丢弃装备"""
+    with Session() as session:
+        try:
+            query = session.query(Equipment).filter(
+                and_(Equipment.tg == tg, Equipment.equipment_id == equipment_id)
+            )
+            
+            if today_only:
+                today = datetime.datetime.now().strftime("%Y-%m-%d")
+                query = query.filter(Equipment.obtained_date == today)
+            
+            equipment = query.first()
+            if equipment:
+                session.delete(equipment)
+                session.commit()
+                return True
+            return False
+        except Exception as e:
+            session.rollback()
+            LOGGER.error(f"丢弃装备失败: {e}")
+            return False
+
+
+# 初始化汽车配置
+init_cars_and_equipment()
+
+# 为向后兼容保留旧函数名
+def init_treasures():
+    """向后兼容的初始化函数"""
+    return init_cars_and_equipment()
+
+def sql_get_fragment_definition(fragment_id: int):
+    """向后兼容的获取碎片定义函数"""
+    return sql_get_equipment_definition(fragment_id)
+
+def sql_get_all_fragment_definitions():
+    """向后兼容的获取所有碎片定义函数"""
+    return sql_get_all_equipment_definitions()
+
+def sql_add_fragment(tg: int, hunt_session_id: int, fragment_id: int) -> bool:
+    """向后兼容的添加碎片函数"""
+    return sql_add_equipment(tg, hunt_session_id, fragment_id)
+
+def sql_get_user_fragments(tg: int, today_only: bool = True):
+    """向后兼容的获取用户碎片函数"""
+    return sql_get_user_equipment(tg, today_only)
+
+def sql_get_daily_treasure(date: str = None):
+    """向后兼容的获取每日宝物函数"""
+    return sql_get_daily_car(date)
+
+def sql_check_treasure_synthesis(tg: int, treasure_id: int) -> bool:
+    """向后兼容的检查宝物合成函数"""
+    return sql_check_car_assembly(tg, treasure_id)
+
+def sql_synthesize_treasure(tg: int, treasure_id: int) -> bool:
+    """向后兼容的合成宝物函数"""
+    return sql_assemble_car(tg, treasure_id)
+
+def sql_cleanup_expired_fragments():
+    """向后兼容的清理过期碎片函数"""
+    return sql_cleanup_expired_equipment()
