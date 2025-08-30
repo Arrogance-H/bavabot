@@ -60,6 +60,35 @@ class EquipmentDefinition(Base):
     rarity_weight = Column(Integer, nullable=False, default=1)  # 稀有度权重，数值越大越容易获得
 
 
+class AssemblyReward(Base):
+    """
+    组装奖励表
+    """
+    __tablename__ = 'assembly_reward'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tg = Column(BigInteger, nullable=False)  # 用户telegram id
+    car_id = Column(Integer, nullable=False)  # 汽车id
+    car_name = Column(String(50), nullable=False)  # 汽车名称
+    reward_type = Column(String(20), nullable=False)  # 奖励类型 (coins/title/badge)
+    reward_value = Column(String(100), nullable=False)  # 奖励数值/内容
+    reward_description = Column(Text, nullable=True)  # 奖励描述
+    obtained_date = Column(String(10), nullable=False)  # 获得日期 YYYY-MM-DD
+    obtained_time = Column(DateTime, nullable=False)  # 获得时间
+
+
+class RewardConfig(Base):
+    """
+    奖励配置表
+    """
+    __tablename__ = 'reward_config'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    car_id = Column(Integer, nullable=False, unique=True)  # 汽车id
+    reward_type = Column(String(20), nullable=False)  # 奖励类型 (coins/title/badge)
+    reward_value = Column(String(100), nullable=False)  # 奖励数值/内容
+    reward_description = Column(Text, nullable=True)  # 奖励描述
+    is_active = Column(Boolean, default=True)  # 是否激活
+
+
 class DailyCar(Base):
     """
     每日汽车表
@@ -82,6 +111,8 @@ Equipment.__table__.create(bind=engine, checkfirst=True)
 EquipmentDefinition.__table__.create(bind=engine, checkfirst=True)
 Car.__table__.create(bind=engine, checkfirst=True)
 DailyCar.__table__.create(bind=engine, checkfirst=True)
+AssemblyReward.__table__.create(bind=engine, checkfirst=True)
+RewardConfig.__table__.create(bind=engine, checkfirst=True)
 
 
 def init_cars_and_equipment():
@@ -95,7 +126,7 @@ def init_cars_and_equipment():
             
             # 首先添加装备定义
             equipment_definitions = [
-                # 紫色装备 (最稀有) - 专属车漆
+                # 紫色装备 (极稀有，权重极低) - 专属车漆
                 EquipmentDefinition(equipment_id=1, equipment_name="赞德福特蓝车漆", description="赞德福特蓝M2专属车漆", category="purple", rarity_weight=1),
                 EquipmentDefinition(equipment_id=2, equipment_name="曼岛绿车漆", description="曼岛绿M3专属车漆", category="purple", rarity_weight=1),
                 EquipmentDefinition(equipment_id=3, equipment_name="圣保罗黄车漆", description="圣保罗黄M4专属车漆", category="purple", rarity_weight=1),
@@ -143,8 +174,21 @@ def init_cars_and_equipment():
             for car in cars:
                 session.add(car)
             
+            # 添加默认奖励配置
+            reward_configs = [
+                RewardConfig(car_id=1, reward_type="coins", reward_value="50", reward_description="组装赞德福特蓝M2获得50金币奖励"),
+                RewardConfig(car_id=2, reward_type="coins", reward_value="60", reward_description="组装曼岛绿M3获得60金币奖励"),
+                RewardConfig(car_id=3, reward_type="coins", reward_value="70", reward_description="组装圣保罗黄M4获得70金币奖励"),
+                RewardConfig(car_id=4, reward_type="coins", reward_value="80", reward_description="组装风暴灰M5获得80金币奖励"),
+                # 可以添加更多奖励类型，如称号、徽章等
+                # RewardConfig(car_id=1, reward_type="title", reward_value="M2车主", reward_description="赞德福特蓝M2专属称号"),
+            ]
+            
+            for reward_config in reward_configs:
+                session.add(reward_config)
+            
             session.commit()
-            LOGGER.info("汽车配置和装备定义初始化完成")
+            LOGGER.info("汽车配置、装备定义和奖励系统初始化完成")
         except Exception as e:
             session.rollback()
             LOGGER.error(f"初始化汽车配置失败: {e}")
@@ -480,8 +524,8 @@ def sql_check_car_assembly(tg: int, car_id: int) -> bool:
             return False
 
 
-def sql_assemble_car(tg: int, car_id: int) -> bool:
-    """组装汽车"""
+def sql_assemble_car(tg: int, car_id: int) -> dict:
+    """组装汽车并发放奖励"""
     with Session() as session:
         try:
             today = datetime.datetime.now().strftime("%Y-%m-%d")
@@ -489,27 +533,45 @@ def sql_assemble_car(tg: int, car_id: int) -> bool:
             # 获取汽车所需装备
             car = session.query(Car).filter(Car.id == car_id).first()
             if not car:
-                return False
+                return {"success": False, "message": "汽车不存在"}
             
             required_equipment = [int(x) for x in car.equipment_ids.split(',')]
             
             # 删除用户的对应装备
+            removed_equipment = []
             for required_id in required_equipment:
                 equipment = session.query(Equipment).filter(
                     and_(Equipment.tg == tg, Equipment.equipment_id == required_id, Equipment.obtained_date == today)
                 ).first()
                 if equipment:
                     session.delete(equipment)
+                    removed_equipment.append(required_id)
                 else:
                     session.rollback()
-                    return False
+                    return {"success": False, "message": "装备不足，无法组装"}
             
             session.commit()
-            return True
+            
+            # 发放奖励
+            reward_result = sql_give_assembly_reward(tg, car_id)
+            
+            return {
+                "success": True,
+                "message": "组装成功",
+                "car_name": car.car_name,
+                "reward": reward_result
+            }
         except Exception as e:
             session.rollback()
             LOGGER.error(f"组装汽车失败: {e}")
-            return False
+            return {"success": False, "message": "组装失败"}
+
+
+# 向后兼容的组装函数
+def sql_assemble_car_legacy(tg: int, car_id: int) -> bool:
+    """向后兼容的组装汽车函数"""
+    result = sql_assemble_car(tg, car_id)
+    return result["success"]
 
 
 def sql_cleanup_expired_equipment():
@@ -553,25 +615,41 @@ def sql_cleanup_timed_out_hunts():
 
 
 def sql_random_equipment_by_rarity():
-    """根据稀有度权重随机选择装备"""
+    """根据稀有度权重随机选择装备 - 紫色装备极稀有"""
     with Session() as session:
         try:
-            equipment_defs = session.query(EquipmentDefinition).all()
-            if not equipment_defs:
-                return None
-            
-            # 创建权重列表
-            weighted_equipment = []
-            for equip_def in equipment_defs:
-                # 根据权重添加多份到列表中
-                for _ in range(equip_def.rarity_weight):
-                    weighted_equipment.append(equip_def.equipment_id)
-            
-            # 随机选择
             import random
-            if weighted_equipment:
-                selected_id = random.choice(weighted_equipment)
-                return selected_id
+            
+            # 使用固定概率确保紫色装备极稀有
+            # 总概率: 蓝色60% + 绿色30% + 金色9.5% + 紫色0.5%
+            rand_value = random.random() * 100  # 0-100的随机数
+            
+            if rand_value < 0.5:  # 0.5% 概率获得紫色装备
+                category = 'purple'
+            elif rand_value < 10:  # 9.5% 概率获得金色装备 (0.5% + 9.5%)
+                category = 'gold'
+            elif rand_value < 40:  # 30% 概率获得绿色装备 (10% + 30%)
+                category = 'green'
+            else:  # 60% 概率获得蓝色装备
+                category = 'blue'
+            
+            # 从选定类别中随机选择装备
+            equipment_defs = session.query(EquipmentDefinition).filter(
+                EquipmentDefinition.category == category
+            ).all()
+            
+            if equipment_defs:
+                selected_equipment = random.choice(equipment_defs)
+                return selected_equipment.equipment_id
+            
+            # 如果选定类别没有装备，fallback到蓝色装备
+            blue_equipment = session.query(EquipmentDefinition).filter(
+                EquipmentDefinition.category == 'blue'
+            ).all()
+            
+            if blue_equipment:
+                selected_equipment = random.choice(blue_equipment)
+                return selected_equipment.equipment_id
             
             return None
         except Exception as e:
@@ -601,6 +679,173 @@ def sql_discard_equipment(tg: int, equipment_id: int, today_only: bool = True) -
             session.rollback()
             LOGGER.error(f"丢弃装备失败: {e}")
             return False
+
+
+def sql_get_reward_config(car_id: int):
+    """获取汽车的奖励配置"""
+    with Session() as session:
+        try:
+            reward_config = session.query(RewardConfig).filter(
+                and_(RewardConfig.car_id == car_id, RewardConfig.is_active == True)
+            ).first()
+            return reward_config
+        except Exception as e:
+            LOGGER.error(f"获取奖励配置失败: {e}")
+            return None
+
+
+def sql_give_assembly_reward(tg: int, car_id: int) -> dict:
+    """给用户发放组装奖励"""
+    with Session() as session:
+        try:
+            # 获取奖励配置
+            reward_config = sql_get_reward_config(car_id)
+            if not reward_config:
+                return {"success": False, "message": "未找到奖励配置"}
+            
+            # 获取汽车信息
+            car = session.query(Car).filter(Car.id == car_id).first()
+            if not car:
+                return {"success": False, "message": "汽车不存在"}
+            
+            today = datetime.datetime.now().strftime("%Y-%m-%d")
+            current_time = datetime.datetime.now()
+            
+            # 检查是否已经获得过奖励
+            existing_reward = session.query(AssemblyReward).filter(
+                and_(
+                    AssemblyReward.tg == tg,
+                    AssemblyReward.car_id == car_id,
+                    AssemblyReward.obtained_date == today
+                )
+            ).first()
+            
+            if existing_reward:
+                return {"success": False, "message": "今日已获得此汽车的奖励"}
+            
+            # 处理不同类型的奖励
+            if reward_config.reward_type == "coins":
+                # 金币奖励
+                from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby
+                user = sql_get_emby(tg)
+                if user:
+                    coin_amount = int(reward_config.reward_value)
+                    if sql_update_emby(Emby.tg == tg, iv=user.iv + coin_amount):
+                        # 记录奖励
+                        reward_record = AssemblyReward(
+                            tg=tg,
+                            car_id=car_id,
+                            car_name=car.car_name,
+                            reward_type=reward_config.reward_type,
+                            reward_value=reward_config.reward_value,
+                            reward_description=reward_config.reward_description,
+                            obtained_date=today,
+                            obtained_time=current_time
+                        )
+                        session.add(reward_record)
+                        session.commit()
+                        
+                        return {
+                            "success": True,
+                            "reward_type": "coins",
+                            "reward_value": coin_amount,
+                            "description": reward_config.reward_description,
+                            "message": f"获得{coin_amount}金币奖励！"
+                        }
+                    else:
+                        return {"success": False, "message": "发放金币奖励失败"}
+                else:
+                    return {"success": False, "message": "用户不存在"}
+            
+            # 其他奖励类型（如称号、徽章）可以在这里添加
+            elif reward_config.reward_type == "title":
+                # 称号奖励 - 这里需要根据实际的用户系统来实现
+                # 暂时只记录奖励，不实际授予称号
+                reward_record = AssemblyReward(
+                    tg=tg,
+                    car_id=car_id,
+                    car_name=car.car_name,
+                    reward_type=reward_config.reward_type,
+                    reward_value=reward_config.reward_value,
+                    reward_description=reward_config.reward_description,
+                    obtained_date=today,
+                    obtained_time=current_time
+                )
+                session.add(reward_record)
+                session.commit()
+                
+                return {
+                    "success": True,
+                    "reward_type": "title",
+                    "reward_value": reward_config.reward_value,
+                    "description": reward_config.reward_description,
+                    "message": f"获得专属称号：{reward_config.reward_value}！"
+                }
+            
+            return {"success": False, "message": "未知的奖励类型"}
+            
+        except Exception as e:
+            session.rollback()
+            LOGGER.error(f"发放组装奖励失败: {e}")
+            return {"success": False, "message": "发放奖励失败"}
+
+
+def sql_get_user_assembly_rewards(tg: int, today_only: bool = True):
+    """获取用户的组装奖励记录"""
+    with Session() as session:
+        try:
+            query = session.query(AssemblyReward).filter(AssemblyReward.tg == tg)
+            
+            if today_only:
+                today = datetime.datetime.now().strftime("%Y-%m-%d")
+                query = query.filter(AssemblyReward.obtained_date == today)
+            
+            rewards = query.order_by(AssemblyReward.obtained_time.desc()).all()
+            return rewards
+        except Exception as e:
+            LOGGER.error(f"获取用户奖励记录失败: {e}")
+            return []
+
+
+def sql_update_reward_config(car_id: int, reward_type: str, reward_value: str, reward_description: str = None) -> bool:
+    """更新奖励配置"""
+    with Session() as session:
+        try:
+            reward_config = session.query(RewardConfig).filter(RewardConfig.car_id == car_id).first()
+            
+            if reward_config:
+                # 更新现有配置
+                reward_config.reward_type = reward_type
+                reward_config.reward_value = reward_value
+                if reward_description:
+                    reward_config.reward_description = reward_description
+            else:
+                # 创建新配置
+                reward_config = RewardConfig(
+                    car_id=car_id,
+                    reward_type=reward_type,
+                    reward_value=reward_value,
+                    reward_description=reward_description,
+                    is_active=True
+                )
+                session.add(reward_config)
+            
+            session.commit()
+            return True
+        except Exception as e:
+            session.rollback()
+            LOGGER.error(f"更新奖励配置失败: {e}")
+            return False
+
+
+def sql_get_probability_stats():
+    """获取装备抽取概率统计信息"""
+    return {
+        "purple": {"probability": "0.5%", "description": "极稀有专属车漆"},
+        "gold": {"probability": "9.5%", "description": "高性能组件"},
+        "green": {"probability": "30%", "description": "车漆变体"},
+        "blue": {"probability": "60%", "description": "常见物品"}
+    }
 
 
 # 初始化汽车配置
@@ -637,7 +882,7 @@ def sql_check_treasure_synthesis(tg: int, treasure_id: int) -> bool:
 
 def sql_synthesize_treasure(tg: int, treasure_id: int) -> bool:
     """向后兼容的合成宝物函数"""
-    return sql_assemble_car(tg, treasure_id)
+    return sql_assemble_car_legacy(tg, treasure_id)
 
 def sql_cleanup_expired_fragments():
     """向后兼容的清理过期碎片函数"""

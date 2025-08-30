@@ -14,7 +14,8 @@ from bot.sql_helper.sql_hunt import (
     sql_start_hunt, sql_end_hunt, sql_get_active_hunt, sql_add_equipment,
     sql_get_user_equipment, sql_get_today_hunt_count, sql_get_daily_car,
     sql_check_car_assembly, sql_assemble_car, sql_get_equipment_definition,
-    sql_random_equipment_by_rarity, sql_count_user_equipment, sql_discard_equipment
+    sql_random_equipment_by_rarity, sql_count_user_equipment, sql_discard_equipment,
+    sql_get_probability_stats
 )
 
 
@@ -33,11 +34,15 @@ def hunt_game_ikb(hunt_id: int, last_hunt_time: int = 0):
     return ikb([
         [(hunt_btn_text, f"hunt_action_{hunt_id}")],
         [("🎒 背包", f"hunt_inventory_{hunt_id}"), ("🔧 组装", f"hunt_assembly_{hunt_id}")],
-        [("❌ 结束游戏", f"hunt_end_{hunt_id}")]
+        [("📊 概率", f"hunt_probability_{hunt_id}"), ("❌ 结束游戏", f"hunt_end_{hunt_id}")]
     ])
 
 
-def hunt_inventory_ikb(hunt_id: int):
+def hunt_probability_ikb(hunt_id: int):
+    """概率信息界面按钮"""
+    return ikb([
+        [("🔙 返回车库", f"hunt_game_{hunt_id}")]
+    ])
     """背包界面按钮"""
     return ikb([
         [("🔧 组装汽车", f"hunt_assembly_{hunt_id}")],
@@ -324,6 +329,42 @@ async def discard_equipment(_, call):
     )
 
 
+@bot.on_callback_query(filters.regex(r'^hunt_probability_(\d+)$'))
+async def hunt_probability(_, call):
+    """查看装备获取概率"""
+    hunt_id = int(call.matches[0].group(1))
+    
+    # 验证游戏会话
+    hunt = sql_get_active_hunt(call.from_user.id)
+    if not hunt or hunt.id != hunt_id:
+        return await callAnswer(call, "❌ 游戏会话无效", show_alert=True)
+    
+    # 获取概率统计
+    prob_stats = sql_get_probability_stats()
+    
+    prob_text = "📊 **装备获取概率**\n\n"
+    prob_text += "🟣 **紫色装备 (极稀有)**\n"
+    prob_text += f"   概率: {prob_stats['purple']['probability']}\n"
+    prob_text += f"   内容: {prob_stats['purple']['description']}\n\n"
+    
+    prob_text += "🟡 **金色装备 (稀有)**\n"
+    prob_text += f"   概率: {prob_stats['gold']['probability']}\n"
+    prob_text += f"   内容: {prob_stats['gold']['description']}\n\n"
+    
+    prob_text += "🟢 **绿色装备 (普通)**\n"
+    prob_text += f"   概率: {prob_stats['green']['probability']}\n"
+    prob_text += f"   内容: {prob_stats['green']['description']}\n\n"
+    
+    prob_text += "🔵 **蓝色装备 (常见)**\n"
+    prob_text += f"   概率: {prob_stats['blue']['probability']}\n"
+    prob_text += f"   内容: {prob_stats['blue']['description']}\n\n"
+    
+    prob_text += "💡 **提示**: 紫色装备极其稀有，获得后请珍惜！"
+    
+    await callAnswer(call, "📊 查看概率")
+    await editMessage(call, prob_text, buttons=hunt_probability_ikb(hunt_id))
+
+
 @bot.on_callback_query(filters.regex(r'^hunt_inventory_(\d+)$'))
 async def hunt_inventory(_, call):
     """查看背包"""
@@ -434,22 +475,34 @@ async def hunt_do_assembly(_, call):
         return await callAnswer(call, "❌ 游戏会话无效", show_alert=True)
     
     # 执行组装
-    if sql_assemble_car(call.from_user.id, car_id):
-        # 获取汽车信息
-        daily_car = sql_get_daily_car()
-        car_name = daily_car.car_name if daily_car else "神秘汽车"
+    assembly_result = sql_assemble_car(call.from_user.id, car_id)
+    
+    if assembly_result["success"]:
+        car_name = assembly_result["car_name"]
+        reward_info = assembly_result["reward"]
+        
+        # 构建奖励信息
+        reward_text = ""
+        if reward_info["success"]:
+            if reward_info["reward_type"] == "coins":
+                reward_text = f"\n💰 奖励: +{reward_info['reward_value']}金币"
+            elif reward_info["reward_type"] == "title":
+                reward_text = f"\n🏆 奖励: {reward_info['reward_value']} 称号"
+            else:
+                reward_text = f"\n🎁 奖励: {reward_info['message']}"
         
         await callAnswer(call, f"🎉 成功组装 {car_name}！")
         await editMessage(
             call,
             f"✨ **组装成功！**\n\n"
             f"🏎️ 恭喜您获得汽车: **{car_name}**\n"
-            f"📝 {daily_car.description if daily_car else ''}\n\n"
+            f"📝 {assembly_result.get('description', '')}\n"
+            f"{reward_text}\n\n"
             f"🎮 继续游戏可以获得更多装备！",
             buttons=hunt_game_ikb(hunt_id)
         )
     else:
-        await callAnswer(call, "❌ 组装失败，请检查装备", show_alert=True)
+        await callAnswer(call, f"❌ 组装失败: {assembly_result['message']}", show_alert=True)
 
 
 @bot.on_callback_query(filters.regex(r'^hunt_end_(\d+)$'))
