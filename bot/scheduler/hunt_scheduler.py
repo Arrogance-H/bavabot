@@ -4,7 +4,8 @@
 import asyncio
 from datetime import datetime, timedelta
 from bot import LOGGER, schedall
-from bot.sql_helper.sql_hunt import sql_cleanup_expired_fragments, sql_end_hunt, sql_get_active_hunt
+from bot.sql_helper.sql_hunt import sql_cleanup_expired_fragments, sql_cleanup_timed_out_hunts
+from bot.sql_helper.sql_emby import get_all_emby
 from bot.sql_helper.sql_emby import get_all_emby
 
 
@@ -20,27 +21,8 @@ async def cleanup_hunt_fragments():
 async def cleanup_expired_hunts():
     """清理超时的寻宝游戏"""
     try:
-        from bot.sql_helper.sql_hunt import Hunt, Session
-        
-        with Session() as session:
-            # 获取所有超过30分钟且仍活跃的游戏
-            timeout_threshold = datetime.now() - timedelta(minutes=30)
-            expired_hunts = session.query(Hunt).filter(
-                Hunt.is_active == True,
-                Hunt.start_time < timeout_threshold
-            ).all()
-            
-            count = 0
-            for hunt in expired_hunts:
-                hunt.is_active = False
-                hunt.end_time = datetime.now()
-                count += 1
-            
-            session.commit()
-            
-            if count > 0:
-                LOGGER.info(f"【寻宝清理】清理了 {count} 个超时的寻宝游戏")
-            
+        sql_cleanup_timed_out_hunts()
+        LOGGER.info("【寻宝清理】超时游戏清理完成")
     except Exception as e:
         LOGGER.error(f"【寻宝清理】清理超时游戏失败: {e}")
 

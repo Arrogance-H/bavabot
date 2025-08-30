@@ -48,6 +48,16 @@ class Treasure(Base):
     description = Column(Text, nullable=True)  # 宝物描述
 
 
+class FragmentDefinition(Base):
+    """
+    碎片定义表
+    """
+    __tablename__ = 'fragment_definition'
+    fragment_id = Column(Integer, primary_key=True)  # 碎片id
+    fragment_name = Column(String(50), nullable=False)  # 碎片名称
+    description = Column(Text, nullable=True)  # 碎片描述
+
+
 class DailyTreasure(Base):
     """
     每日宝物表
@@ -60,6 +70,7 @@ class DailyTreasure(Base):
 # 创建表
 Hunt.__table__.create(bind=engine, checkfirst=True)
 Fragment.__table__.create(bind=engine, checkfirst=True)
+FragmentDefinition.__table__.create(bind=engine, checkfirst=True)
 Treasure.__table__.create(bind=engine, checkfirst=True)
 DailyTreasure.__table__.create(bind=engine, checkfirst=True)
 
@@ -73,7 +84,20 @@ def init_treasures():
             if existing:
                 return
             
-            # 添加默认宝物
+            # 首先添加碎片定义
+            fragment_definitions = [
+                FragmentDefinition(fragment_id=1, fragment_name="红色碎片", description="神秘的红色宝物碎片"),
+                FragmentDefinition(fragment_id=2, fragment_name="蓝色碎片", description="神秘的蓝色宝物碎片"),
+                FragmentDefinition(fragment_id=3, fragment_name="绿色碎片", description="神秘的绿色宝物碎片"),
+                FragmentDefinition(fragment_id=4, fragment_name="金色碎片", description="传说的金色宝物碎片"),
+                FragmentDefinition(fragment_id=5, fragment_name="银色碎片", description="传说的银色宝物碎片"),
+                FragmentDefinition(fragment_id=6, fragment_name="紫色碎片", description="传说的紫色宝物碎片")
+            ]
+            
+            for fragment_def in fragment_definitions:
+                session.add(fragment_def)
+            
+            # 然后添加宝物配置
             treasures = [
                 Treasure(treasure_name="m", fragment_ids="1,2,3", description="神秘宝物m"),
                 Treasure(treasure_name="l", fragment_ids="4,5,6", description="传说宝物l")
@@ -83,10 +107,66 @@ def init_treasures():
                 session.add(treasure)
             
             session.commit()
-            LOGGER.info("宝物配置初始化完成")
+            LOGGER.info("宝物配置和碎片定义初始化完成")
         except Exception as e:
             session.rollback()
             LOGGER.error(f"初始化宝物配置失败: {e}")
+
+
+def add_treasure_with_fragments(treasure_name: str, fragment_ids: str, description: str = None, fragment_definitions: list = None):
+    """添加宝物并确保相应的碎片定义存在"""
+    with Session() as session:
+        try:
+            # 解析需要的碎片ID
+            required_fragment_ids = [int(x.strip()) for x in fragment_ids.split(',')]
+            
+            # 确保所有需要的碎片定义都存在
+            for fragment_id in required_fragment_ids:
+                existing_fragment = session.query(FragmentDefinition).filter(
+                    FragmentDefinition.fragment_id == fragment_id
+                ).first()
+                
+                if not existing_fragment:
+                    # 如果提供了碎片定义，使用提供的；否则创建默认的
+                    if fragment_definitions:
+                        fragment_def = next((f for f in fragment_definitions if f['id'] == fragment_id), None)
+                        if fragment_def:
+                            new_fragment = FragmentDefinition(
+                                fragment_id=fragment_id,
+                                fragment_name=fragment_def['name'],
+                                description=fragment_def.get('description', f"碎片 {fragment_id}")
+                            )
+                        else:
+                            new_fragment = FragmentDefinition(
+                                fragment_id=fragment_id,
+                                fragment_name=f"碎片 {fragment_id}",
+                                description=f"碎片 {fragment_id} 的描述"
+                            )
+                    else:
+                        new_fragment = FragmentDefinition(
+                            fragment_id=fragment_id,
+                            fragment_name=f"碎片 {fragment_id}",
+                            description=f"碎片 {fragment_id} 的描述"
+                        )
+                    
+                    session.add(new_fragment)
+                    LOGGER.info(f"添加碎片定义: {fragment_id}")
+            
+            # 添加宝物
+            treasure = Treasure(
+                treasure_name=treasure_name,
+                fragment_ids=fragment_ids,
+                description=description or f"宝物 {treasure_name}"
+            )
+            session.add(treasure)
+            
+            session.commit()
+            LOGGER.info(f"成功添加宝物 {treasure_name} 及其碎片定义")
+            return True
+        except Exception as e:
+            session.rollback()
+            LOGGER.error(f"添加宝物失败: {e}")
+            return False
 
 
 def sql_start_hunt(tg: int) -> int:
@@ -103,13 +183,21 @@ def sql_start_hunt(tg: int) -> int:
             if today_games >= 5:
                 return -1  # 超过每日限制
             
-            # 检查是否有进行中的游戏
+            # 强化检查：确保用户只能有一个活跃游戏
             active_hunt = session.query(Hunt).filter(
                 and_(Hunt.tg == tg, Hunt.is_active == True)
             ).first()
             
             if active_hunt:
-                return -2  # 已有进行中的游戏
+                # 检查是否超时，如果超时则自动结束
+                current_time = datetime.datetime.now()
+                if (current_time - active_hunt.start_time).total_seconds() > 1800:  # 30分钟
+                    active_hunt.end_time = current_time
+                    active_hunt.is_active = False
+                    session.commit()
+                    LOGGER.info(f"自动结束超时游戏: 用户 {tg}, 会话 {active_hunt.id}")
+                else:
+                    return -2  # 已有进行中的游戏
             
             # 创建新游戏会话
             hunt = Hunt(
@@ -126,6 +214,30 @@ def sql_start_hunt(tg: int) -> int:
             session.rollback()
             LOGGER.error(f"开始寻宝失败: {e}")
             return 0
+
+
+def sql_get_fragment_definition(fragment_id: int):
+    """获取碎片定义"""
+    with Session() as session:
+        try:
+            fragment_def = session.query(FragmentDefinition).filter(
+                FragmentDefinition.fragment_id == fragment_id
+            ).first()
+            return fragment_def
+        except Exception as e:
+            LOGGER.error(f"获取碎片定义失败: {e}")
+            return None
+
+
+def sql_get_all_fragment_definitions():
+    """获取所有碎片定义"""
+    with Session() as session:
+        try:
+            fragment_defs = session.query(FragmentDefinition).order_by(FragmentDefinition.fragment_id).all()
+            return fragment_defs
+        except Exception as e:
+            LOGGER.error(f"获取所有碎片定义失败: {e}")
+            return []
 
 
 def sql_end_hunt(hunt_id: int) -> bool:
@@ -334,6 +446,32 @@ def sql_cleanup_expired_fragments():
         except Exception as e:
             session.rollback()
             LOGGER.error(f"清理过期碎片失败: {e}")
+
+
+def sql_cleanup_timed_out_hunts():
+    """清理超时的寻宝游戏"""
+    with Session() as session:
+        try:
+            current_time = datetime.datetime.now()
+            timeout_threshold = current_time - datetime.timedelta(seconds=1800)  # 30分钟前
+            
+            # 查找超时的活跃游戏
+            timed_out_hunts = session.query(Hunt).filter(
+                and_(Hunt.is_active == True, Hunt.start_time < timeout_threshold)
+            ).all()
+            
+            updated_count = 0
+            for hunt in timed_out_hunts:
+                hunt.end_time = current_time
+                hunt.is_active = False
+                updated_count += 1
+            
+            if updated_count > 0:
+                session.commit()
+                LOGGER.info(f"清理了 {updated_count} 个超时的寻宝游戏")
+        except Exception as e:
+            session.rollback()
+            LOGGER.error(f"清理超时游戏失败: {e}")
 
 
 # 初始化宝物配置

@@ -13,7 +13,7 @@ from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby
 from bot.sql_helper.sql_hunt import (
     sql_start_hunt, sql_end_hunt, sql_get_active_hunt, sql_add_fragment,
     sql_get_user_fragments, sql_get_today_hunt_count, sql_get_daily_treasure,
-    sql_check_treasure_synthesis, sql_synthesize_treasure
+    sql_check_treasure_synthesis, sql_synthesize_treasure, sql_get_fragment_definition
 )
 
 
@@ -179,7 +179,11 @@ async def hunt_action(_, call):
         # 刷新hunt对象
         hunt = sql_get_active_hunt(call.from_user.id)
         
-        await callAnswer(call, f"🎉 获得碎片 {fragment_id}！")
+        # 获取碎片定义以显示更好的名称
+        fragment_def = sql_get_fragment_definition(fragment_id)
+        fragment_name = fragment_def.fragment_name if fragment_def else f"碎片 {fragment_id}"
+        
+        await callAnswer(call, f"🎉 获得{fragment_name}！")
         await editMessage(
             call,
             f"🎮 **寻宝游戏进行中**\n\n"
@@ -187,7 +191,7 @@ async def hunt_action(_, call):
             f"⏰ 剩余时间: {remaining_minutes}分{remaining_seconds}秒\n"
             f"💰 当前{sakura_b}: {user.iv - 1}\n"
             f"🎲 找到的碎片: {hunt.fragments_found}个\n"
-            f"🆕 刚获得: 碎片 {fragment_id}\n\n"
+            f"🆕 刚获得: {fragment_name}\n\n"
             f"继续寻宝吧！",
             buttons=hunt_game_ikb(hunt_id, int(current_time.timestamp()))
         )
@@ -220,7 +224,10 @@ async def hunt_inventory(_, call):
     if fragment_counts:
         for fragment_id in sorted(fragment_counts.keys()):
             count = fragment_counts[fragment_id]
-            inventory_text += f"🧩 碎片 {fragment_id}: {count}个\n"
+            # 获取碎片定义以显示更好的名称
+            fragment_def = sql_get_fragment_definition(fragment_id)
+            fragment_name = fragment_def.fragment_name if fragment_def else f"碎片 {fragment_id}"
+            inventory_text += f"🧩 {fragment_name}: {count}个\n"
     else:
         inventory_text += "空空如也...\n"
     
@@ -264,7 +271,10 @@ async def hunt_synthesis(_, call):
     for req_id in required_fragments:
         have_count = fragment_counts.get(req_id, 0)
         status = "✅" if have_count >= 1 else "❌"
-        synthesis_text += f"{status} 碎片 {req_id}: {have_count}/1\n"
+        # 获取碎片定义以显示更好的名称
+        fragment_def = sql_get_fragment_definition(req_id)
+        fragment_name = fragment_def.fragment_name if fragment_def else f"碎片 {req_id}"
+        synthesis_text += f"{status} {fragment_name}: {have_count}/1\n"
     
     if can_synthesize:
         synthesis_text += f"\n🎉 **可以合成！**"
@@ -341,7 +351,10 @@ async def hunt_end(_, call):
         if fragment_counts:
             for fragment_id in sorted(fragment_counts.keys()):
                 count = fragment_counts[fragment_id]
-                result_text += f"🧩 碎片 {fragment_id}: {count}个\n"
+                # 获取碎片定义以显示更好的名称
+                fragment_def = sql_get_fragment_definition(fragment_id)
+                fragment_name = fragment_def.fragment_name if fragment_def else f"碎片 {fragment_id}"
+                result_text += f"🧩 {fragment_name}: {count}个\n"
         else:
             result_text += "空空如也...\n"
         
