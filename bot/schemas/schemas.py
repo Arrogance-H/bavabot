@@ -132,6 +132,9 @@ class RedEnvelope(BaseModel):
     status: bool = True  # 是否开启红包
     allow_private: bool = True # 是否允许专属红包
 
+class Lottery(BaseModel):
+    status: bool = True  # 是否开启抽奖功能
+
 class Config(BaseModel):
     bot_name: str
     bot_token: str
@@ -188,6 +191,7 @@ class Config(BaseModel):
     moviepilot: MP = Field(default_factory=MP)
     auto_update: AutoUpdate = Field(default_factory=AutoUpdate)
     red_envelope: RedEnvelope = Field(default_factory=RedEnvelope)
+    lottery: Lottery = Field(default_factory=Lottery)
     api: API = Field(default_factory=API)
 
     def __init__(self, **data):

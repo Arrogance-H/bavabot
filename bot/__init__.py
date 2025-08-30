@@ -59,6 +59,7 @@ kk_gift_days = config.kk_gift_days
 fuxx_pitao = config.fuxx_pitao
 activity_check_days = config.activity_check_days
 red_envelope = config.red_envelope
+lottery = config.lottery
 
 moviepilot = config.moviepilot
 auto_update = config.auto_update

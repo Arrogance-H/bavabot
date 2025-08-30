@@ -415,6 +415,87 @@ async def set_red_envelope_allow_private(_, call):
     save_config()
     LOGGER.info(log_message)
 
+@bot.on_callback_query(filters.regex('set_lottery_status') & admins_on_filter)
+async def set_lottery_status(_, call):
+    config.lottery.status = not config.lottery.status
+    if config.lottery.status:
+        message = '👮🏻‍♂️ 您已开启 抽奖功能，现在管理员可以创建抽奖了'
+        log_message = f"【admin】：管理员 {call.from_user.first_name} 已调整 抽奖功能 True"
+    else:
+        message = '👮🏻‍♂️ 您已关闭 抽奖功能，所有抽奖活动将被暂停'
+        log_message = f"【admin】：管理员 {call.from_user.first_name} 已调整 抽奖功能 False"
+    await callAnswer(call, message, True)
+    await config_p_re(_, call)
+    save_config()
+    LOGGER.info(log_message)
+
+@bot.on_callback_query(filters.regex('lottery_manage') & admins_on_filter)
+async def lottery_manage_panel(_, call):
+    from bot.func_helper.fix_bottons import lottery_manage_ikb
+    await callAnswer(call, '🎊 抽奖管理面板')
+    text = f'🎊 **抽奖管理面板**\\n\\n' \
+           f'这里可以管理所有抽奖活动，包括创建新抽奖、添加奖品、查看参与情况等。\\n\\n' \
+           f'请选择要执行的操作：'
+    await editMessage(call, text, buttons=lottery_manage_ikb())
+
+@bot.on_callback_query(filters.regex('lottery_create_panel') & admins_on_filter)
+async def lottery_create_panel(_, call):
+    await callAnswer(call, '✨ 创建抽奖')
+    text = f'🎊 **创建新抽奖**\\n\\n' \
+           f'请发送抽奖信息，格式如下：\\n' \
+           f'`抽奖名称|描述|参与方式|开奖方式|参与条件|参数`\\n\\n' \
+           f'**参与方式：**\\n' \
+           f'1 - 关键字参与 (需设置关键字)\\n' \
+           f'2 - 按钮参与\\n\\n' \
+           f'**开奖方式：**\\n' \
+           f'1 - 定时开奖 (格式: YYYY-MM-DD HH:MM)\\n' \
+           f'2 - 人数开奖 (设置目标人数)\\n\\n' \
+           f'**参与条件：**\\n' \
+           f'1 - 付费参与 (设置费用)\\n' \
+           f'2 - 仅Emby用户\\n' \
+           f'3 - 所有人可参与\\n\\n' \
+           f'**示例：**\\n' \
+           f'`新年抽奖|祝大家新年快乐|2|1|3|2024-01-01 20:00`\\n' \
+           f'`每日签到|签到送奖品|1|2|2|签到,100`'
+    
+    from bot.func_helper.fix_bottons import back_config_p_ikb
+    await editMessage(call, text, buttons=back_config_p_ikb)
+
+@bot.on_callback_query(filters.regex('lottery_add_prize_panel') & admins_on_filter)
+async def lottery_add_prize_panel(_, call):
+    await callAnswer(call, '🎁 添加奖品')
+    text = f'🎁 **添加抽奖奖品**\\n\\n' \
+           f'请发送奖品信息，格式如下：\\n' \
+           f'`抽奖ID|奖品名称|数量|描述|类型`\\n\\n' \
+           f'**奖品类型：**\\n' \
+           f'virtual - 虚拟奖品\\n' \
+           f'physical - 实物奖品\\n' \
+           f'coins - 积分奖品\\n\\n' \
+           f'**示例：**\\n' \
+           f'`1|iPhone 15|1|最新款苹果手机|physical`\\n' \
+           f'`1|积分奖励|5|100积分|coins`'
+    
+    from bot.func_helper.fix_bottons import back_config_p_ikb
+    await editMessage(call, text, buttons=back_config_p_ikb)
+
+@bot.on_callback_query(filters.regex('lottery_list') & admins_on_filter)
+async def lottery_list_panel(_, call):
+    from bot.sql_helper.sql_lottery import sql_get_active_lotteries
+    await callAnswer(call, '📋 查看抽奖列表')
+    
+    lotteries = sql_get_active_lotteries()
+    if not lotteries:
+        text = "📋 **抽奖列表**\\n\\n暂无活跃的抽奖活动"
+    else:
+        text = "📋 **活跃抽奖列表**\\n\\n"
+        for lottery in lotteries:
+            text += f"🎊 **{lottery.name}** (ID: {lottery.id})\\n"
+            text += f"📝 {lottery.description or '无描述'}\\n"
+            text += f"⏰ 创建时间: {lottery.created_at.strftime('%Y-%m-%d %H:%M')}\\n\\n"
+    
+    from bot.func_helper.fix_bottons import back_config_p_ikb
+    await editMessage(call, text, buttons=back_config_p_ikb)
+
 @bot.on_callback_query(filters.regex('set_activity_check_days') & admins_on_filter)
 async def set_activity_check_days(_, call):
     await callAnswer(call, '📌 设置活跃检测天数')
