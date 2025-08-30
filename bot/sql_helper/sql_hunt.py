@@ -621,16 +621,16 @@ def sql_random_equipment_by_rarity():
             import random
             
             # 使用固定概率确保紫色装备极稀有
-            # 总概率: 蓝色60% + 绿色30% + 金色9.5% + 紫色0.5%
+            # 总概率: 蓝色60.4% + 绿色30% + 金色9.5% + 紫色0.1%
             rand_value = random.random() * 100  # 0-100的随机数
             
-            if rand_value < 0.5:  # 0.5% 概率获得紫色装备
+            if rand_value < 0.1:  # 0.1% 概率获得紫色装备 (极稀有)
                 category = 'purple'
-            elif rand_value < 10:  # 9.5% 概率获得金色装备 (0.5% + 9.5%)
+            elif rand_value < 9.6:  # 9.5% 概率获得金色装备 (0.1% + 9.5%)
                 category = 'gold'
-            elif rand_value < 40:  # 30% 概率获得绿色装备 (10% + 30%)
+            elif rand_value < 39.6:  # 30% 概率获得绿色装备 (9.6% + 30%)
                 category = 'green'
-            else:  # 60% 概率获得蓝色装备
+            else:  # 60.4% 概率获得蓝色装备
                 category = 'blue'
             
             # 从选定类别中随机选择装备
@@ -841,10 +841,10 @@ def sql_update_reward_config(car_id: int, reward_type: str, reward_value: str, r
 def sql_get_probability_stats():
     """获取装备抽取概率统计信息"""
     return {
-        "purple": {"probability": "0.5%", "description": "极稀有专属车漆"},
+        "purple": {"probability": "0.1%", "description": "极稀有专属车漆"},
         "gold": {"probability": "9.5%", "description": "高性能组件"},
         "green": {"probability": "30%", "description": "车漆变体"},
-        "blue": {"probability": "60%", "description": "常见物品"}
+        "blue": {"probability": "60.4%", "description": "常见物品"}
     }
 
 

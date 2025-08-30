@@ -14,8 +14,7 @@ from bot.sql_helper.sql_hunt import (
     sql_start_hunt, sql_end_hunt, sql_get_active_hunt, sql_add_equipment,
     sql_get_user_equipment, sql_get_today_hunt_count, sql_get_daily_car,
     sql_check_car_assembly, sql_assemble_car, sql_get_equipment_definition,
-    sql_random_equipment_by_rarity, sql_count_user_equipment, sql_discard_equipment,
-    sql_get_probability_stats
+    sql_random_equipment_by_rarity, sql_count_user_equipment, sql_discard_equipment
 )
 
 
@@ -34,15 +33,11 @@ def hunt_game_ikb(hunt_id: int, last_hunt_time: int = 0):
     return ikb([
         [(hunt_btn_text, f"hunt_action_{hunt_id}")],
         [("🎒 背包", f"hunt_inventory_{hunt_id}"), ("🔧 组装", f"hunt_assembly_{hunt_id}")],
-        [("📊 概率", f"hunt_probability_{hunt_id}"), ("❌ 结束游戏", f"hunt_end_{hunt_id}")]
+        [("❌ 结束游戏", f"hunt_end_{hunt_id}")]
     ])
 
 
-def hunt_probability_ikb(hunt_id: int):
-    """概率信息界面按钮"""
-    return ikb([
-        [("🔙 返回车库", f"hunt_game_{hunt_id}")]
-    ])
+def hunt_inventory_ikb(hunt_id: int):
     """背包界面按钮"""
     return ikb([
         [("🔧 组装汽车", f"hunt_assembly_{hunt_id}")],
@@ -162,8 +157,7 @@ async def start_hunt(_, msg):
         f"💰 每次寻找消耗 1{sakura_b}\n"
         f"🔄 寻找冷却: 1秒\n"
         f"🎒 背包容量: 30个装备\n"
-        f"📅 装备仅当天有效\n"
-        f"📊 紫色装备概率: 极低(0.5%)\n\n"
+        f"📅 装备仅当天有效\n\n"
         f"**今日剩余游戏次数: {5 - today_count - 1}**\n\n"
         f"点击下方按钮开始寻找装备！",
         buttons=hunt_game_ikb(hunt_id)
@@ -219,23 +213,13 @@ async def hunt_action(_, call):
             equipment_category = equipment_def.category
             color_emoji = get_equipment_color_emoji(equipment_category)
             
-            # 获取稀有度信息
-            rarity_info = {
-                'purple': '极稀有 (0.5%)',
-                'gold': '稀有 (9.5%)',
-                'green': '普通 (30%)',
-                'blue': '常见 (60%)'
-            }
-            rarity_text = rarity_info.get(equipment_category, '未知')
-            
             # 显示装备选择界面
             await callAnswer(call, f"🎉 发现了{equipment_name}！")
             await editMessage(
                 call,
                 f"🔍 **发现装备！**\n\n"
                 f"{color_emoji} **{equipment_name}**\n"
-                f"📝 {equipment_def.description}\n"
-                f"🏷️ 稀有度: {rarity_text}\n\n"
+                f"📝 {equipment_def.description}\n\n"
                 f"🎒 当前背包: {current_equipment_count}/30\n\n"
                 f"是否保留这个装备？",
                 buttons=equipment_choice_ikb(hunt_id, equipment_id)
@@ -348,41 +332,6 @@ async def discard_equipment(_, call):
         buttons=hunt_game_ikb(hunt_id, int(datetime.datetime.now().timestamp()))
     )
 
-
-@bot.on_callback_query(filters.regex(r'^hunt_probability_(\d+)$'))
-async def hunt_probability(_, call):
-    """查看装备获取概率"""
-    hunt_id = int(call.matches[0].group(1))
-    
-    # 验证游戏会话
-    hunt = sql_get_active_hunt(call.from_user.id)
-    if not hunt or hunt.id != hunt_id:
-        return await callAnswer(call, "❌ 游戏会话无效", show_alert=True)
-    
-    # 获取概率统计
-    prob_stats = sql_get_probability_stats()
-    
-    prob_text = "📊 **装备获取概率**\n\n"
-    prob_text += "🟣 **紫色装备 (极稀有)**\n"
-    prob_text += f"   概率: {prob_stats['purple']['probability']}\n"
-    prob_text += f"   内容: {prob_stats['purple']['description']}\n\n"
-    
-    prob_text += "🟡 **金色装备 (稀有)**\n"
-    prob_text += f"   概率: {prob_stats['gold']['probability']}\n"
-    prob_text += f"   内容: {prob_stats['gold']['description']}\n\n"
-    
-    prob_text += "🟢 **绿色装备 (普通)**\n"
-    prob_text += f"   概率: {prob_stats['green']['probability']}\n"
-    prob_text += f"   内容: {prob_stats['green']['description']}\n\n"
-    
-    prob_text += "🔵 **蓝色装备 (常见)**\n"
-    prob_text += f"   概率: {prob_stats['blue']['probability']}\n"
-    prob_text += f"   内容: {prob_stats['blue']['description']}\n\n"
-    
-    prob_text += "💡 **提示**: 紫色装备极其稀有，获得后请珍惜！"
-    
-    await callAnswer(call, "📊 查看概率")
-    await editMessage(call, prob_text, buttons=hunt_probability_ikb(hunt_id))
 
 
 @bot.on_callback_query(filters.regex(r'^hunt_inventory_(\d+)$'))
