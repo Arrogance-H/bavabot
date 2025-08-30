@@ -39,6 +39,7 @@ action_dict = {
     "check_ex": check_expired,
     "low_activity": check_low_activity,
     "backup_db": auto_backup_db,
+    "lottery_timing": check_lottery_timing,
 }
 
 # 字典，对应的操作函数的参数和id
@@ -50,6 +51,7 @@ args_dict = {
     "check_ex": {'hour': 1, 'minute': 30, 'id': 'check_expired'},
     "low_activity": {'hour': 8, 'minute': 30, 'id': 'check_low_activity'},
     "backup_db": {'hour': 2, 'minute': 30, 'id': 'backup_db'},
+    "lottery_timing": {'minute': '*/5', 'id': 'lottery_timing'},  # 每5分钟检查一次抽奖时间
 }
 
 

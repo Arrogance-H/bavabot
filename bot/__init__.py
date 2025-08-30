@@ -110,6 +110,8 @@ admin_p = user_p + [
     BotCommand("callall", "群发消息给每个人 [管理]"),
     BotCommand("only_rm_emby", "删除指定的Emby账号 [管理]"),
     BotCommand("only_rm_record", "删除指定的tgid数据库记录 [管理]"),
+    BotCommand("lottery_publish", "发布抽奖到群组 [管理]"),
+    BotCommand("lottery_info", "查看抽奖信息 [管理]"),
     BotCommand("restart", "重启bot [管理]"),
     BotCommand("update_bot", "更新bot [管理]"),
 ]
