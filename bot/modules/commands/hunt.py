@@ -21,9 +21,13 @@ from bot.sql_helper.sql_hunt import (
 def hunt_game_ikb(hunt_id: int, last_hunt_time: int = 0):
     """创建寻宝游戏按钮"""
     current_time = int(datetime.datetime.now().timestamp())
-    can_hunt = current_time - last_hunt_time >= 1  # 1秒冷却
+    cooldown_remaining = max(0, 1 - (current_time - last_hunt_time))  # 1秒冷却
+    can_hunt = cooldown_remaining == 0
     
-    hunt_btn_text = "🎯 寻宝" if can_hunt else f"⏰ 寻宝 ({1 - (current_time - last_hunt_time)}s)"
+    if can_hunt:
+        hunt_btn_text = "🎯 寻宝"
+    else:
+        hunt_btn_text = f"⏰ 寻宝 ({cooldown_remaining}s)"
     
     return ikb([
         [(hunt_btn_text, f"hunt_action_{hunt_id}")],
@@ -142,6 +146,13 @@ async def hunt_action(_, call):
     if (current_time - start_time).total_seconds() > 1800:  # 30分钟
         sql_end_hunt(hunt_id)
         return await editMessage(call, "⏰ 寻宝游戏时间已结束！\n\n感谢参与，请明日再来！")
+    
+    # 检查1秒冷却时间
+    if hunt.last_hunt_time:
+        time_since_last = (current_time - hunt.last_hunt_time).total_seconds()
+        if time_since_last < 1:
+            remaining = 1 - time_since_last
+            return await callAnswer(call, f"⏰ 请等待 {remaining:.1f} 秒后再寻宝", show_alert=True)
     
     # 检查用户金币
     user = sql_get_emby(call.from_user.id)

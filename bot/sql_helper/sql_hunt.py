@@ -21,6 +21,7 @@ class Hunt(Base):
     is_active = Column(Boolean, default=True)  # 游戏是否进行中
     fragments_found = Column(Integer, default=0)  # 找到的碎片数量
     coins_spent = Column(Integer, default=0)  # 消耗的金币数量
+    last_hunt_time = Column(DateTime, nullable=True)  # 上次寻宝时间
 
 
 class Fragment(Base):
@@ -162,21 +163,23 @@ def sql_add_fragment(tg: int, hunt_session_id: int, fragment_id: int) -> bool:
     with Session() as session:
         try:
             today = datetime.datetime.now().strftime("%Y-%m-%d")
+            current_time = datetime.datetime.now()
             
             fragment = Fragment(
                 tg=tg,
                 fragment_id=fragment_id,
                 obtained_date=today,
-                obtained_time=datetime.datetime.now(),
+                obtained_time=current_time,
                 hunt_session_id=hunt_session_id
             )
             session.add(fragment)
             
-            # 更新hunt会话的碎片计数
+            # 更新hunt会话的碎片计数和最后寻宝时间
             hunt = session.query(Hunt).filter(Hunt.id == hunt_session_id).first()
             if hunt:
                 hunt.fragments_found += 1
                 hunt.coins_spent += 1
+                hunt.last_hunt_time = current_time
             
             session.commit()
             return True
