@@ -48,10 +48,7 @@ class Lottery:
         self.name = "未命名抽奖"
         self.description = ""
         self.image_url = None
-        
-        # 参与方式配置
-        self.keyword = None  # 关键词参与
-        self.allow_button = True  # 允许按钮参与
+        self.collection_location = ""  # 领奖地点
         
         # 开奖方式配置
         self.draw_type = "manual"  # "manual" 或 "auto"
@@ -123,12 +120,12 @@ async def handle_lottery_setup(_, msg: Message):
     elif setup.step == "description":
         if text != "/skip":
             setup.lottery.description = text
-        setup.step = "keyword"
-        await sendMessage(msg, "✅ 抽奖描述已设置\n\n请输入参与关键词（可选，发送 /skip 跳过）：")
+        setup.step = "collection_location"
+        await sendMessage(msg, "✅ 抽奖描述已设置\n\n请输入领奖地点（可选，发送 /skip 跳过）：")
     
-    elif setup.step == "keyword":
+    elif setup.step == "collection_location":
         if text != "/skip":
-            setup.lottery.keyword = text
+            setup.lottery.collection_location = text
         setup.step = "participation_type"
         
         keyboard = InlineKeyboardMarkup([
@@ -137,7 +134,7 @@ async def handle_lottery_setup(_, msg: Message):
             [InlineKeyboardButton("💰 付费抽奖", "lottery_setup_participation_paid")]
         ])
         
-        await sendMessage(msg, "✅ 参与关键词已设置\n\n请选择参与条件：", buttons=keyboard)
+        await sendMessage(msg, "✅ 领奖地点已设置\n\n请选择参与条件：", buttons=keyboard)
     
     elif setup.step == "entry_fee":
         try:
@@ -287,15 +284,17 @@ def format_lottery_message(lottery: Lottery) -> str:
 {prizes_text}
 
 👥 **参与条件：** {participation_type_text[lottery.participation_type]}
-🎯 **开奖方式：** {draw_type_text[lottery.draw_type]}
+🎯 **开奖方式：** {draw_type_text[lottery.draw_type]}"""
+
+    if lottery.collection_location:
+        text += f"\n📍 **领奖地点：** {lottery.collection_location}"
+
+    text += f"""
 
 👨‍💼 **创建者：** {lottery.creator_name}
 📅 **创建时间：** {lottery.created_at.strftime('%Y-%m-%d %H:%M:%S')}
 
 💫 **当前参与人数：** {len(lottery.participants)}"""
-
-    if lottery.keyword:
-        text += f"\n🔑 **参与关键词：** {lottery.keyword}"
     
     return text
 
@@ -333,7 +332,17 @@ async def join_lottery(_, call: CallbackQuery):
     # 添加参与者
     lottery.participants[user_id] = user_name
     
-    await callAnswer(call, f"✅ 成功参与抽奖！当前参与人数：{len(lottery.participants)}", True)
+    # 发送参与确认消息，1分钟后自动删除
+    confirmation_text = f"✅ 成功参与抽奖！当前参与人数：{len(lottery.participants)}"
+    await callAnswer(call, confirmation_text, True)
+    
+    # 发送临时确认消息并设置自动删除
+    try:
+        temp_msg = await bot.send_message(call.from_user.id, confirmation_text)
+        # 1分钟后删除消息
+        asyncio.create_task(delete_message_after_delay(call.from_user.id, temp_msg.id, 60))
+    except Exception:
+        pass  # 如果无法发送私信则忽略
     
     # 检查是否需要自动开奖
     if (lottery.draw_type == "auto" and 
@@ -343,6 +352,15 @@ async def join_lottery(_, call: CallbackQuery):
         # 更新消息
         text = format_lottery_message(lottery)
         await editMessage(call, text)
+
+
+async def delete_message_after_delay(chat_id: int, message_id: int, delay: int):
+    """延迟删除消息"""
+    await asyncio.sleep(delay)
+    try:
+        await bot.delete_messages(chat_id, message_id)
+    except Exception:
+        pass  # 忽略删除失败的情况
 
 
 @bot.on_callback_query(filters.regex("lottery_info_"))
@@ -415,7 +433,7 @@ async def draw_lottery(lottery: Lottery, chat_id: int, message_id: int):
             
             if prize.name not in winners:
                 winners[prize.name] = []
-            winners[prize.name].append(winner_name)
+            winners[prize.name].append((winner_id, winner_name))
     
     # 生成开奖结果
     result_text = f"""🎉 **{lottery.name} - 开奖结果**
@@ -426,14 +444,33 @@ async def draw_lottery(lottery: Lottery, chat_id: int, message_id: int):
     
     for prize_name, winner_list in winners.items():
         result_text += f"🏆 **{prize_name}**\n"
-        for winner in winner_list:
-            result_text += f"    • {winner}\n"
+        for _, winner_name in winner_list:
+            result_text += f"    • {winner_name}\n"
         result_text += "\n"
     
     result_text += f"📊 **本次抽奖统计：**\n"
     result_text += f"   参与人数：{len(lottery.participants)}\n"
     result_text += f"   获奖人数：{sum(len(w) for w in winners.values())}\n"
     result_text += f"   创建者：{lottery.creator_name}"
+    
+    # 发送私信给中奖者
+    for prize_name, winner_list in winners.items():
+        for winner_id, winner_name in winner_list:
+            try:
+                private_msg = f"""🎉 恭喜中奖！
+
+🎲 **抽奖名称：** {lottery.name}
+🏆 **中奖内容：** {prize_name}"""
+                
+                if lottery.collection_location:
+                    private_msg += f"\n📍 **领奖地点：** {lottery.collection_location}"
+                
+                private_msg += f"\n\n请及时联系管理员领取奖品！"
+                
+                await bot.send_message(winner_id, private_msg)
+            except Exception:
+                # 如果无法发送私信则忽略
+                pass
     
     # 移除抽奖
     del active_lotteries[lottery.id]
@@ -449,48 +486,4 @@ async def draw_lottery(lottery: Lottery, chat_id: int, message_id: int):
         await bot.send_message(chat_id, result_text)
 
 
-# 关键词参与抽奖
-@bot.on_message(filters.text & filters.group & user_in_group_on_filter)
-async def keyword_lottery_participation(_, msg: Message):
-    """通过关键词参与抽奖"""
-    if not msg.text:
-        return
-    
-    text = msg.text.strip()
-    user_id = msg.from_user.id
-    user_name = msg.from_user.first_name or "匿名用户"
-    
-    # 检查是否有匹配的抽奖关键词
-    for lottery_id, lottery in active_lotteries.items():
-        if lottery.keyword and text == lottery.keyword:
-            # 检查是否已参与
-            if user_id in lottery.participants:
-                continue
-            
-            # 检查参与条件
-            if lottery.participation_type == "emby":
-                e = sql_get_emby(tg=user_id)
-                if not e:
-                    await msg.reply("❌ 您需要有Emby账号才能参与此抽奖")
-                    continue
-            
-            elif lottery.participation_type == "paid":
-                e = sql_get_emby(tg=user_id)
-                if not e or e.iv < lottery.entry_fee:
-                    await msg.reply(f"❌ 余额不足，需要 {lottery.entry_fee} {sakura_b}")
-                    continue
-                
-                # 扣除费用
-                sql_update_emby(sql_get_emby(tg=user_id).tg == user_id, iv=e.iv - lottery.entry_fee)
-            
-            # 添加参与者
-            lottery.participants[user_id] = user_name
-            
-            await msg.reply(f"✅ 成功参与抽奖「{lottery.name}」！当前参与人数：{len(lottery.participants)}")
-            
-            # 检查是否需要自动开奖
-            if (lottery.draw_type == "auto" and 
-                len(lottery.participants) >= lottery.target_participants):
-                await auto_draw_lottery(lottery, msg.chat.id, msg.id)
-            
-            break
+# Lottery module ends here
