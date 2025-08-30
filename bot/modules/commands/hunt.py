@@ -143,16 +143,27 @@ async def start_hunt(_, msg):
     car_name = daily_car.car_name if daily_car else "未知"
     required_equipment = daily_car.equipment_ids if daily_car else "5,12,6,15,1"
     
+    # 获取奖励信息
+    from bot.sql_helper.sql_hunt import sql_get_reward_config
+    reward_config = sql_get_reward_config(daily_car.id) if daily_car else None
+    reward_text = ""
+    if reward_config:
+        if reward_config.reward_type == "coins":
+            reward_text = f"\n🎁 完成奖励: {reward_config.reward_value}金币"
+        else:
+            reward_text = f"\n🎁 完成奖励: {reward_config.reward_description}"
+    
     await sendMessage(
         msg,
         f"🏎️ **车库游戏开始！**\n\n"
         f"🎯 今日目标汽车: **{car_name}**\n"
-        f"🔧 需要装备: {required_equipment}\n"
+        f"🔧 需要装备: {required_equipment}{reward_text}\n"
         f"⏰ 游戏时间: 30分钟\n"
         f"💰 每次寻找消耗 1{sakura_b}\n"
         f"🔄 寻找冷却: 1秒\n"
         f"🎒 背包容量: 30个装备\n"
-        f"📅 装备仅当天有效\n\n"
+        f"📅 装备仅当天有效\n"
+        f"📊 紫色装备概率: 极低(0.5%)\n\n"
         f"**今日剩余游戏次数: {5 - today_count - 1}**\n\n"
         f"点击下方按钮开始寻找装备！",
         buttons=hunt_game_ikb(hunt_id)
@@ -208,6 +219,15 @@ async def hunt_action(_, call):
             equipment_category = equipment_def.category
             color_emoji = get_equipment_color_emoji(equipment_category)
             
+            # 获取稀有度信息
+            rarity_info = {
+                'purple': '极稀有 (0.5%)',
+                'gold': '稀有 (9.5%)',
+                'green': '普通 (30%)',
+                'blue': '常见 (60%)'
+            }
+            rarity_text = rarity_info.get(equipment_category, '未知')
+            
             # 显示装备选择界面
             await callAnswer(call, f"🎉 发现了{equipment_name}！")
             await editMessage(
@@ -215,7 +235,7 @@ async def hunt_action(_, call):
                 f"🔍 **发现装备！**\n\n"
                 f"{color_emoji} **{equipment_name}**\n"
                 f"📝 {equipment_def.description}\n"
-                f"🏷️ 类别: {equipment_category}\n\n"
+                f"🏷️ 稀有度: {rarity_text}\n\n"
                 f"🎒 当前背包: {current_equipment_count}/30\n\n"
                 f"是否保留这个装备？",
                 buttons=equipment_choice_ikb(hunt_id, equipment_id)
@@ -425,6 +445,10 @@ async def hunt_assembly(_, call):
     # 检查是否可以组装
     can_assemble = sql_check_car_assembly(call.from_user.id, daily_car.id)
     
+    # 获取奖励信息
+    from bot.sql_helper.sql_hunt import sql_get_reward_config
+    reward_config = sql_get_reward_config(daily_car.id)
+    
     # 获取用户装备统计
     equipment_list = sql_get_user_equipment(call.from_user.id, today_only=True)
     equipment_counts = {}
@@ -435,8 +459,16 @@ async def hunt_assembly(_, call):
     
     assembly_text = f"🔧 **汽车组装**\n\n"
     assembly_text += f"🏎️ 今日目标: **{daily_car.car_name}**\n"
-    assembly_text += f"📝 描述: {daily_car.description}\n\n"
-    assembly_text += f"📋 **需要装备:**\n"
+    assembly_text += f"📝 描述: {daily_car.description}\n"
+    
+    # 添加奖励信息
+    if reward_config:
+        if reward_config.reward_type == "coins":
+            assembly_text += f"🎁 完成奖励: {reward_config.reward_value}金币\n"
+        else:
+            assembly_text += f"🎁 完成奖励: {reward_config.reward_description}\n"
+    
+    assembly_text += f"\n📋 **需要装备:**\n"
     
     for req_id in required_equipment:
         have_count = equipment_counts.get(req_id, 0)
