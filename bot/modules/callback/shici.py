@@ -34,7 +34,9 @@ async def start_shici_game(_, call):
         # 创建字符选择按钮
         keyboard = shici_button(char_options)
         # 添加提示和返回按钮
-        keyboard.inline_keyboard.append([('💡 查看答案', f'shici_answer-{original_poem}'), ('🔙 返回', 'back_start')])
+        from pyromod.helpers import ikb
+        additional_buttons = ikb([[('💡 查看答案', f'shici_answer-{original_poem[:20]}'), ('🔙 返回', 'back_start')]])
+        keyboard.inline_keyboard.extend(additional_buttons.inline_keyboard)
         
         await editMessage(call, text, keyboard)
         
@@ -49,13 +51,18 @@ async def handle_shici_choice(_, call):
     try:
         char = call.data.split('-', 1)[1]
         
-        # 这里可以添加更复杂的逻辑来验证选择是否正确
-        # 现在简单回应选择
         await callAnswer(call, f'您选择了：{char}')
         
-        # 可以在这里添加积分奖励逻辑
-        text = f'✨ **选择完成**\n\n您选择了字符：**{char}**\n\n感谢参与诗词游戏！'
-        await editMessage(call, text, checkin_button)
+        # 提供更好的反馈
+        text = f'✨ **诗词游戏参与完成**\n\n您选择了字符：**{char}**\n\n📚 诗词是中华文化的瑰宝，每一个字都蕴含着深刻的意境。\n\n感谢您参与诗词填空游戏！'
+        
+        # 创建重新游戏和返回的按钮
+        from pyromod.helpers import ikb
+        buttons = ikb([
+            [('🎮 再来一局', 'shici_game'), ('🔙 返回', 'back_start')]
+        ])
+        
+        await editMessage(call, text, buttons)
         
     except Exception as e:
         print(f"Poetry choice error: {e}")
@@ -68,8 +75,15 @@ async def show_shici_answer(_, call):
     try:
         original_poem = call.data.split('-', 1)[1]
         
-        text = f'💡 **诗词答案**\n\n{original_poem}\n\n希望您喜欢这首诗词！'
-        await editMessage(call, text, checkin_button)
+        text = f'💡 **诗词答案**\n\n{original_poem}\n\n📜 诗词是中华文化的精髓，每一首都承载着诗人的情感和智慧。\n\n希望您能从中感受到古典文学的美妙！'
+        
+        # 创建重新游戏和返回的按钮
+        from pyromod.helpers import ikb
+        buttons = ikb([
+            [('🎮 再来一局', 'shici_game'), ('🔙 返回', 'back_start')]
+        ])
+        
+        await editMessage(call, text, buttons)
         
     except Exception as e:
         print(f"Show answer error: {e}")
