@@ -238,53 +238,167 @@ class Singleton(abc.ABCMeta, type):
             cls._instances[key] = super().__call__(*args, **kwargs)
         return cls._instances[key]
 
-# import random
-# import grequests
+import random
+import requests
+import asyncio
 
 
-# def err_handler(request, exception):
-#     get_bot_wlc()
+def random_shici_data(data_list, x):
+    try:
+        # 根据不同的url返回的数据结构，获取相应的字段
+        if x == 0:
+            ju, nm = data_list[0]["content"], f'{data_list[0]["author"]}《{data_list[0]["origin"]}》'
+        elif x == 1:
+            ju, nm = data_list[1]["hitokoto"], f'{data_list[1]["from_who"]}《{data_list[1]["from"]}》'
+        elif x == 2:
+            ju, nm = data_list[2]["content"], data_list[2]["source"]
+            # 如果没有作者信息，就不显示
+        return ju, nm
+    except:
+        return False
 
 
-# def random_shici_data(data_list, x):
-#     try:
-#         # 根据不同的url返回的数据结构，获取相应的字段
-#         if x == 0:
-#             ju, nm = data_list[0]["content"], f'{data_list[0]["author"]}《{data_list[0]["origin"]}》'
-#         elif x == 1:
-#             ju, nm = data_list[1]["hitokoto"], f'{data_list[1]["from_who"]}《{data_list[1]["from"]}》'
-#         elif x == 2:
-#             ju, nm = data_list[2]["content"], data_list[2]["source"]
-#             # 如果没有作者信息，就不显示
-#         return ju, nm
-#     except:
-#         return False
+# 请求每日诗词
+async def get_bot_shici():
+    try:
+        urls = ['https://v1.jinrishici.com/all.json', 'https://international.v1.hitokoto.cn/?c=i',
+                'http://yijuzhan.com/api/word.php?m=json']
+        
+        data_list = []
+        
+        for url in urls:
+            try:
+                response = requests.get(url, timeout=5)
+                if response.status_code == 200:
+                    data_list.append(response.json())
+                else:
+                    data_list.append({})
+            except Exception:
+                data_list.append({})
+        
+        # 过滤有效数据
+        valid_indices = []
+        for i, data in enumerate(data_list):
+            if data and (
+                (i == 0 and "content" in data and "author" in data and "origin" in data) or
+                (i == 1 and "hitokoto" in data and "from_who" in data and "from" in data) or
+                (i == 2 and "content" in data and "source" in data)
+            ):
+                valid_indices.append(i)
+        
+        # 如果网络API都失败，使用内置诗词库
+        if not valid_indices:
+            return get_fallback_shici()
+        
+        seq = valid_indices.copy()
+        x = random.choice(seq)
+        seq.remove(x)
+        
+        if not seq:
+            # 只有一个有效数据源
+            ju, nm = random_shici_data(data_list, x=x)
+            return ju, [], ju, nm
+        
+        e = random.choice(seq)
+        ju, nm = random_shici_data(data_list, x=x)
+        e_ju, e_nm = random_shici_data(data_list, x=e)
+        
+        if not ju or not e_ju:
+            return get_fallback_shici()
+            
+        # 创建诗词填空游戏
+        e_ju_chars = list(e_ju)
+        if len(e_ju_chars) > 6:
+            e_ju_selected = random.sample(e_ju_chars, 6)
+        else:
+            e_ju_selected = e_ju_chars
+            
+        T = ju
+        ju_chars = list(ju)
+        if len(ju_chars) >= 2:
+            t = random.sample(ju_chars, min(2, len(ju_chars)))
+            e_ju_selected.extend(t)
+            random.shuffle(e_ju_selected)
+            
+            for char in t:
+                ju = ju.replace(char, '░', 1)  # 只替换第一个出现的字符
+        
+        return T, e_ju_selected, ju, nm
+    except Exception as e:
+        print(f"Poetry fetch error: {e}")
+        return get_fallback_shici()
 
 
-# # 请求每日诗词
-# def get_bot_shici():
-#     try:
-#         urls = ['https://v1.jinrishici.com/all.json', 'https://international.v1.hitokoto.cn/?c=i',
-#                 'http://yijuzhan.com/api/word.php?m=json']
-#         reqs = [grequests.get(url) for url in urls]
-#         res_list = grequests.map(reqs)  # exception_handler=err_handler
-#         data_list = [res.json() for res in res_list]
-#         # print(data_list)
-#         seq = [0, 1, 2]
-#         x = random.choice(seq)
-#         seq.remove(x)
-#         e = random.choice(seq)
-#         ju, nm = random_shici_data(data_list, x=x)
-#         e_ju, e_nm = random_shici_data(data_list, x=e)
-#         e_ju = random.sample(e_ju, 6)
-#         T = ju
-#         t = random.sample(ju, 2)
-#         e_ju.extend(t)
-#         random.shuffle(e_ju)
-#         for i in t:
-#             ju = ju.replace(i, '░')  # ░
-#         print(T, e_ju, ju, nm)
-#         return T, e_ju, ju, nm
-#     except Exception as e:
-#         print(e)
-#         # await get_bot_shici()
+def get_fallback_shici():
+    """内置诗词库，当网络API失败时使用"""
+    try:
+        poems = [
+            {
+                "content": "床前明月光，疑是地上霜。举头望明月，低头思故乡。",
+                "author": "李白",
+                "origin": "静夜思"
+            },
+            {
+                "content": "春眠不觉晓，处处闻啼鸟。夜来风雨声，花落知多少。",
+                "author": "孟浩然", 
+                "origin": "春晓"
+            },
+            {
+                "content": "白日依山尽，黄河入海流。欲穷千里目，更上一层楼。",
+                "author": "王之涣",
+                "origin": "登鹳雀楼"
+            },
+            {
+                "content": "红豆生南国，春来发几枝。愿君多采撷，此物最相思。",
+                "author": "王维",
+                "origin": "相思"
+            },
+            {
+                "content": "锄禾日当午，汗滴禾下土。谁知盘中餐，粒粒皆辛苦。",
+                "author": "李绅",
+                "origin": "悯农"
+            }
+        ]
+        
+        # 随机选择两首诗
+        selected_poems = random.sample(poems, 2)
+        main_poem = selected_poems[0]
+        alt_poem = selected_poems[1]
+        
+        # 主诗句
+        ju = main_poem["content"]
+        nm = f'{main_poem["author"]}《{main_poem["origin"]}》'
+        
+        # 创建选项字符（从备选诗句中选择）
+        alt_chars = list(alt_poem["content"])
+        # 过滤掉标点符号
+        alt_chars = [c for c in alt_chars if c not in '，。？！；：、']
+        
+        # 选择6个备选字符
+        if len(alt_chars) > 6:
+            selected_chars = random.sample(alt_chars, 6)
+        else:
+            selected_chars = alt_chars
+        
+        # 从主诗句中选择2个字符进行遮挡
+        main_chars = list(ju)
+        valid_chars = [c for c in main_chars if c not in '，。？！；：、']
+        
+        if len(valid_chars) >= 2:
+            chars_to_hide = random.sample(valid_chars, 2)
+            selected_chars.extend(chars_to_hide)
+            random.shuffle(selected_chars)
+            
+            # 创建遮挡版本
+            masked_ju = ju
+            for char in chars_to_hide:
+                masked_ju = masked_ju.replace(char, '░', 1)
+        else:
+            masked_ju = ju
+        
+        return ju, selected_chars, masked_ju, nm
+        
+    except Exception as e:
+        print(f"Fallback poetry error: {e}")
+        # 最后的兜底方案
+        return ("春眠不觉晓，处处闻啼鸟", ["春", "眠", "晓", "鸟", "花", "雨"], "░眠不觉░，处处闻啼鸟", "孟浩然《春晓》")

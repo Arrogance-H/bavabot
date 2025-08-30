@@ -450,17 +450,19 @@ def sched_buttons():
 
 """ checkin 按钮↓"""
 
-# def shici_button(ls: list):
-#     shici = []
-#     for l in ls:
-#         l = [l, f'checkin-{l}']
-#         shici.append(l)
-#     # print(shici)
-#     lines = array_chunk(shici, 4)
-#     return ikb(lines)
+def shici_button(ls: list):
+    shici = []
+    for l in ls:
+        l = [l, f'shici-{l}']
+        shici.append(l)
+    lines = array_chunk(shici, 4)
+    return ikb(lines)
 
 
-# checkin_button = ikb([[('🔋 重新签到', 'checkin'), ('🎮 返回主页', 'back_start')]])
+checkin_button = ikb([[('🔋 重新签到', 'checkin'), ('🎮 返回主页', 'back_start')]])
+
+# 诗词游戏按钮
+shici_game_ikb = ikb([[('📝 诗词填空', 'shici_game'), ('🔙 返回', 'back_start')]])
 
 """ Request_media """
 
