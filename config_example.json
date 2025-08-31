@@ -108,6 +108,7 @@
       "*"
     ]
   },
+  "hunt_daily_limit": 5,
   "hunt": {
     "rewards": {
       "1": {
