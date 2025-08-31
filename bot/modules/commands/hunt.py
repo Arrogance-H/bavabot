@@ -59,6 +59,67 @@ def get_equipment_color_emoji(category: str) -> str:
     return color_map.get(category, '⚪')
 
 
+async def process_assembly_success(call, hunt_id: int, car_id: int, assembly_result: dict, message_prefix: str = "✨ **组装成功！**") -> None:
+    """处理组装成功的通用逻辑"""
+    car_name = assembly_result["car_name"]
+    reward_info = assembly_result["reward"]
+    
+    # 构建奖励信息
+    reward_text = ""
+    if reward_info.get("success", False):
+        if reward_info.get("reward_type") == "coins":
+            reward_text = f"\n💰 奖励: +{reward_info['reward_value']}{sakura_b} (已自动添加)"
+        elif reward_info.get("reward_type") == "code":
+            reward_text = f"\n🎫 奖励: {reward_info['reward_value']}个注册码\n📞 请联系 @MEBimmerSupportBot 领取"
+        elif reward_info.get("reward_type") == "white":
+            reward_text = f"\n⚪ 奖励: {reward_info['reward_value']}个白名单\n📞 请联系 @MEBimmerSupportBot 领取"
+        else:
+            reward_text = f"\n🎁 奖励: {reward_info.get('message', '未知奖励')}"
+    elif reward_info.get("message"):
+        # 奖励处理失败，但组装成功
+        reward_text = f"\n⚠️ 奖励处理异常: {reward_info['message']}"
+    
+    # 构建按钮 - 只有M4(car_id=3)和M5(car_id=4)才显示奖励按钮
+    buttons = []
+    if car_id in [3, 4]:  # M4圣保罗黄和M5风暴灰
+        # 检查是否有自定义奖励按钮配置
+        reward_button = sql_get_reward_button(car_id)
+        if reward_button:
+            buttons.append([(reward_button.button_text, reward_button.button_url)])
+    
+    buttons.extend([
+        [("🎮 继续游戏", f"hunt_game_{hunt_id}")],
+        [("❌ 结束游戏", f"hunt_end_{hunt_id}")]
+    ])
+    
+    message_text = f"{message_prefix}\n\n"
+    message_text += f"🏎️ 恭喜您获得汽车: **{car_name}**\n"
+    message_text += f"📝 {assembly_result.get('description', '')}\n"
+    message_text += f"{reward_text}\n\n"
+    message_text += f"🎮 您可以继续游戏或结束当前游戏！"
+    
+    await editMessage(call, message_text, buttons=ikb(buttons))
+    
+    # 3分钟后删除消息的异步任务
+    asyncio.create_task(delete_message_after_delay(call.message, 180))
+
+
+async def handle_auto_assembly(call, hunt_id: int, daily_car, assembly_result_text_prefix: str = "") -> bool:
+    """处理自动组装逻辑，返回是否成功组装"""
+    if not daily_car:
+        return False
+    
+    # 执行组装
+    assembly_result = sql_assemble_car(call.from_user.id, daily_car.id)
+    
+    if assembly_result["success"]:
+        message_prefix = f"{assembly_result_text_prefix}🎉 **装备齐全，自动组装成功！**"
+        await process_assembly_success(call, hunt_id, daily_car.id, assembly_result, message_prefix)
+        return True
+    
+    return False
+
+
 def get_user_target_equipment_display(tg: int, target_equipment_ids: list) -> str:
     """获取用户目标装备显示信息"""
     # 获取用户今日装备
@@ -317,6 +378,15 @@ async def hunt_bulk_action(_, call):
         target_equipment_ids = [int(x) for x in daily_car.equipment_ids.split(',')]
         equipment_display, assembly_ready = get_user_target_equipment_display(call.from_user.id, target_equipment_ids)
     
+    # 检查是否装备齐全，自动组装
+    if assembly_ready and daily_car and target_found > 0:
+        # 调用自动组装处理函数
+        auto_assembly_success = await handle_auto_assembly(call, hunt_id, daily_car, result_text + "\n\n")
+        if auto_assembly_success:
+            await callAnswer(call, "🎉 批量寻找完成并自动组装成功！")
+            return  # 自动组装成功，直接返回
+    
+    # 装备未齐全或自动组装失败，显示正常的游戏进行界面
     result_text += f"\n🏎️ **当前状态:**\n"
     result_text += f"🎯 目标汽车: {car_name}\n"
     result_text += f"⏰ 剩余时间: {remaining_minutes}分{remaining_seconds}秒\n"
@@ -403,6 +473,15 @@ async def hunt_action(_, call):
                         target_equipment_ids = [int(x) for x in daily_car.equipment_ids.split(',')]
                         equipment_display, assembly_ready = get_user_target_equipment_display(call.from_user.id, target_equipment_ids)
                     
+                    # 检查是否装备齐全，自动组装
+                    if assembly_ready and daily_car:
+                        # 调用自动组装处理函数
+                        auto_assembly_success = await handle_auto_assembly(call, hunt_id, daily_car, 
+                                                                           f"✅ 最后获得: {color_emoji} {equipment_name}\n\n")
+                        if auto_assembly_success:
+                            return  # 自动组装成功，直接返回
+                    
+                    # 装备未齐全或自动组装失败，显示正常的游戏进行界面
                     # 刷新hunt对象获取最新统计
                     hunt = sql_get_active_hunt(call.from_user.id)
                     
@@ -555,50 +634,8 @@ async def hunt_do_assembly(_, call):
     
     if assembly_result["success"]:
         car_name = assembly_result["car_name"]
-        reward_info = assembly_result["reward"]
-        
-        # 构建奖励信息
-        reward_text = ""
-        if reward_info.get("success", False):
-            if reward_info.get("reward_type") == "coins":
-                reward_text = f"\n💰 奖励: +{reward_info['reward_value']}{sakura_b} (已自动添加)"
-            elif reward_info.get("reward_type") == "code":
-                reward_text = f"\n🎫 奖励: {reward_info['reward_value']}个注册码\n📞 请联系 @MEBimmerSupportBot 领取"
-            elif reward_info.get("reward_type") == "white":
-                reward_text = f"\n⚪ 奖励: {reward_info['reward_value']}个白名单\n📞 请联系 @MEBimmerSupportBot 领取"
-            else:
-                reward_text = f"\n🎁 奖励: {reward_info.get('message', '未知奖励')}"
-        elif reward_info.get("message"):
-            # 奖励处理失败，但组装成功
-            reward_text = f"\n⚠️ 奖励处理异常: {reward_info['message']}"
-        
         await callAnswer(call, f"🎉 成功组装 {car_name}！")
-        
-        # 构建按钮 - 只有M4(car_id=3)和M5(car_id=4)才显示奖励按钮
-        buttons = []
-        if car_id in [3, 4]:  # M4圣保罗黄和M5风暴灰
-            # 检查是否有自定义奖励按钮配置
-            reward_button = sql_get_reward_button(car_id)
-            if reward_button:
-                buttons.append([(reward_button.button_text, reward_button.button_url)])
-        
-        buttons.extend([
-            [("🎮 继续游戏", f"hunt_game_{hunt_id}")],
-            [("❌ 结束游戏", f"hunt_end_{hunt_id}")]
-        ])
-        
-        await editMessage(
-            call,
-            f"✨ **组装成功！**\n\n"
-            f"🏎️ 恭喜您获得汽车: **{car_name}**\n"
-            f"📝 {assembly_result.get('description', '')}\n"
-            f"{reward_text}\n\n"
-            f"🎮 您可以继续游戏或结束当前游戏！",
-            buttons=ikb(buttons)
-        )
-        
-        # 3分钟后删除消息的异步任务
-        asyncio.create_task(delete_message_after_delay(call.message, 180))  # 180秒 = 3分钟
+        await process_assembly_success(call, hunt_id, car_id, assembly_result)
         
     else:
         # 组装失败，提供详细错误信息
