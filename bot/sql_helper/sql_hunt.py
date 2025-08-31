@@ -5,7 +5,7 @@ import datetime
 from bot.sql_helper import Base, Session, engine
 from sqlalchemy import Column, BigInteger, String, DateTime, Integer, Boolean, Text, and_
 from sqlalchemy import func
-from bot import LOGGER, hunt_daily_limit
+from bot import LOGGER, config
 
 
 class Hunt(Base):
@@ -278,7 +278,7 @@ def sql_start_hunt(tg: int) -> int:
                 and_(Hunt.tg == tg, Hunt.game_date == today)
             ).count()
             
-            if today_games >= hunt_daily_limit:
+            if today_games >= config.hunt_daily_limit:
                 return -1  # 超过每日限制
             
             # 强化检查：确保用户只能有一个活跃游戏
