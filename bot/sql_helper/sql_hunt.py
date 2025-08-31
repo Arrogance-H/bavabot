@@ -278,7 +278,7 @@ def sql_start_hunt(tg: int) -> int:
                 and_(Hunt.tg == tg, Hunt.game_date == today)
             ).count()
             
-            if today_games >= 5:
+            if today_games >= 100:
                 return -1  # 超过每日限制
             
             # 强化检查：确保用户只能有一个活跃游戏
