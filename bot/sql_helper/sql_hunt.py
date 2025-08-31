@@ -98,6 +98,18 @@ class DailyCar(Base):
     car_id = Column(Integer, nullable=False)  # 当日汽车id
 
 
+class RewardButton(Base):
+    """
+    自定义奖励按钮配置表
+    """
+    __tablename__ = 'reward_button'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    car_id = Column(Integer, nullable=False)  # 汽车id
+    button_text = Column(String(100), nullable=False)  # 按钮文字
+    button_url = Column(String(500), nullable=False)  # 跳转URL
+    is_active = Column(Boolean, default=True)  # 是否激活
+
+
 # 为了向后兼容，保留旧表结构但标记为废弃
 Fragment = Equipment  # 别名，向后兼容
 Treasure = Car  # 别名，向后兼容  
@@ -113,6 +125,7 @@ Car.__table__.create(bind=engine, checkfirst=True)
 DailyCar.__table__.create(bind=engine, checkfirst=True)
 AssemblyReward.__table__.create(bind=engine, checkfirst=True)
 RewardConfig.__table__.create(bind=engine, checkfirst=True)
+RewardButton.__table__.create(bind=engine, checkfirst=True)
 
 
 def init_cars_and_equipment():
@@ -612,6 +625,96 @@ def sql_cleanup_timed_out_hunts():
         except Exception as e:
             session.rollback()
             LOGGER.error(f"清理超时游戏失败: {e}")
+
+
+def sql_update_hunt_stats(hunt_id: int, last_hunt_time: datetime.datetime) -> bool:
+    """更新车库游戏统计信息"""
+    with Session() as session:
+        try:
+            hunt = session.query(Hunt).filter(Hunt.id == hunt_id).first()
+            if hunt:
+                hunt.last_hunt_time = last_hunt_time
+                hunt.equipment_found = (hunt.equipment_found or 0) + 1
+                session.commit()
+                return True
+            return False
+        except Exception as e:
+            session.rollback()
+            LOGGER.error(f"更新车库游戏统计失败: {e}")
+            return False
+
+
+def sql_cleanup_idle_hunts():
+    """清理超过5分钟无活动的游戏会话"""
+    with Session() as session:
+        try:
+            current_time = datetime.datetime.now()
+            idle_threshold = current_time - datetime.timedelta(minutes=5)  # 5分钟前
+            
+            # 查找超过5分钟无活动的活跃游戏
+            idle_hunts = session.query(Hunt).filter(
+                and_(
+                    Hunt.is_active == True, 
+                    Hunt.last_hunt_time < idle_threshold,
+                    Hunt.last_hunt_time.isnot(None)
+                )
+            ).all()
+            
+            updated_count = 0
+            for hunt in idle_hunts:
+                hunt.end_time = current_time
+                hunt.is_active = False
+                updated_count += 1
+            
+            if updated_count > 0:
+                session.commit()
+                LOGGER.info(f"清理了 {updated_count} 个闲置的车库游戏")
+        except Exception as e:
+            session.rollback()
+            LOGGER.error(f"清理闲置游戏失败: {e}")
+
+
+def sql_get_reward_button(car_id: int):
+    """获取汽车的自定义奖励按钮配置"""
+    with Session() as session:
+        try:
+            button_config = session.query(RewardButton).filter(
+                and_(RewardButton.car_id == car_id, RewardButton.is_active == True)
+            ).first()
+            return button_config
+        except Exception as e:
+            LOGGER.error(f"获取奖励按钮配置失败: {e}")
+            return None
+
+
+def sql_set_reward_button(car_id: int, button_text: str, button_url: str) -> bool:
+    """设置汽车的自定义奖励按钮"""
+    with Session() as session:
+        try:
+            # 查找现有配置
+            existing_button = session.query(RewardButton).filter(RewardButton.car_id == car_id).first()
+            
+            if existing_button:
+                # 更新现有配置
+                existing_button.button_text = button_text
+                existing_button.button_url = button_url
+                existing_button.is_active = True
+            else:
+                # 创建新配置
+                new_button = RewardButton(
+                    car_id=car_id,
+                    button_text=button_text,
+                    button_url=button_url,
+                    is_active=True
+                )
+                session.add(new_button)
+            
+            session.commit()
+            return True
+        except Exception as e:
+            session.rollback()
+            LOGGER.error(f"设置奖励按钮失败: {e}")
+            return False
 
 
 def sql_random_equipment_by_rarity():
