@@ -321,6 +321,14 @@ def sql_get_equipment_definition(equipment_id: int):
             equipment_def = session.query(EquipmentDefinition).filter(
                 EquipmentDefinition.equipment_id == equipment_id
             ).first()
+            if equipment_def:
+                # Load all attributes before expunging to avoid session binding issues
+                _ = equipment_def.equipment_id
+                _ = equipment_def.equipment_name
+                _ = equipment_def.description
+                _ = equipment_def.category
+                _ = equipment_def.rarity_weight
+                session.expunge(equipment_def)
             return equipment_def
         except Exception as e:
             LOGGER.error(f"获取装备定义失败: {e}")
@@ -332,6 +340,16 @@ def sql_get_all_equipment_definitions():
     with Session() as session:
         try:
             equipment_defs = session.query(EquipmentDefinition).order_by(EquipmentDefinition.equipment_id).all()
+            
+            # Load all attributes before expunging to avoid session binding issues
+            for equipment_def in equipment_defs:
+                _ = equipment_def.equipment_id
+                _ = equipment_def.equipment_name
+                _ = equipment_def.description
+                _ = equipment_def.category
+                _ = equipment_def.rarity_weight
+                session.expunge(equipment_def)
+                
             return equipment_defs
         except Exception as e:
             LOGGER.error(f"获取所有装备定义失败: {e}")
@@ -345,6 +363,16 @@ def sql_get_equipment_by_category(category: str):
             equipment_defs = session.query(EquipmentDefinition).filter(
                 EquipmentDefinition.category == category
             ).all()
+            
+            # Load all attributes before expunging to avoid session binding issues
+            for equipment_def in equipment_defs:
+                _ = equipment_def.equipment_id
+                _ = equipment_def.equipment_name
+                _ = equipment_def.description
+                _ = equipment_def.category
+                _ = equipment_def.rarity_weight
+                session.expunge(equipment_def)
+                
             return equipment_defs
         except Exception as e:
             LOGGER.error(f"获取{category}类别装备失败: {e}")
@@ -392,6 +420,18 @@ def sql_get_active_hunt(tg: int):
             hunt = session.query(Hunt).filter(
                 and_(Hunt.tg == tg, Hunt.is_active == True)
             ).first()
+            if hunt:
+                # Load all attributes before expunging to avoid session binding issues
+                _ = hunt.id
+                _ = hunt.tg
+                _ = hunt.start_time
+                _ = hunt.end_time
+                _ = hunt.game_date
+                _ = hunt.is_active
+                _ = hunt.equipment_found
+                _ = hunt.coins_spent
+                _ = hunt.last_hunt_time
+                session.expunge(hunt)
             return hunt
         except Exception as e:
             LOGGER.error(f"获取活跃车库会话失败: {e}")
@@ -445,6 +485,17 @@ def sql_get_user_equipment(tg: int, today_only: bool = True):
                 query = query.filter(Equipment.obtained_date == today)
             
             equipment_list = query.all()
+            
+            # Load all attributes before expunging to avoid session binding issues
+            for equip in equipment_list:
+                _ = equip.id
+                _ = equip.tg
+                _ = equip.equipment_id
+                _ = equip.obtained_date
+                _ = equip.obtained_time
+                _ = equip.hunt_session_id
+                session.expunge(equip)
+                
             return equipment_list
         except Exception as e:
             LOGGER.error(f"获取用户装备失败: {e}")
@@ -489,6 +540,13 @@ def sql_get_daily_car(date: str = None):
                     session.add(daily_car)
                     session.commit()
                     LOGGER.info(f"创建今日汽车: {selected_car.car_name} (ID: {selected_car.id})")
+                    
+                    # Load all attributes before expunging to avoid session binding issues
+                    _ = selected_car.id
+                    _ = selected_car.car_name
+                    _ = selected_car.equipment_ids
+                    _ = selected_car.description
+                    session.expunge(selected_car)
                     return selected_car
                 else:
                     LOGGER.error("没有可用的汽车配置")
@@ -501,6 +559,13 @@ def sql_get_daily_car(date: str = None):
                     LOGGER.error(f"今日汽车配置无效: car_id {daily_car.car_id} 不存在")
                     return None
                 LOGGER.debug(f"获取今日汽车: {car.car_name} (ID: {car.id})")
+                
+                # Load all attributes before expunging to avoid session binding issues
+                _ = car.id
+                _ = car.car_name
+                _ = car.equipment_ids
+                _ = car.description
+                session.expunge(car)
                 return car
             
             return None
@@ -744,6 +809,14 @@ def sql_get_reward_button(car_id: int):
             button_config = session.query(RewardButton).filter(
                 and_(RewardButton.car_id == car_id, RewardButton.is_active == True)
             ).first()
+            if button_config:
+                # Load all attributes before expunging to avoid session binding issues
+                _ = button_config.id
+                _ = button_config.car_id
+                _ = button_config.button_text
+                _ = button_config.button_url
+                _ = button_config.is_active
+                session.expunge(button_config)
             return button_config
         except Exception as e:
             LOGGER.error(f"获取奖励按钮配置失败: {e}")
@@ -862,6 +935,15 @@ def sql_get_reward_config(car_id: int):
             reward_config = session.query(RewardConfig).filter(
                 and_(RewardConfig.car_id == car_id, RewardConfig.is_active == True)
             ).first()
+            if reward_config:
+                # Load all attributes before expunging to avoid session binding issues
+                _ = reward_config.id
+                _ = reward_config.car_id
+                _ = reward_config.reward_type
+                _ = reward_config.reward_value
+                _ = reward_config.reward_description
+                _ = reward_config.is_active
+                session.expunge(reward_config)
             return reward_config
         except Exception as e:
             LOGGER.error(f"获取奖励配置失败: {e}")
