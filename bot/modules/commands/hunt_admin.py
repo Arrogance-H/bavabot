@@ -38,12 +38,12 @@ async def config_hunt_reward(_, msg):
 
 **参数说明:**
 - 车型ID: 1=赞德福特蓝M2, 2=曼岛绿M3, 3=圣保罗黄M4, 4=风暴灰M5
-- 奖励类型: coins(金币), title(称号), badge(徽章)
-- 奖励值: 金币数量或称号名称
+- 奖励类型: coins({sakura_b}), title(称号), badge(徽章)
+- 奖励值: {sakura_b}数量或称号名称
 - 描述: 可选的奖励描述
 
 **示例:**
-`/hunt_config_reward 1 coins 100 组装M2获得100金币`
+`/hunt_config_reward 1 coins 100 组装M2获得100{sakura_b}`
 `/hunt_config_reward 2 title M3车主 曼岛绿M3专属称号`
         """
         return await sendMessage(msg, help_text)
@@ -67,9 +67,9 @@ async def config_hunt_reward(_, msg):
             try:
                 coin_amount = int(reward_value)
                 if coin_amount <= 0:
-                    return await sendMessage(msg, "❌ 金币数量必须大于0")
+                    return await sendMessage(msg, f"❌ {sakura_b}数量必须大于0")
             except ValueError:
-                return await sendMessage(msg, "❌ 金币数量必须为有效数字")
+                return await sendMessage(msg, f"❌ {sakura_b}数量必须为有效数字")
         
         # 更新奖励配置
         if sql_update_reward_config(car_id, reward_type, reward_value, reward_description):

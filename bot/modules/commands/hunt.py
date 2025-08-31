@@ -155,7 +155,7 @@ async def start_hunt(_, msg):
     reward_text = ""
     if reward_config:
         if reward_config.reward_type == "coins":
-            reward_text = f"🎁 完成奖励: {reward_config.reward_value}金币\n"
+            reward_text = f"🎁 完成奖励: {reward_config.reward_value}{sakura_b}\n"
         else:
             reward_text = f"🎁 完成奖励: {reward_config.reward_description}\n"
     
@@ -202,7 +202,7 @@ async def hunt_bulk_action(_, call):
     
     # 扣除金币
     if not sql_update_emby(Emby.tg == call.from_user.id, iv=user.iv - 10):
-        return await callAnswer(call, "❌ 扣除金币失败", show_alert=True)
+        return await callAnswer(call, f"❌ 扣除{sakura_b}失败", show_alert=True)
     
     # 获取今日目标汽车装备ID
     daily_car = sql_get_daily_car()
@@ -309,7 +309,7 @@ async def hunt_action(_, call):
     
     # 扣除金币
     if not sql_update_emby(Emby.tg == call.from_user.id, iv=user.iv - 1):
-        return await callAnswer(call, "❌ 扣除金币失败", show_alert=True)
+        return await callAnswer(call, f"❌ 扣除{sakura_b}失败", show_alert=True)
     
     # 根据稀有度权重随机获得装备
     equipment_id = sql_random_equipment_by_rarity()
@@ -436,7 +436,7 @@ async def hunt_assembly(_, call):
     # 添加奖励信息
     if reward_config:
         if reward_config.reward_type == "coins":
-            assembly_text += f"🎁 完成奖励: {reward_config.reward_value}金币\n"
+            assembly_text += f"🎁 完成奖励: {reward_config.reward_value}{sakura_b}\n"
         else:
             assembly_text += f"🎁 完成奖励: {reward_config.reward_description}\n"
     
@@ -489,7 +489,7 @@ async def hunt_do_assembly(_, call):
         reward_text = ""
         if reward_info["success"]:
             if reward_info["reward_type"] == "coins":
-                reward_text = f"\n💰 奖励: +{reward_info['reward_value']}金币 (已自动添加)"
+                reward_text = f"\n💰 奖励: +{reward_info['reward_value']}{sakura_b} (已自动添加)"
             elif reward_info["reward_type"] == "code":
                 reward_text = f"\n🎫 奖励: {reward_info['reward_value']}个注册码\n📞 请联系 @MEBimmerSupportBot 领取"
             elif reward_info["reward_type"] == "white":
