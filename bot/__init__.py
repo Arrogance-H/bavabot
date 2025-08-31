@@ -76,8 +76,8 @@ user_p = [
     BotCommand("red", "[用户/禁言] 发红包"),
     BotCommand("srank", "[用户/禁言] 查看计分"),
     # 车库游戏用户命令 (Hunt Game User Commands)
-    BotCommand("hunt", "[用户] 开始车库寻宝游戏"),
-    BotCommand("hunt_stats", "[用户] 查看车库游戏统计信息")]
+    BotCommand("hunt", "[用户] 开始寻宝游戏"),
+    BotCommand("hunt_stats", "[用户] 查看寻宝游戏统计信息")]
 
 # 取消 BotCommand("exchange", "[私聊] 使用注册码")
 admin_p = user_p + [
@@ -115,8 +115,8 @@ admin_p = user_p + [
     BotCommand("restart", "重启bot [管理]"),
     BotCommand("update_bot", "更新bot [管理]"),
     # 车库游戏管理员命令 (Hunt Game Admin Commands)
-    BotCommand("hunt_config_reward", "配置车库游戏奖励 [管理]"),
-    BotCommand("hunt_list_rewards", "查看车库游戏奖励配置 [管理]"),
+    BotCommand("hunt_config_reward", "配置寻宝游戏奖励 [管理]"),
+    BotCommand("hunt_list_rewards", "查看寻宝游戏奖励配置 [管理]"),
 ]
 
 owner_p = admin_p + [
