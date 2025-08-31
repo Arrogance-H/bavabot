@@ -97,7 +97,11 @@ def hunt_assembly_ikb(hunt_id: int, car_id: int = None):
     """组装界面按钮"""
     buttons = []
     if car_id:
-        buttons.append([("✨ 组装", f"hunt_do_assembly_{hunt_id}_{car_id}")])
+        assembly_button = ("✨ 组装", f"hunt_do_assembly_{hunt_id}_{car_id}")
+        buttons.append([assembly_button])
+        LOGGER.debug(f"添加组装按钮: hunt_id={hunt_id}, car_id={car_id}, callback={assembly_button[1]}")
+    else:
+        LOGGER.debug(f"未添加组装按钮: car_id为空")
     
     buttons.append([("🔙 返回车库", f"hunt_game_{hunt_id}")])
     
@@ -517,14 +521,21 @@ async def hunt_assembly(_, call):
     
     if can_assemble:
         assembly_text += f"\n🎉 **可以组装！**"
+        LOGGER.info(f"用户 {call.from_user.id} 可以组装汽车 {daily_car.car_name} (ID: {daily_car.id})")
     else:
         assembly_text += f"\n❌ **装备不足，无法组装**"
+        LOGGER.debug(f"用户 {call.from_user.id} 装备不足，无法组装汽车 {daily_car.car_name}")
     
     await callAnswer(call, "🔧 汽车组装")
+    
+    # 确保按钮生成逻辑正确
+    button_car_id = daily_car.id if can_assemble else None
+    LOGGER.debug(f"用户 {call.from_user.id} 组装界面: can_assemble={can_assemble}, button_car_id={button_car_id}")
+    
     await editMessage(
         call, 
         assembly_text, 
-        buttons=hunt_assembly_ikb(hunt_id, daily_car.id if can_assemble else None)
+        buttons=hunt_assembly_ikb(hunt_id, button_car_id)
     )
 
 
@@ -548,15 +559,18 @@ async def hunt_do_assembly(_, call):
         
         # 构建奖励信息
         reward_text = ""
-        if reward_info["success"]:
-            if reward_info["reward_type"] == "coins":
+        if reward_info.get("success", False):
+            if reward_info.get("reward_type") == "coins":
                 reward_text = f"\n💰 奖励: +{reward_info['reward_value']}{sakura_b} (已自动添加)"
-            elif reward_info["reward_type"] == "code":
+            elif reward_info.get("reward_type") == "code":
                 reward_text = f"\n🎫 奖励: {reward_info['reward_value']}个注册码\n📞 请联系 @MEBimmerSupportBot 领取"
-            elif reward_info["reward_type"] == "white":
+            elif reward_info.get("reward_type") == "white":
                 reward_text = f"\n⚪ 奖励: {reward_info['reward_value']}个白名单\n📞 请联系 @MEBimmerSupportBot 领取"
             else:
-                reward_text = f"\n🎁 奖励: {reward_info['message']}"
+                reward_text = f"\n🎁 奖励: {reward_info.get('message', '未知奖励')}"
+        elif reward_info.get("message"):
+            # 奖励处理失败，但组装成功
+            reward_text = f"\n⚠️ 奖励处理异常: {reward_info['message']}"
         
         await callAnswer(call, f"🎉 成功组装 {car_name}！")
         
@@ -587,7 +601,23 @@ async def hunt_do_assembly(_, call):
         asyncio.create_task(delete_message_after_delay(call.message, 180))  # 180秒 = 3分钟
         
     else:
-        await callAnswer(call, f"❌ 组装失败: {assembly_result['message']}", show_alert=True)
+        # 组装失败，提供详细错误信息
+        error_message = assembly_result.get("message", "未知错误")
+        LOGGER.warning(f"用户 {call.from_user.id} 汽车组装失败: {error_message}")
+        
+        await callAnswer(call, f"❌ 组装失败: {error_message}", show_alert=True)
+        
+        # 返回组装界面让用户重试
+        await editMessage(
+            call,
+            f"❌ **组装失败**\n\n"
+            f"错误信息: {error_message}\n\n"
+            f"请检查您的装备或重试组装。如果问题持续，请联系管理员。",
+            buttons=ikb([
+                [("🔄 重试组装", f"hunt_assembly_{hunt_id}")],
+                [("🔙 返回车库", f"hunt_game_{hunt_id}")]
+            ])
+        )
 
 
 @bot.on_callback_query(filters.regex(r'^hunt_end_(\d+)$'))
