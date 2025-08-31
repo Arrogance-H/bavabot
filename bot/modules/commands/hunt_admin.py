@@ -9,7 +9,8 @@ from bot.func_helper.msg_utils import sendMessage
 from bot.sql_helper.sql_emby import sql_get_emby
 from bot.sql_helper.sql_hunt import (
     sql_update_reward_config, sql_get_reward_config, 
-    sql_get_probability_stats, Car, RewardConfig
+    sql_get_probability_stats, Car, RewardConfig,
+    sql_set_reward_button, sql_get_reward_button
 )
 from bot.sql_helper import Session
 
@@ -189,3 +190,133 @@ async def hunt_statistics(_, msg):
     except Exception as e:
         LOGGER.error(f"查看统计信息失败: {e}")
         await sendMessage(msg, "❌ 获取统计信息失败")
+
+
+@bot.on_message(filters.command('hunt_config_button', prefixes) & user_in_group_on_filter)
+async def config_hunt_button(_, msg):
+    """配置车库游戏自定义奖励按钮 - 仅管理员使用"""
+    await msg.delete()
+    
+    user = sql_get_emby(msg.from_user.id)
+    if not user:
+        return await sendMessage(msg, "❌ 请先私聊机器人进行注册")
+    
+    # 简单的管理员检查 - 这里可以根据实际需求修改权限检查逻辑
+    # if not user.is_admin:  # 假设有管理员字段
+    #     return await sendMessage(msg, "❌ 仅管理员可以使用此命令")
+    
+    # 解析命令参数
+    args = msg.text.split()
+    if len(args) < 4:
+        help_text = """
+🔧 **车库奖励按钮配置帮助**
+
+**用法:** `/hunt_config_button <车型ID> <按钮文字> <跳转URL>`
+
+**参数说明:**
+- 车型ID: 1=赞德福特蓝M2, 2=曼岛绿M3, 3=圣保罗黄M4, 4=风暴灰M5
+- 按钮文字: 按钮显示的文字（如：🎁 领取专属奖励）
+- 跳转URL: 点击按钮后跳转的网址
+
+**示例:**
+`/hunt_config_button 1 🎁 领取M2奖励 https://example.com/reward1`
+`/hunt_config_button 2 🏆 查看称号 https://example.com/title2`
+
+**注意:** 按钮仅在用户成功组装汽车后显示
+        """
+        return await sendMessage(msg, help_text)
+    
+    try:
+        car_id = int(args[1])
+        # 处理包含空格的按钮文字和URL
+        parts = msg.text.split(None, 3)  # 最多分割3次
+        if len(parts) < 4:
+            return await sendMessage(msg, "❌ 参数不完整，请提供按钮文字和URL")
+        
+        # 从第三个参数开始可能包含空格，需要特殊处理
+        remaining_text = parts[3]
+        # 寻找最后一个以http开头的部分作为URL
+        words = remaining_text.split()
+        url = None
+        button_text_words = []
+        
+        for i, word in enumerate(words):
+            if word.startswith('http'):
+                url = word
+                button_text_words = words[:i]
+                break
+        
+        if not url:
+            return await sendMessage(msg, "❌ 未找到有效的URL（必须以http开头）")
+        
+        if not button_text_words:
+            return await sendMessage(msg, "❌ 按钮文字不能为空")
+        
+        button_text = ' '.join(button_text_words)
+        
+        # 验证车型ID
+        with Session() as session:
+            car = session.query(Car).filter(Car.id == car_id).first()
+            if not car:
+                return await sendMessage(msg, f"❌ 车型ID {car_id} 不存在")
+            
+            car_name = car.car_name
+        
+        # 设置奖励按钮
+        if sql_set_reward_button(car_id, button_text, url):
+            await sendMessage(
+                msg, 
+                f"✅ **奖励按钮配置成功！**\n\n"
+                f"🏎️ 汽车: {car_name}\n"
+                f"🔘 按钮文字: {button_text}\n"
+                f"🔗 跳转链接: {url}\n\n"
+                f"💡 用户组装此汽车后将看到自定义按钮"
+            )
+        else:
+            await sendMessage(msg, "❌ 配置奖励按钮失败")
+            
+    except ValueError:
+        await sendMessage(msg, "❌ 车型ID必须是数字")
+    except Exception as e:
+        LOGGER.error(f"配置奖励按钮失败: {e}")
+        await sendMessage(msg, f"❌ 配置失败: {str(e)}")
+
+
+@bot.on_message(filters.command('hunt_view_button', prefixes) & user_in_group_on_filter)
+async def view_hunt_button(_, msg):
+    """查看车库游戏奖励按钮配置"""
+    await msg.delete()
+    
+    user = sql_get_emby(msg.from_user.id)
+    if not user:
+        return await sendMessage(msg, "❌ 请先私聊机器人进行注册")
+    
+    try:
+        with Session() as session:
+            cars = session.query(Car).all()
+            
+            if not cars:
+                return await sendMessage(msg, "❌ 没有找到任何汽车配置")
+            
+            config_text = "🔧 **奖励按钮配置**\n\n"
+            
+            for car in cars:
+                button_config = sql_get_reward_button(car.id)
+                config_text += f"🏎️ **{car.car_name}** (ID: {car.id})\n"
+                
+                if button_config:
+                    config_text += f"🔘 按钮: {button_config.button_text}\n"
+                    config_text += f"🔗 链接: {button_config.button_url}\n"
+                    config_text += f"📱 状态: {'✅ 启用' if button_config.is_active else '❌ 禁用'}\n"
+                else:
+                    config_text += f"📱 状态: ❌ 未配置\n"
+                
+                config_text += "\n"
+            
+            config_text += "💡 使用 `/hunt_config_button` 命令配置自定义按钮"
+            
+            await sendMessage(msg, config_text)
+            
+    except Exception as e:
+        LOGGER.error(f"查看奖励按钮配置失败: {e}")
+        await sendMessage(msg, "❌ 获取配置信息失败")
