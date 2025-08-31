@@ -716,17 +716,17 @@ def sql_set_reward_button(car_id: int, button_text: str, button_url: str) -> boo
 
 
 def sql_random_equipment_by_rarity():
-    """根据稀有度权重随机选择装备 - 紫色装备概率大幅提升，M2>M3>M4>M5概率递减"""
+    """根据稀有度权重随机选择装备 - 新概率分布：蓝色 > 绿色 > 金色 > 紫色(3.9%)"""
     with Session() as session:
         try:
             import random
             
-            # 更新概率分布，紫色装备按M系列车型概率递减
-            # 总概率: 蓝色92.1% + 绿色4.0% + 金色0% + 紫色3.9%
+            # 新概率分布，按从高到低排序: 蓝色 > 绿色 > 金色 > 紫色(3.9%)
+            # 总概率: 蓝色81.1% + 绿色10.0% + 金色5.0% + 紫色3.9%
             # 紫色装备细分: M2(2.0%) > M3(1.0%) > M4(0.8%) > M5(0.1%)
             rand_value = random.random() * 100  # 0-100的随机数
             
-            # 紫色装备个别概率判断 (M2 > M3 > M4 > M5)
+            # 紫色装备个别概率判断 (M2 > M3 > M4 > M5) - 保持3.9%总概率
             if rand_value < 0.1:  # 0.1% M5紫色装备 (风暴灰车漆, equipment_id=4)
                 return 4  # 直接返回M5专属紫色装备ID
             elif rand_value < 0.9:  # 0.8% M4紫色装备 (圣保罗黄车漆, equipment_id=3)
@@ -735,9 +735,11 @@ def sql_random_equipment_by_rarity():
                 return 2  # 直接返回M3专属紫色装备ID
             elif rand_value < 3.9:  # 2.0% M2紫色装备 (赞德福特蓝车漆, equipment_id=1)
                 return 1  # 直接返回M2专属紫色装备ID
-            elif rand_value < 7.9:  # 4.0% 概率获得绿色装备 (3.9% + 4.0%)
+            elif rand_value < 8.9:  # 5.0% 概率获得金色装备 (3.9% + 5.0%)
+                category = 'gold'
+            elif rand_value < 18.9:  # 10.0% 概率获得绿色装备 (8.9% + 10.0%)
                 category = 'green'
-            else:  # 92.1% 概率获得蓝色装备
+            else:  # 81.1% 概率获得蓝色装备
                 category = 'blue'
             
             # 从选定类别中随机选择装备 (非紫色装备)
