@@ -4,7 +4,7 @@
 import asyncio
 from datetime import datetime, timedelta
 from bot import LOGGER, schedall
-from bot.sql_helper.sql_hunt import sql_cleanup_expired_equipment, sql_cleanup_timed_out_hunts
+from bot.sql_helper.sql_hunt import sql_cleanup_expired_equipment, sql_cleanup_timed_out_hunts, sql_cleanup_idle_hunts
 from bot.sql_helper.sql_emby import get_all_emby
 from bot.sql_helper.sql_emby import get_all_emby
 
@@ -25,6 +25,15 @@ async def cleanup_expired_hunts():
         LOGGER.info("【车库清理】超时游戏清理完成")
     except Exception as e:
         LOGGER.error(f"【车库清理】清理超时游戏失败: {e}")
+
+
+async def cleanup_idle_hunts():
+    """清理闲置的车库游戏"""
+    try:
+        sql_cleanup_idle_hunts()
+        LOGGER.info("【车库清理】闲置游戏清理完成")
+    except Exception as e:
+        LOGGER.error(f"【车库清理】清理闲置游戏失败: {e}")
 
 
 # 注册定时任务
@@ -49,6 +58,14 @@ if getattr(schedall, 'hunt_cleanup', True):  # 默认启用
         'interval',
         minutes=10,
         id='hunt_expired_cleanup'
+    )
+    
+    # 每5分钟清理闲置游戏
+    scheduler.add_job(
+        cleanup_idle_hunts,
+        'interval',
+        minutes=5,
+        id='hunt_idle_cleanup'
     )
     
     try:
