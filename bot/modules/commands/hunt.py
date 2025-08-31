@@ -489,29 +489,21 @@ async def hunt_do_assembly(_, call):
         reward_text = ""
         if reward_info["success"]:
             if reward_info["reward_type"] == "coins":
-                reward_text = f"\n💰 奖励: +{reward_info['reward_value']}金币"
-            elif reward_info["reward_type"] == "title":
-                reward_text = f"\n🏆 奖励: {reward_info['reward_value']} 称号"
+                reward_text = f"\n💰 奖励: +{reward_info['reward_value']}金币 (已自动添加)"
+            elif reward_info["reward_type"] == "code":
+                reward_text = f"\n🎫 奖励: {reward_info['reward_value']}个注册码\n📞 请联系 @MEBimmerSupportBot 领取"
+            elif reward_info["reward_type"] == "white":
+                reward_text = f"\n⚪ 奖励: {reward_info['reward_value']}个白名单\n📞 请联系 @MEBimmerSupportBot 领取"
             else:
                 reward_text = f"\n🎁 奖励: {reward_info['message']}"
         
-        # 获取自定义奖励按钮
-        reward_button_config = sql_get_reward_button(car_id)
-        reward_button = None
-        if reward_button_config:
-            reward_button = {
-                'text': reward_button_config.button_text,
-                'url': reward_button_config.button_url
-            }
-        
         await callAnswer(call, f"🎉 成功组装 {car_name}！")
         
-        # 构建按钮，包含自定义奖励按钮
-        buttons = []
-        if reward_button:
-            buttons.append([(reward_button['text'], reward_button['url'], 'url')])
-        buttons.append([("🎮 继续游戏", f"hunt_game_{hunt_id}")])
-        buttons.append([("❌ 结束游戏", f"hunt_end_{hunt_id}")])
+        # 构建按钮 - 移除自定义奖励按钮，只保留游戏控制按钮
+        buttons = [
+            [("🎮 继续游戏", f"hunt_game_{hunt_id}")],
+            [("❌ 结束游戏", f"hunt_end_{hunt_id}")]
+        ]
         
         await editMessage(
             call,
@@ -519,7 +511,7 @@ async def hunt_do_assembly(_, call):
             f"🏎️ 恭喜您获得汽车: **{car_name}**\n"
             f"📝 {assembly_result.get('description', '')}\n"
             f"{reward_text}\n\n"
-            f"🎮 您可以继续游戏或领取专属奖励！",
+            f"🎮 您可以继续游戏或结束当前游戏！",
             buttons=ikb(buttons)
         )
         

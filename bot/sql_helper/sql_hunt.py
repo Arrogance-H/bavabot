@@ -187,14 +187,12 @@ def init_cars_and_equipment():
             for car in cars:
                 session.add(car)
             
-            # 添加默认奖励配置
+            # 添加更新的奖励配置
             reward_configs = [
-                RewardConfig(car_id=1, reward_type="coins", reward_value="50", reward_description="组装赞德福特蓝M2获得50金币奖励"),
-                RewardConfig(car_id=2, reward_type="coins", reward_value="60", reward_description="组装曼岛绿M3获得60金币奖励"),
-                RewardConfig(car_id=3, reward_type="coins", reward_value="70", reward_description="组装圣保罗黄M4获得70金币奖励"),
-                RewardConfig(car_id=4, reward_type="coins", reward_value="80", reward_description="组装风暴灰M5获得80金币奖励"),
-                # 可以添加更多奖励类型，如称号、徽章等
-                # RewardConfig(car_id=1, reward_type="title", reward_value="M2车主", reward_description="赞德福特蓝M2专属称号"),
+                RewardConfig(car_id=1, reward_type="coins", reward_value="100", reward_description="组装赞德福特蓝M2获得100金币奖励"),
+                RewardConfig(car_id=2, reward_type="coins", reward_value="1916", reward_description="组装曼岛绿M3获得1916金币奖励"),
+                RewardConfig(car_id=3, reward_type="code", reward_value="1", reward_description="组装圣保罗黄M4获得1个注册码"),
+                RewardConfig(car_id=4, reward_type="white", reward_value="1", reward_description="组装风暴灰M5获得1个白名单"),
             ]
             
             for reward_config in reward_configs:
@@ -718,30 +716,28 @@ def sql_set_reward_button(car_id: int, button_text: str, button_url: str) -> boo
 
 
 def sql_random_equipment_by_rarity():
-    """根据稀有度权重随机选择装备 - 紫色装备极稀有，M2>M3>M4>M5概率递减"""
+    """根据稀有度权重随机选择装备 - 紫色装备概率大幅提升，M2>M3>M4>M5概率递减"""
     with Session() as session:
         try:
             import random
             
-            # 使用细化的概率分布，紫色装备按M系列车型概率递减
-            # 总概率: 蓝色60.4% + 绿色30% + 金色9.5% + 紫色0.1%
-            # 紫色装备细分: M2(0.04%) > M3(0.03%) > M4(0.02%) > M5(0.01%)
+            # 更新概率分布，紫色装备按M系列车型概率递减
+            # 总概率: 蓝色92.1% + 绿色4.0% + 金色0% + 紫色3.9%
+            # 紫色装备细分: M2(2.0%) > M3(1.0%) > M4(0.8%) > M5(0.1%)
             rand_value = random.random() * 100  # 0-100的随机数
             
             # 紫色装备个别概率判断 (M2 > M3 > M4 > M5)
-            if rand_value < 0.01:  # 0.01% M5紫色装备 (风暴灰车漆, equipment_id=4)
+            if rand_value < 0.1:  # 0.1% M5紫色装备 (风暴灰车漆, equipment_id=4)
                 return 4  # 直接返回M5专属紫色装备ID
-            elif rand_value < 0.03:  # 0.02% M4紫色装备 (圣保罗黄车漆, equipment_id=3)
+            elif rand_value < 0.9:  # 0.8% M4紫色装备 (圣保罗黄车漆, equipment_id=3)
                 return 3  # 直接返回M4专属紫色装备ID
-            elif rand_value < 0.06:  # 0.03% M3紫色装备 (曼岛绿车漆, equipment_id=2)
+            elif rand_value < 1.9:  # 1.0% M3紫色装备 (曼岛绿车漆, equipment_id=2)
                 return 2  # 直接返回M3专属紫色装备ID
-            elif rand_value < 0.1:  # 0.04% M2紫色装备 (赞德福特蓝车漆, equipment_id=1)
+            elif rand_value < 3.9:  # 2.0% M2紫色装备 (赞德福特蓝车漆, equipment_id=1)
                 return 1  # 直接返回M2专属紫色装备ID
-            elif rand_value < 9.6:  # 9.5% 概率获得金色装备 (0.1% + 9.5%)
-                category = 'gold'
-            elif rand_value < 39.6:  # 30% 概率获得绿色装备 (9.6% + 30%)
+            elif rand_value < 7.9:  # 4.0% 概率获得绿色装备 (3.9% + 4.0%)
                 category = 'green'
-            else:  # 60.4% 概率获得蓝色装备
+            else:  # 92.1% 概率获得蓝色装备
                 category = 'blue'
             
             # 从选定类别中随机选择装备 (非紫色装备)
@@ -836,7 +832,7 @@ def sql_give_assembly_reward(tg: int, car_id: int) -> dict:
             
             # 处理不同类型的奖励
             if reward_config.reward_type == "coins":
-                # 金币奖励
+                # 金币奖励 - 直接给用户增加金币
                 from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby
                 user = sql_get_emby(tg)
                 if user:
@@ -861,17 +857,16 @@ def sql_give_assembly_reward(tg: int, car_id: int) -> dict:
                             "reward_type": "coins",
                             "reward_value": coin_amount,
                             "description": reward_config.reward_description,
-                            "message": f"获得{coin_amount}金币奖励！"
+                            "message": f"已自动添加{coin_amount}金币到您的账户！"
                         }
                     else:
                         return {"success": False, "message": "发放金币奖励失败"}
                 else:
                     return {"success": False, "message": "用户不存在"}
             
-            # 其他奖励类型（如称号、徽章）可以在这里添加
-            elif reward_config.reward_type == "title":
-                # 称号奖励 - 这里需要根据实际的用户系统来实现
-                # 暂时只记录奖励，不实际授予称号
+            # 注册码奖励
+            elif reward_config.reward_type == "code":
+                # 注册码奖励 - 提示用户联系客服
                 reward_record = AssemblyReward(
                     tg=tg,
                     car_id=car_id,
@@ -887,10 +882,34 @@ def sql_give_assembly_reward(tg: int, car_id: int) -> dict:
                 
                 return {
                     "success": True,
-                    "reward_type": "title",
+                    "reward_type": "code",
                     "reward_value": reward_config.reward_value,
                     "description": reward_config.reward_description,
-                    "message": f"获得专属称号：{reward_config.reward_value}！"
+                    "message": f"恭喜获得{reward_config.reward_value}个注册码！请联系 @MEBimmerSupportBot 领取"
+                }
+            
+            # 白名单奖励
+            elif reward_config.reward_type == "white":
+                # 白名单奖励 - 提示用户联系客服
+                reward_record = AssemblyReward(
+                    tg=tg,
+                    car_id=car_id,
+                    car_name=car.car_name,
+                    reward_type=reward_config.reward_type,
+                    reward_value=reward_config.reward_value,
+                    reward_description=reward_config.reward_description,
+                    obtained_date=today,
+                    obtained_time=current_time
+                )
+                session.add(reward_record)
+                session.commit()
+                
+                return {
+                    "success": True,
+                    "reward_type": "white",
+                    "reward_value": reward_config.reward_value,
+                    "description": reward_config.reward_description,
+                    "message": f"恭喜获得{reward_config.reward_value}个白名单！请联系 @MEBimmerSupportBot 领取"
                 }
             
             return {"success": False, "message": "未知的奖励类型"}
@@ -953,18 +972,18 @@ def sql_get_probability_stats():
     """获取装备抽取概率统计信息"""
     return {
         "purple": {
-            "probability": "0.1%", 
-            "description": "极稀有专属车漆",
+            "probability": "3.9%", 
+            "description": "专属车漆奖励",
             "details": {
-                "M2_赞德福特蓝车漆": "0.04%",
-                "M3_曼岛绿车漆": "0.03%", 
-                "M4_圣保罗黄车漆": "0.02%",
-                "M5_风暴灰车漆": "0.01%"
+                "M2_赞德福特蓝车漆": "2.0%",
+                "M3_曼岛绿车漆": "1.0%", 
+                "M4_圣保罗黄车漆": "0.8%",
+                "M5_风暴灰车漆": "0.1%"
             }
         },
-        "gold": {"probability": "9.5%", "description": "高性能组件"},
-        "green": {"probability": "30%", "description": "车漆变体"},
-        "blue": {"probability": "60.4%", "description": "常见物品"}
+        "gold": {"probability": "0%", "description": "已移除"},
+        "green": {"probability": "4.0%", "description": "车漆变体"},
+        "blue": {"probability": "92.1%", "description": "常见物品"}
     }
 
 
