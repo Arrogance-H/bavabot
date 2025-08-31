@@ -716,13 +716,13 @@ def sql_set_reward_button(car_id: int, button_text: str, button_url: str) -> boo
 
 
 def sql_random_equipment_by_rarity():
-    """根据稀有度权重随机选择装备 - 新概率分布：蓝色 > 绿色 > 金色 > 紫色(3.9%)"""
+    """根据稀有度权重随机选择装备 - 优化概率分布：蓝色 > 绿色 > 金色 > 紫色(3.9%)"""
     with Session() as session:
         try:
             import random
             
-            # 新概率分布，按从高到低排序: 蓝色 > 绿色 > 金色 > 紫色(3.9%)
-            # 总概率: 蓝色81.1% + 绿色10.0% + 金色5.0% + 紫色3.9%
+            # 优化概率分布，按从高到低排序: 蓝色 > 绿色 > 金色 > 紫色(3.9%)
+            # 总概率: 蓝色84.1% + 绿色7.0% + 金色5.0% + 紫色3.9%
             # 紫色装备细分: M2(2.0%) > M3(1.0%) > M4(0.8%) > M5(0.1%)
             rand_value = random.random() * 100  # 0-100的随机数
             
@@ -737,9 +737,9 @@ def sql_random_equipment_by_rarity():
                 return 1  # 直接返回M2专属紫色装备ID
             elif rand_value < 8.9:  # 5.0% 概率获得金色装备 (3.9% + 5.0%)
                 category = 'gold'
-            elif rand_value < 18.9:  # 10.0% 概率获得绿色装备 (8.9% + 10.0%)
+            elif rand_value < 15.9:  # 7.0% 概率获得绿色装备 (8.9% + 7.0%)
                 category = 'green'
-            else:  # 81.1% 概率获得蓝色装备
+            else:  # 84.1% 概率获得蓝色装备
                 category = 'blue'
             
             # 从选定类别中随机选择装备 (非紫色装备)
@@ -983,9 +983,9 @@ def sql_get_probability_stats():
                 "M5_风暴灰车漆": "0.1%"
             }
         },
-        "gold": {"probability": "0%", "description": "已移除"},
-        "green": {"probability": "4.0%", "description": "车漆变体"},
-        "blue": {"probability": "92.1%", "description": "常见物品"}
+        "gold": {"probability": "5.0%", "description": "高级组件"},
+        "green": {"probability": "7.0%", "description": "车漆变体"},
+        "blue": {"probability": "84.1%", "description": "常见物品"}
     }
 
 
