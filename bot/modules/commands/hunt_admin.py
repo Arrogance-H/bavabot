@@ -147,13 +147,9 @@ async def hunt_statistics(_, msg):
     """查看车库游戏统计信息"""
     await msg.delete()
     
-    user = sql_get_emby(msg.from_user.id)
-    if not user:
-        return await sendMessage(msg, "❌ 请先私聊机器人进行注册")
-    
     try:
         from bot.sql_helper.sql_hunt import (
-            Hunt, Equipment, AssemblyReward, EquipmentDefinition
+            Hunt, Equipment, AssemblyReward
         )
         
         with Session() as session:
@@ -177,12 +173,6 @@ async def hunt_statistics(_, msg):
                 AssemblyReward.tg == msg.from_user.id, AssemblyReward.obtained_date == today
             ).count()
             
-            # 装备类别统计
-            equipment_stats = {}
-            equipment_defs = session.query(EquipmentDefinition).all()
-            for eq_def in equipment_defs:
-                equipment_stats[eq_def.category] = equipment_stats.get(eq_def.category, 0) + 1
-            
             stats_text = f"📊 **车库游戏统计**\n\n"
             stats_text += f"📅 **今日全服数据:**\n"
             stats_text += f"🎮 游戏场次: {today_hunts}\n"
@@ -192,12 +182,7 @@ async def hunt_statistics(_, msg):
             stats_text += f"👤 **您的今日数据:**\n"
             stats_text += f"🎮 游戏场次: {user_today_hunts}/5\n"
             stats_text += f"🔍 发现装备: {user_today_equipment}\n"
-            stats_text += f"🏎️ 完成组装: {user_today_rewards}\n\n"
-            
-            stats_text += f"📋 **装备配置:**\n"
-            for category, count in equipment_stats.items():
-                emoji = {'purple': '🟣', 'gold': '🟡', 'green': '🟢', 'blue': '🔵'}.get(category, '⚪')
-                stats_text += f"{emoji} {category}: {count}种\n"
+            stats_text += f"🏎️ 完成组装: {user_today_rewards}\n"
             
             await sendMessage(msg, stats_text)
             

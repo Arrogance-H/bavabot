@@ -878,6 +878,13 @@ async def hunt_end(_, call):
         duration_minutes = int(game_duration.total_seconds() // 60)
         duration_seconds = int(game_duration.total_seconds() % 60)
         
+        # 获取用户昵称
+        user_nickname = call.from_user.first_name
+        if call.from_user.last_name:
+            user_nickname += f" {call.from_user.last_name}"
+        if call.from_user.username:
+            user_nickname += f" (@{call.from_user.username})"
+        
         # 获取用户今日装备
         equipment_list = sql_get_user_equipment(call.from_user.id, today_only=True)
         equipment_counts = {}
@@ -885,6 +892,7 @@ async def hunt_end(_, call):
             equipment_counts[equip.equipment_id] = equipment_counts.get(equip.equipment_id, 0) + 1
         
         result_text = f"🏁 **车库游戏结束**\n\n"
+        result_text += f"👤 **{user_nickname}** 已经结束寻宝\n\n"
         result_text += f"⏱️ 游戏时长: {duration_minutes}分{duration_seconds}秒\n"
         result_text += f"🔍 找到装备: {hunt.equipment_found}个\n"
         result_text += f"💰 消耗{sakura_b}: {hunt.coins_spent}\n\n"
