@@ -513,7 +513,7 @@ def sql_check_car_assembly(tg: int, car_id: int) -> bool:
             if not car:
                 return False
             
-            required_equipment = [int(x) for x in car.equipment_ids.split(',')]
+            required_equipment = [int(x.strip()) for x in car.equipment_ids.split(',')]
             
             # 检查用户是否拥有所需装备
             user_equipment = session.query(Equipment).filter(
@@ -524,7 +524,7 @@ def sql_check_car_assembly(tg: int, car_id: int) -> bool:
             for equip in user_equipment:
                 user_equipment_counts[equip.equipment_id] = user_equipment_counts.get(equip.equipment_id, 0) + 1
             
-            # 检查是否有足够的装备
+            # 检查是否有足够的装备 - 每种装备至少需要1个
             for required_id in required_equipment:
                 if user_equipment_counts.get(required_id, 0) < 1:
                     return False
@@ -536,7 +536,7 @@ def sql_check_car_assembly(tg: int, car_id: int) -> bool:
 
 
 def sql_assemble_car(tg: int, car_id: int) -> dict:
-    """组装汽车并发放奖励"""
+    """组装汽车并发放奖励 - 改进版本处理多个装备"""
     with Session() as session:
         try:
             today = datetime.datetime.now().strftime("%Y-%m-%d")
@@ -546,20 +546,38 @@ def sql_assemble_car(tg: int, car_id: int) -> dict:
             if not car:
                 return {"success": False, "message": "汽车不存在"}
             
-            required_equipment = [int(x) for x in car.equipment_ids.split(',')]
+            required_equipment = [int(x.strip()) for x in car.equipment_ids.split(',')]
             
-            # 删除用户的对应装备
+            # 再次检查用户是否有足够的装备
+            user_equipment = session.query(Equipment).filter(
+                and_(Equipment.tg == tg, Equipment.obtained_date == today)
+            ).all()
+            
+            user_equipment_counts = {}
+            user_equipment_by_id = {}
+            for equip in user_equipment:
+                if equip.equipment_id not in user_equipment_by_id:
+                    user_equipment_by_id[equip.equipment_id] = []
+                user_equipment_by_id[equip.equipment_id].append(equip)
+                user_equipment_counts[equip.equipment_id] = user_equipment_counts.get(equip.equipment_id, 0) + 1
+            
+            # 检查是否有足够装备
+            for required_id in required_equipment:
+                if user_equipment_counts.get(required_id, 0) < 1:
+                    return {"success": False, "message": f"装备不足：缺少装备 {required_id}"}
+            
+            # 删除用户的对应装备 - 每种类型删除一个
             removed_equipment = []
             for required_id in required_equipment:
-                equipment = session.query(Equipment).filter(
-                    and_(Equipment.tg == tg, Equipment.equipment_id == required_id, Equipment.obtained_date == today)
-                ).first()
-                if equipment:
-                    session.delete(equipment)
+                if required_id in user_equipment_by_id and user_equipment_by_id[required_id]:
+                    # 删除第一个该类型的装备
+                    equipment_to_remove = user_equipment_by_id[required_id][0]
+                    session.delete(equipment_to_remove)
                     removed_equipment.append(required_id)
+                    LOGGER.info(f"用户 {tg} 组装 {car.car_name}，删除装备 {required_id}")
                 else:
                     session.rollback()
-                    return {"success": False, "message": "装备不足，无法组装"}
+                    return {"success": False, "message": f"装备不足：无法找到装备 {required_id}"}
             
             session.commit()
             
@@ -570,6 +588,7 @@ def sql_assemble_car(tg: int, car_id: int) -> dict:
                 "success": True,
                 "message": "组装成功",
                 "car_name": car.car_name,
+                "description": car.description,
                 "reward": reward_result
             }
         except Exception as e:

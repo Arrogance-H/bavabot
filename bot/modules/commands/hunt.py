@@ -30,7 +30,7 @@ async def delete_message_after_delay(message, delay_seconds: int):
 
 # 车库游戏按钮
 def hunt_game_ikb(hunt_id: int, last_hunt_time: int = 0):
-    """创建车库游戏按钮"""
+    """创建车库游戏按钮 - 每行2个按钮"""
     current_time = int(datetime.datetime.now().timestamp())
     cooldown_remaining = max(0, 1 - (current_time - last_hunt_time))  # 1秒冷却
     can_hunt = cooldown_remaining == 0
@@ -43,10 +43,8 @@ def hunt_game_ikb(hunt_id: int, last_hunt_time: int = 0):
         bulk_hunt_btn_text = f"⏰ 批量寻找 ({cooldown_remaining}s)"
     
     return ikb([
-        [(hunt_btn_text, f"hunt_action_{hunt_id}")],
-        [(bulk_hunt_btn_text, f"hunt_bulk_action_{hunt_id}")],
-        [("🔧 组装汽车", f"hunt_assembly_{hunt_id}")],
-        [("❌ 结束游戏", f"hunt_end_{hunt_id}")]
+        [(hunt_btn_text, f"hunt_action_{hunt_id}"), (bulk_hunt_btn_text, f"hunt_bulk_action_{hunt_id}")],
+        [("🔧 组装汽车", f"hunt_assembly_{hunt_id}"), ("❌ 结束游戏", f"hunt_end_{hunt_id}")]
     ])
 
 
@@ -59,6 +57,40 @@ def get_equipment_color_emoji(category: str) -> str:
         'blue': '🔵'
     }
     return color_map.get(category, '⚪')
+
+
+def get_user_target_equipment_display(tg: int, target_equipment_ids: list) -> str:
+    """获取用户目标装备显示信息"""
+    # 获取用户今日装备
+    equipment_list = sql_get_user_equipment(tg, today_only=True)
+    equipment_counts = {}
+    for equip in equipment_list:
+        equipment_counts[equip.equipment_id] = equipment_counts.get(equip.equipment_id, 0) + 1
+    
+    display_text = "🎒 **已获得目标装备:**\n"
+    all_equipped = True
+    
+    for target_id in target_equipment_ids:
+        have_count = equipment_counts.get(target_id, 0)
+        status = "✅" if have_count >= 1 else "❌"
+        if have_count < 1:
+            all_equipped = False
+            
+        # 获取装备定义
+        equipment_def = sql_get_equipment_definition(target_id)
+        if equipment_def:
+            equipment_name = equipment_def.equipment_name
+            color_emoji = get_equipment_color_emoji(equipment_def.category)
+            display_text += f"{status} {color_emoji} {equipment_name}: {have_count}/1\n"
+        else:
+            display_text += f"{status} ⚪ 装备 {target_id}: {have_count}/1\n"
+    
+    if all_equipped:
+        display_text += "\n🎉 **装备齐全，可以组装！**"
+    else:
+        display_text += "\n❓ **还需收集更多装备**"
+    
+    return display_text, all_equipped
 
 
 def hunt_assembly_ikb(hunt_id: int, car_id: int = None):
@@ -106,6 +138,14 @@ async def start_hunt(_, msg):
             # 获取目标装备数量
             equipment_count = sql_count_user_equipment(msg.from_user.id, today_only=True)
             
+            # 获取目标装备显示信息
+            target_equipment_ids = []
+            equipment_display = ""
+            assembly_ready = False
+            if daily_car:
+                target_equipment_ids = [int(x) for x in daily_car.equipment_ids.split(',')]
+                equipment_display, assembly_ready = get_user_target_equipment_display(msg.from_user.id, target_equipment_ids)
+            
             # 获取用户昵称
             user_nickname = msg.from_user.first_name
             
@@ -116,8 +156,8 @@ async def start_hunt(_, msg):
                 f"🎯 今日目标汽车: **{car_name}**\n"
                 f"⏰ 剩余时间: {remaining_minutes}分{remaining_seconds}秒\n"
                 f"💰 当前{sakura_b}: {user.iv}\n"
-                f"🎒 目标装备: {equipment_count}个\n"
                 f"🔍 找到装备: {active_hunt.equipment_found}个\n\n"
+                f"{equipment_display}\n\n"
                 f"继续您的寻宝之旅吧！",
                 buttons=hunt_game_ikb(active_hunt.id)
             )
@@ -264,15 +304,22 @@ async def hunt_bulk_action(_, call):
     remaining_seconds = remaining_time % 60
     
     car_name = daily_car.car_name if daily_car else "未知"
-    current_equipment_count = sql_count_user_equipment(call.from_user.id, today_only=True)
     hunt = sql_get_active_hunt(call.from_user.id)  # 刷新统计
+    
+    # 获取目标装备显示信息
+    target_equipment_ids = []
+    equipment_display = ""
+    assembly_ready = False
+    if daily_car:
+        target_equipment_ids = [int(x) for x in daily_car.equipment_ids.split(',')]
+        equipment_display, assembly_ready = get_user_target_equipment_display(call.from_user.id, target_equipment_ids)
     
     result_text += f"\n🏎️ **当前状态:**\n"
     result_text += f"🎯 目标汽车: {car_name}\n"
     result_text += f"⏰ 剩余时间: {remaining_minutes}分{remaining_seconds}秒\n"
     result_text += f"💰 当前{sakura_b}: {user.iv - 10}\n"
-    result_text += f"🎒 目标装备: {current_equipment_count}个\n"
     result_text += f"🔍 总计找到: {hunt.equipment_found}个\n\n"
+    result_text += f"{equipment_display}\n\n"
     result_text += f"继续寻找装备吧！"
     
     await callAnswer(call, "💎 批量寻找完成！")
@@ -344,7 +391,14 @@ async def hunt_action(_, call):
                     remaining_seconds = remaining_time % 60
                     
                     car_name = daily_car.car_name if daily_car else "未知"
-                    current_equipment_count = sql_count_user_equipment(call.from_user.id, today_only=True)
+                    
+                    # 获取目标装备显示信息
+                    target_equipment_ids = []
+                    equipment_display = ""
+                    assembly_ready = False
+                    if daily_car:
+                        target_equipment_ids = [int(x) for x in daily_car.equipment_ids.split(',')]
+                        equipment_display, assembly_ready = get_user_target_equipment_display(call.from_user.id, target_equipment_ids)
                     
                     # 刷新hunt对象获取最新统计
                     hunt = sql_get_active_hunt(call.from_user.id)
@@ -355,9 +409,9 @@ async def hunt_action(_, call):
                         f"🎯 今日目标汽车: **{car_name}**\n"
                         f"⏰ 剩余时间: {remaining_minutes}分{remaining_seconds}秒\n"
                         f"💰 当前{sakura_b}: {user.iv - 1}\n"
-                        f"🎒 目标装备: {current_equipment_count}个\n"
                         f"🔍 找到装备: {hunt.equipment_found}个\n"
                         f"✅ 刚获得: {color_emoji} {equipment_name} (目标装备)\n\n"
+                        f"{equipment_display}\n\n"
                         f"继续寻找装备吧！",
                         buttons=hunt_game_ikb(hunt_id, int(current_time.timestamp()))
                     )
@@ -373,7 +427,14 @@ async def hunt_action(_, call):
                 remaining_seconds = remaining_time % 60
                 
                 car_name = daily_car.car_name if daily_car else "未知"
-                current_equipment_count = sql_count_user_equipment(call.from_user.id, today_only=True)
+                
+                # 获取目标装备显示信息
+                target_equipment_ids = []
+                equipment_display = ""
+                assembly_ready = False
+                if daily_car:
+                    target_equipment_ids = [int(x) for x in daily_car.equipment_ids.split(',')]
+                    equipment_display, assembly_ready = get_user_target_equipment_display(call.from_user.id, target_equipment_ids)
                 
                 # 刷新hunt对象获取最新统计
                 hunt = sql_get_active_hunt(call.from_user.id)
@@ -384,9 +445,9 @@ async def hunt_action(_, call):
                     f"🎯 今日目标汽车: **{car_name}**\n"
                     f"⏰ 剩余时间: {remaining_minutes}分{remaining_seconds}秒\n"
                     f"💰 当前{sakura_b}: {user.iv - 1}\n"
-                    f"🎒 目标装备: {current_equipment_count}个\n"
                     f"🔍 找到装备: {hunt.equipment_found}个\n"
                     f"🗑️ 刚丢弃: {color_emoji} {equipment_name} (非目标装备)\n\n"
+                    f"{equipment_display}\n\n"
                     f"继续寻找装备吧！",
                     buttons=hunt_game_ikb(hunt_id, int(current_time.timestamp()))
                 )
@@ -500,11 +561,18 @@ async def hunt_do_assembly(_, call):
         
         await callAnswer(call, f"🎉 成功组装 {car_name}！")
         
-        # 构建按钮 - 移除自定义奖励按钮，只保留游戏控制按钮
-        buttons = [
+        # 构建按钮 - 只有M4(car_id=3)和M5(car_id=4)才显示奖励按钮
+        buttons = []
+        if car_id in [3, 4]:  # M4圣保罗黄和M5风暴灰
+            # 检查是否有自定义奖励按钮配置
+            reward_button = sql_get_reward_button(car_id)
+            if reward_button:
+                buttons.append([(reward_button.button_text, reward_button.button_url)])
+        
+        buttons.extend([
             [("🎮 继续游戏", f"hunt_game_{hunt_id}")],
             [("❌ 结束游戏", f"hunt_end_{hunt_id}")]
-        ]
+        ])
         
         await editMessage(
             call,
@@ -611,10 +679,17 @@ async def hunt_game_return(_, call):
     daily_car = sql_get_daily_car()
     car_name = daily_car.car_name if daily_car else "未知"
     
-    # 获取用户当前金币和目标装备数量
+    # 获取用户当前金币
     user = sql_get_emby(call.from_user.id)
     current_coins = user.iv if user else 0
-    equipment_count = sql_count_user_equipment(call.from_user.id, today_only=True)
+    
+    # 获取目标装备显示信息
+    target_equipment_ids = []
+    equipment_display = ""
+    assembly_ready = False
+    if daily_car:
+        target_equipment_ids = [int(x) for x in daily_car.equipment_ids.split(',')]
+        equipment_display, assembly_ready = get_user_target_equipment_display(call.from_user.id, target_equipment_ids)
     
     await callAnswer(call, "🏎️ 返回车库")
     await editMessage(
@@ -623,8 +698,8 @@ async def hunt_game_return(_, call):
         f"🎯 今日目标汽车: **{car_name}**\n"
         f"⏰ 剩余时间: {remaining_minutes}分{remaining_seconds}秒\n"
         f"💰 当前{sakura_b}: {current_coins}\n"
-        f"🎒 目标装备: {equipment_count}个\n"
         f"🔍 找到的装备: {hunt.equipment_found}个\n\n"
+        f"{equipment_display}\n\n"
         f"点击下方按钮继续寻找装备！",
         buttons=hunt_game_ikb(hunt_id)
     )
