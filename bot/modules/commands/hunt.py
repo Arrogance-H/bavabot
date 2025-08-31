@@ -39,8 +39,8 @@ def hunt_game_ikb(hunt_id: int, last_hunt_time: int = 0):
         hunt_btn_text = "🔍 寻找装备"
         bulk_hunt_btn_text = "💎 批量寻找"
     else:
-        hunt_btn_text = f"⏰ 寻找装备 ({cooldown_remaining}s)"
-        bulk_hunt_btn_text = f"⏰ 批量寻找 ({cooldown_remaining}s)"
+        hunt_btn_text = f"⏰ 寻找装备)"
+        bulk_hunt_btn_text = f"⏰ 批量寻找)"
     
     return ikb([
         [(hunt_btn_text, f"hunt_action_{hunt_id}"), (bulk_hunt_btn_text, f"hunt_bulk_action_{hunt_id}")],
@@ -211,7 +211,6 @@ async def start_hunt(_, msg):
         f"🔧 需要装备:\n{equipment_display}\n\n"
         f"⏰ 游戏时间: 30分钟\n"
         f"💰 每次寻找消耗 1{sakura_b}\n"
-        f"🔄 寻找冷却: 1秒\n"
         f"**今日剩余游戏次数: {5 - today_count - 1}**\n\n"
         f"💡 提示: 非目标装备将自动丢弃\n"
         f"点击下方按钮开始寻找装备！",
@@ -642,7 +641,7 @@ async def hunt_end(_, call):
         else:
             result_text += "空空如也...\n"
         
-        result_text += f"\n💡 记住：装备仅当天有效哦！\n感谢参与车库游戏！"
+        result_text += f"\n💡 记住：装备仅当天有效哦！\n感谢参与寻宝游戏！"
         
         await callAnswer(call, "🏁 游戏结束")
         await editMessage(call, result_text)
@@ -669,7 +668,7 @@ async def hunt_game_return(_, call):
     current_time = datetime.datetime.now()
     if (current_time - start_time).total_seconds() > 1800:  # 30分钟
         sql_end_hunt(hunt_id)
-        return await editMessage(call, "⏰ 车库游戏时间已结束！\n\n感谢参与，请明日再来！")
+        return await editMessage(call, "⏰ 车库游戏时间已结束！")
     
     remaining_time = 1800 - int((current_time - start_time).total_seconds())
     remaining_minutes = remaining_time // 60
