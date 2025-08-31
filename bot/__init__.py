@@ -117,6 +117,7 @@ admin_p = user_p + [
     # 车库游戏管理员命令 (Hunt Game Admin Commands)
     BotCommand("hunt_config_reward", "配置寻宝游戏奖励 [管理]"),
     BotCommand("hunt_list_rewards", "查看寻宝游戏奖励配置 [管理]"),
+    BotCommand("hunt_config_button", "配置寻宝游戏领奖配置 [管理]"),
 ]
 
 owner_p = admin_p + [
