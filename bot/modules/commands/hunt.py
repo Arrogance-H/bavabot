@@ -27,7 +27,7 @@ def hunt_game_ikb(hunt_id: int, last_hunt_time: int = 0):
     
     if can_hunt:
         hunt_btn_text = "🔍 寻找装备"
-        bulk_hunt_btn_text = "💎 批量寻找(50次)"
+        bulk_hunt_btn_text = "💎 批量寻找"
     else:
         hunt_btn_text = f"⏰ 寻找装备 ({cooldown_remaining}s)"
         bulk_hunt_btn_text = f"⏰ 批量寻找 ({cooldown_remaining}s)"
@@ -94,7 +94,7 @@ async def start_hunt(_, msg):
     # 检查今日游戏次数
     today_count = sql_get_today_hunt_count(msg.from_user.id)
     if today_count >= 5:
-        return await sendMessage(msg, f"❌ 您今日已进行了 {today_count} 次车库游戏，每日限制 5 次")
+        return await sendMessage(msg, f"❌ 您今日已进行了 {today_count} 次寻宝游戏，每日限制 5 次")
     
     # 检查是否有进行中的游戏
     active_hunt = sql_get_active_hunt(msg.from_user.id)
@@ -104,7 +104,7 @@ async def start_hunt(_, msg):
         current_time = datetime.datetime.now()
         if (current_time - start_time).total_seconds() > 1800:  # 30分钟
             sql_end_hunt(active_hunt.id)
-            return await sendMessage(msg, "⏰ 您的上一场车库游戏已超时结束，请重新开始")
+            return await sendMessage(msg, "⏰ 您的上一场寻宝游戏已超时结束，请重新开始")
         else:
             remaining_time = 1800 - int((current_time - start_time).total_seconds())
             remaining_minutes = remaining_time // 60
@@ -126,11 +126,11 @@ async def start_hunt(_, msg):
             
             return await sendMessage(
                 msg,
-                f"🏎️ **车库游戏进行中**\n\n"
+                f"🏎️ **寻宝游戏进行中**\n\n"
                 f"👤 **{user_nickname}** 正在寻宝...\n\n"
                 f"🎯 今日目标汽车: **{car_name}**\n"
                 f"⏰ 剩余时间: {remaining_minutes}分{remaining_seconds}秒\n"
-                f"💰 单次寻找消耗 1{sakura_b}，批量寻找消耗 50{sakura_b}\n"
+                f"💰 每次寻找消耗 1{sakura_b}\n"
                 f"🎒 背包装备: {equipment_count}/150\n"
                 f"🔍 找到的装备: {active_hunt.equipment_found}个\n\n"
                 f"点击下方按钮进行寻找装备！",
@@ -140,11 +140,11 @@ async def start_hunt(_, msg):
     # 开始新游戏
     hunt_id = sql_start_hunt(msg.from_user.id)
     if hunt_id == -1:
-        return await sendMessage(msg, f"❌ 您今日已进行了 5 次车库游戏，请明日再来")
+        return await sendMessage(msg, f"❌ 您今日已进行了 5 次寻宝游戏，请明日再来")
     elif hunt_id == -2:
-        return await sendMessage(msg, "❌ 您已有进行中的车库游戏")
+        return await sendMessage(msg, "❌ 您已有进行中的寻宝游戏")
     elif hunt_id == 0:
-        return await sendMessage(msg, "❌ 开始车库游戏失败，请稍后重试")
+        return await sendMessage(msg, "❌ 开始寻宝游戏失败，请稍后重试")
     
     # 获取今日汽车
     daily_car = sql_get_daily_car()
@@ -184,16 +184,13 @@ async def start_hunt(_, msg):
     
     await sendMessage(
         msg,
-        f"🏎️ **车库游戏开始！**\n\n"
+        f"🏎️ **寻宝游戏开始！**\n\n"
         f"👤 **{user_nickname}** 正在寻宝...\n\n"
         f"🎯 今日目标汽车: **{car_name}**\n"
         f"🔧 需要装备:\n{equipment_display}{reward_text}\n\n"
         f"⏰ 游戏时间: 30分钟\n"
-        f"💰 单次寻找消耗 1{sakura_b}，批量寻找消耗 50{sakura_b}\n"
+        f"💰 每次寻找消耗 1{sakura_b}\n"
         f"🔄 寻找冷却: 1秒\n"
-        f"🎒 背包容量: 150个装备\n"
-        f"📅 装备仅当天有效\n"
-        f"🗑️ 可在背包中管理装备\n\n"
         f"**今日剩余游戏次数: {5 - today_count - 1}**\n\n"
         f"点击下方按钮开始寻找装备！",
         buttons=hunt_game_ikb(hunt_id)
@@ -215,7 +212,7 @@ async def hunt_bulk_action(_, call):
     current_time = datetime.datetime.now()
     if (current_time - start_time).total_seconds() > 1800:  # 30分钟
         sql_end_hunt(hunt_id)
-        return await editMessage(call, "⏰ 车库游戏时间已结束！\n\n感谢参与，请明日再来！")
+        return await editMessage(call, "⏰ 寻宝游戏时间已结束！")
     
     # 检查1秒冷却时间
     if hunt.last_hunt_time:
@@ -346,7 +343,7 @@ async def hunt_action(_, call):
     current_time = datetime.datetime.now()
     if (current_time - start_time).total_seconds() > 1800:  # 30分钟
         sql_end_hunt(hunt_id)
-        return await editMessage(call, "⏰ 车库游戏时间已结束！\n\n感谢参与，请明日再来！")
+        return await editMessage(call, "⏰ 寻宝游戏时间已结束！")
     
     # 检查1秒冷却时间
     if hunt.last_hunt_time:
@@ -452,7 +449,7 @@ async def keep_equipment(_, call):
         await callAnswer(call, f"✅ 已保留{equipment_name}！")
         await editMessage(
             call,
-            f"🏎️ **车库游戏进行中**\n\n"
+            f"🏎️ **寻宝游戏进行中**\n\n"
             f"🎯 今日目标汽车: **{car_name}**\n"
             f"⏰ 剩余时间: {remaining_minutes}分{remaining_seconds}秒\n"
             f"💰 当前{sakura_b}: {current_coins}\n"
@@ -498,7 +495,7 @@ async def discard_equipment(_, call):
     await callAnswer(call, f"🗑️ 已丢弃{equipment_name}")
     await editMessage(
         call,
-        f"🏎️ **车库游戏进行中**\n\n"
+        f"🏎️ **寻宝游戏进行中**\n\n"
         f"🎯 今日目标汽车: **{car_name}**\n"
         f"⏰ 剩余时间: {remaining_minutes}分{remaining_seconds}秒\n"
         f"💰 当前{sakura_b}: {current_coins}\n"
