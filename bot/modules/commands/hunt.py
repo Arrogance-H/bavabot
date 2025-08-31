@@ -5,7 +5,7 @@ import asyncio
 import datetime
 import random
 from pyrogram import filters
-from bot import bot, prefixes, sakura_b, LOGGER
+from bot import bot, prefixes, sakura_b, LOGGER, hunt_daily_limit
 from bot.func_helper.filters import user_in_group_on_filter
 from bot.func_helper.msg_utils import sendMessage, editMessage, callAnswer, deleteMessage
 from bot.func_helper.fix_bottons import ikb
@@ -115,7 +115,7 @@ async def start_hunt(_, msg):
     
     # 检查今日游戏次数
     today_count = sql_get_today_hunt_count(msg.from_user.id)
-    if today_count >= 5:
+    if today_count >= hunt_daily_limit:
         return await sendMessage(msg, "⏰ 您今日的寻宝游戏次数已用完，请明日再来！")
     
     # 检查是否已有活跃游戏
@@ -211,7 +211,7 @@ async def start_hunt(_, msg):
         f"🔧 需要装备:\n{equipment_display}\n\n"
         f"⏰ 游戏时间: 30分钟\n"
         f"💰 每次寻找消耗 1{sakura_b}\n"
-        f"**今日剩余游戏次数: {5 - today_count - 1}**\n\n"
+        f"**今日剩余游戏次数: {hunt_daily_limit - today_count - 1}**\n\n"
         f"💡 提示: 非目标装备将自动丢弃\n"
         f"点击下方按钮开始寻找装备！",
         buttons=hunt_game_ikb(hunt_id)

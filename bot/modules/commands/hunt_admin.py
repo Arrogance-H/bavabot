@@ -5,7 +5,7 @@ import datetime
 import json
 import os
 from pyrogram import filters
-from bot import bot, prefixes, sakura_b, LOGGER
+from bot import bot, prefixes, sakura_b, LOGGER, hunt_daily_limit
 from bot.func_helper.filters import user_in_group_on_filter
 from bot.func_helper.msg_utils import sendMessage
 from bot.sql_helper.sql_emby import sql_get_emby
@@ -195,7 +195,7 @@ async def hunt_statistics(_, msg):
             stats_text += f"🏎️ 完成组装: {today_assemblies}\n\n"
             
             stats_text += f"👤 **您的今日数据:**\n"
-            stats_text += f"🎮 游戏场次: {user_today_hunts}/5\n"
+            stats_text += f"🎮 游戏场次: {user_today_hunts}/{hunt_daily_limit}\n"
             stats_text += f"🔍 发现装备: {user_today_equipment}\n"
             stats_text += f"🏎️ 完成组装: {user_today_rewards}\n"
             
