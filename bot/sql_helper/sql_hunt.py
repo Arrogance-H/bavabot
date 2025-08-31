@@ -718,17 +718,25 @@ def sql_set_reward_button(car_id: int, button_text: str, button_url: str) -> boo
 
 
 def sql_random_equipment_by_rarity():
-    """根据稀有度权重随机选择装备 - 紫色装备极稀有"""
+    """根据稀有度权重随机选择装备 - 紫色装备极稀有，M2>M3>M4>M5概率递减"""
     with Session() as session:
         try:
             import random
             
-            # 使用固定概率确保紫色装备极稀有
+            # 使用细化的概率分布，紫色装备按M系列车型概率递减
             # 总概率: 蓝色60.4% + 绿色30% + 金色9.5% + 紫色0.1%
+            # 紫色装备细分: M2(0.04%) > M3(0.03%) > M4(0.02%) > M5(0.01%)
             rand_value = random.random() * 100  # 0-100的随机数
             
-            if rand_value < 0.1:  # 0.1% 概率获得紫色装备 (极稀有)
-                category = 'purple'
+            # 紫色装备个别概率判断 (M2 > M3 > M4 > M5)
+            if rand_value < 0.01:  # 0.01% M5紫色装备 (风暴灰车漆, equipment_id=4)
+                return 4  # 直接返回M5专属紫色装备ID
+            elif rand_value < 0.03:  # 0.02% M4紫色装备 (圣保罗黄车漆, equipment_id=3)
+                return 3  # 直接返回M4专属紫色装备ID
+            elif rand_value < 0.06:  # 0.03% M3紫色装备 (曼岛绿车漆, equipment_id=2)
+                return 2  # 直接返回M3专属紫色装备ID
+            elif rand_value < 0.1:  # 0.04% M2紫色装备 (赞德福特蓝车漆, equipment_id=1)
+                return 1  # 直接返回M2专属紫色装备ID
             elif rand_value < 9.6:  # 9.5% 概率获得金色装备 (0.1% + 9.5%)
                 category = 'gold'
             elif rand_value < 39.6:  # 30% 概率获得绿色装备 (9.6% + 30%)
@@ -736,7 +744,7 @@ def sql_random_equipment_by_rarity():
             else:  # 60.4% 概率获得蓝色装备
                 category = 'blue'
             
-            # 从选定类别中随机选择装备
+            # 从选定类别中随机选择装备 (非紫色装备)
             equipment_defs = session.query(EquipmentDefinition).filter(
                 EquipmentDefinition.category == category
             ).all()
@@ -944,7 +952,16 @@ def sql_update_reward_config(car_id: int, reward_type: str, reward_value: str, r
 def sql_get_probability_stats():
     """获取装备抽取概率统计信息"""
     return {
-        "purple": {"probability": "0.1%", "description": "极稀有专属车漆"},
+        "purple": {
+            "probability": "0.1%", 
+            "description": "极稀有专属车漆",
+            "details": {
+                "M2_赞德福特蓝车漆": "0.04%",
+                "M3_曼岛绿车漆": "0.03%", 
+                "M4_圣保罗黄车漆": "0.02%",
+                "M5_风暴灰车漆": "0.01%"
+            }
+        },
         "gold": {"probability": "9.5%", "description": "高性能组件"},
         "green": {"probability": "30%", "description": "车漆变体"},
         "blue": {"probability": "60.4%", "description": "常见物品"}
