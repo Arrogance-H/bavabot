@@ -488,11 +488,19 @@ def sql_get_daily_car(date: str = None):
                     )
                     session.add(daily_car)
                     session.commit()
+                    LOGGER.info(f"创建今日汽车: {selected_car.car_name} (ID: {selected_car.id})")
                     return selected_car
+                else:
+                    LOGGER.error("没有可用的汽车配置")
+                    return None
             else:
                 car = session.query(Car).filter(
                     Car.id == daily_car.car_id
                 ).first()
+                if not car:
+                    LOGGER.error(f"今日汽车配置无效: car_id {daily_car.car_id} 不存在")
+                    return None
+                LOGGER.debug(f"获取今日汽车: {car.car_name} (ID: {car.id})")
                 return car
             
             return None
@@ -556,6 +564,19 @@ def sql_assemble_car(tg: int, car_id: int) -> dict:
             
             required_equipment = [int(x.strip()) for x in car.equipment_ids.split(',')]
             LOGGER.info(f"用户 {tg} 尝试组装 {car.car_name}，需要装备: {required_equipment}")
+            
+            # 验证所需装备配置是否有效
+            invalid_equipment = []
+            for req_id in required_equipment:
+                equipment_def = session.query(EquipmentDefinition).filter(
+                    EquipmentDefinition.equipment_id == req_id
+                ).first()
+                if not equipment_def:
+                    invalid_equipment.append(req_id)
+            
+            if invalid_equipment:
+                LOGGER.error(f"汽车 {car.car_name} 配置无效，包含不存在的装备: {invalid_equipment}")
+                return {"success": False, "message": f"汽车配置错误：装备 {invalid_equipment} 不存在"}
             
             # 再次检查用户是否有足够的装备
             user_equipment = session.query(Equipment).filter(
