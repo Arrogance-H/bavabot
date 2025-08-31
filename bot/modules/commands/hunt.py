@@ -116,9 +116,17 @@ async def start_hunt(_, msg):
             # 获取背包装备数量
             equipment_count = sql_count_user_equipment(msg.from_user.id, today_only=True)
             
+            # 获取用户昵称
+            user_nickname = msg.from_user.first_name
+            if msg.from_user.last_name:
+                user_nickname += f" {msg.from_user.last_name}"
+            if msg.from_user.username:
+                user_nickname += f" (@{msg.from_user.username})"
+            
             return await sendMessage(
                 msg,
                 f"🏎️ **车库游戏进行中**\n\n"
+                f"👤 **{user_nickname}** 正在寻宝...\n\n"
                 f"🎯 今日目标汽车: **{car_name}**\n"
                 f"⏰ 剩余时间: {remaining_minutes}分{remaining_seconds}秒\n"
                 f"💰 单次寻找消耗 1{sakura_b}，批量寻找消耗 50{sakura_b}\n"
@@ -140,7 +148,25 @@ async def start_hunt(_, msg):
     # 获取今日汽车
     daily_car = sql_get_daily_car()
     car_name = daily_car.car_name if daily_car else "未知"
-    required_equipment = daily_car.equipment_ids if daily_car else "5,12,6,15,1"
+    required_equipment_ids = daily_car.equipment_ids if daily_car else "5,12,6,15,1"
+    
+    # 解析并获取装备名称
+    required_equipment_list = [int(x) for x in required_equipment_ids.split(',')]
+    equipment_names = []
+    for eq_id in required_equipment_list:
+        eq_def = sql_get_equipment_definition(eq_id)
+        if eq_def:
+            color_emoji = get_equipment_color_emoji(eq_def.category)
+            equipment_names.append(f"{color_emoji} {eq_def.equipment_name}")
+        else:
+            equipment_names.append(f"⚪ 装备{eq_id}")
+    
+    # 获取用户昵称
+    user_nickname = msg.from_user.first_name
+    if msg.from_user.last_name:
+        user_nickname += f" {msg.from_user.last_name}"
+    if msg.from_user.username:
+        user_nickname += f" (@{msg.from_user.username})"
     
     # 获取奖励信息
     from bot.sql_helper.sql_hunt import sql_get_reward_config
@@ -152,11 +178,15 @@ async def start_hunt(_, msg):
         else:
             reward_text = f"\n🎁 完成奖励: {reward_config.reward_description}"
     
+    # 装备需求展示
+    equipment_display = "\n".join(equipment_names)
+    
     await sendMessage(
         msg,
         f"🏎️ **车库游戏开始！**\n\n"
+        f"👤 **{user_nickname}** 正在寻宝...\n\n"
         f"🎯 今日目标汽车: **{car_name}**\n"
-        f"🔧 需要装备: {required_equipment}{reward_text}\n"
+        f"🔧 需要装备:\n{equipment_display}{reward_text}\n\n"
         f"⏰ 游戏时间: 30分钟\n"
         f"💰 单次寻找消耗 1{sakura_b}，批量寻找消耗 50{sakura_b}\n"
         f"🔄 寻找冷却: 1秒\n"
@@ -241,11 +271,25 @@ async def hunt_bulk_action(_, call):
         if current_user:
             sql_update_emby(Emby.tg == call.from_user.id, iv=current_user.iv + refund_coins)
     
-    # 统计获得的装备
-    equipment_counts = {}
+    # 获取今日目标汽车装备列表
+    daily_car = sql_get_daily_car()
+    target_equipment_ids = []
+    if daily_car:
+        target_equipment_ids = [int(x) for x in daily_car.equipment_ids.split(',')]
+    
+    # 统计获得的装备，区分目标装备和普通装备
+    target_equipment = {}
+    normal_equipment = {}
+    
     for item in found_equipment:
-        key = f"{item['name']}"
-        equipment_counts[key] = equipment_counts.get(key, 0) + 1
+        equipment_name = item['name']
+        color_emoji = get_equipment_color_emoji(item['category'])
+        display_name = f"{color_emoji} {equipment_name}"
+        
+        if item['id'] in target_equipment_ids:
+            target_equipment[display_name] = target_equipment.get(display_name, 0) + 1
+        else:
+            normal_equipment[display_name] = normal_equipment.get(display_name, 0) + 1
     
     # 构建结果消息
     result_text = f"🎉 **批量寻找完成！**\n\n"
@@ -254,10 +298,19 @@ async def hunt_bulk_action(_, call):
         result_text += f"💰 退还金币: {50 - actual_searches}{sakura_b}\n"
     result_text += f"🎁 获得装备: {len(found_equipment)}个\n\n"
     
-    if equipment_counts:
-        result_text += "📦 **获得的装备:**\n"
-        for equipment_name, count in equipment_counts.items():
-            result_text += f"• {equipment_name}: {count}个\n"
+    if target_equipment or normal_equipment:
+        # 先显示目标装备
+        if target_equipment:
+            result_text += "🎯 **目标汽车装备:**\n"
+            for equipment_name, count in target_equipment.items():
+                result_text += f"• {equipment_name}: {count}个\n"
+            result_text += "\n"
+        
+        # 再显示普通装备
+        if normal_equipment:
+            result_text += "📦 **其他装备:**\n"
+            for equipment_name, count in normal_equipment.items():
+                result_text += f"• {equipment_name}: {count}个\n"
     else:
         result_text += "😅 很遗憾，这次没有找到任何装备...\n"
     
@@ -326,6 +379,15 @@ async def hunt_action(_, call):
             equipment_category = equipment_def.category
             color_emoji = get_equipment_color_emoji(equipment_category)
             
+            # 检查是否为今日目标汽车装备
+            daily_car = sql_get_daily_car()
+            is_target_equipment = False
+            target_status = ""
+            if daily_car:
+                required_equipment_ids = [int(x) for x in daily_car.equipment_ids.split(',')]
+                is_target_equipment = equipment_id in required_equipment_ids
+                target_status = f"🎯 **这是今日目标汽车装备！**\n" if is_target_equipment else f"ℹ️ 这不是今日目标汽车装备\n"
+            
             # 显示装备选择界面
             await callAnswer(call, f"🎉 发现了{equipment_name}！")
             await editMessage(
@@ -333,6 +395,7 @@ async def hunt_action(_, call):
                 f"🔍 **发现装备！**\n\n"
                 f"{color_emoji} **{equipment_name}**\n"
                 f"📝 {equipment_def.description}\n\n"
+                f"{target_status}"
                 f"🎒 当前背包: {current_equipment_count}/150\n\n"
                 f"是否保留这个装备？",
                 buttons=equipment_choice_ikb(hunt_id, equipment_id)
@@ -491,7 +554,7 @@ async def hunt_inventory(_, call):
 
 @bot.on_callback_query(filters.regex(r'^hunt_manage_(\d+)$'))
 async def hunt_manage(_, call):
-    """装备管理界面"""
+    """装备管理界面 - 数字排序便于丢弃"""
     hunt_id = int(call.matches[0].group(1))
     
     # 验证游戏会话
@@ -506,36 +569,125 @@ async def hunt_manage(_, call):
         await callAnswer(call, "❌ 背包为空，无装备可管理", show_alert=True)
         return
     
-    # 统计装备类型
+    # 统计装备类型并按装备ID排序
     equipment_counts = {}
     for equip in equipment_list:
         equipment_counts[equip.equipment_id] = equipment_counts.get(equip.equipment_id, 0) + 1
     
-    # 创建装备管理界面
+    # 创建装备管理界面，使用数字排序
     manage_text = "🗑️ **装备管理**\n\n"
-    manage_text += "选择要丢弃的装备类型：\n\n"
+    manage_text += "点击数字丢弃对应装备：\n\n"
     
-    buttons = []
-    for equipment_id in sorted(equipment_counts.keys()):
+    # 按装备ID排序以确保数字顺序
+    sorted_equipment = sorted(equipment_counts.keys())
+    
+    # 显示装备列表，每个装备分配一个数字
+    for idx, equipment_id in enumerate(sorted_equipment, 1):
         count = equipment_counts[equipment_id]
-        # 获取装备定义以显示更好的名称和颜色
         equipment_def = sql_get_equipment_definition(equipment_id)
         if equipment_def:
             equipment_name = equipment_def.equipment_name
             color_emoji = get_equipment_color_emoji(equipment_def.category)
-            button_text = f"{color_emoji} {equipment_name} ({count}个)"
+            manage_text += f"{idx}. {color_emoji} **{equipment_name}** ({count}个)\n"
         else:
-            button_text = f"⚪ 装备 {equipment_id} ({count}个)"
-        
-        buttons.append([(button_text, f"hunt_discard_{hunt_id}_{equipment_id}")])
+            manage_text += f"{idx}. ⚪ **装备 {equipment_id}** ({count}个)\n"
+    
+    # 创建数字按钮（每行3个）
+    buttons = []
+    row = []
+    for idx, equipment_id in enumerate(sorted_equipment, 1):
+        row.append((str(idx), f"hunt_discard_num_{hunt_id}_{equipment_id}"))
+        if len(row) == 3:  # 每行3个数字
+            buttons.append(row)
+            row = []
+    
+    # 添加最后一行（如果有剩余按钮）
+    if row:
+        buttons.append(row)
     
     # 添加返回按钮
     buttons.append([("🔙 返回背包", f"hunt_inventory_{hunt_id}")])
     
-    manage_text += f"📊 总装备数: {len(equipment_list)}/150"
+    manage_text += f"\n📊 总装备数: {len(equipment_list)}/150"
     
     await callAnswer(call, "🗑️ 装备管理")
     await editMessage(call, manage_text, buttons=ikb(buttons))
+
+
+@bot.on_callback_query(filters.regex(r'^hunt_discard_num_(\d+)_(\d+)$'))
+async def hunt_discard_equipment_by_number(_, call):
+    """通过数字丢弃指定装备"""
+    hunt_id = int(call.matches[0].group(1))
+    equipment_id = int(call.matches[0].group(2))
+    
+    # 验证游戏会话
+    hunt = sql_get_active_hunt(call.from_user.id)
+    if not hunt or hunt.id != hunt_id:
+        return await callAnswer(call, "❌ 游戏会话无效", show_alert=True)
+    
+    # 获取装备信息
+    equipment_def = sql_get_equipment_definition(equipment_id)
+    equipment_name = equipment_def.equipment_name if equipment_def else f"装备 {equipment_id}"
+    
+    # 丢弃装备
+    if sql_discard_equipment(call.from_user.id, equipment_id, today_only=True):
+        await callAnswer(call, f"✅ 已丢弃 {equipment_name}")
+        
+        # 获取更新后的装备列表
+        equipment_list = sql_get_user_equipment(call.from_user.id, today_only=True)
+        
+        if equipment_list:
+            # 重新统计装备
+            equipment_counts = {}
+            for equip in equipment_list:
+                equipment_counts[equip.equipment_id] = equipment_counts.get(equip.equipment_id, 0) + 1
+            
+            # 重新显示管理界面
+            manage_text = "🗑️ **装备管理**\n\n"
+            manage_text += "点击数字丢弃对应装备：\n\n"
+            
+            # 按装备ID排序以确保数字顺序
+            sorted_equipment = sorted(equipment_counts.keys())
+            
+            # 显示装备列表，每个装备分配一个数字
+            for idx, eq_id in enumerate(sorted_equipment, 1):
+                count = equipment_counts[eq_id]
+                eq_def = sql_get_equipment_definition(eq_id)
+                if eq_def:
+                    eq_name = eq_def.equipment_name
+                    color_emoji = get_equipment_color_emoji(eq_def.category)
+                    manage_text += f"{idx}. {color_emoji} **{eq_name}** ({count}个)\n"
+                else:
+                    manage_text += f"{idx}. ⚪ **装备 {eq_id}** ({count}个)\n"
+            
+            # 创建数字按钮（每行3个）
+            buttons = []
+            row = []
+            for idx, eq_id in enumerate(sorted_equipment, 1):
+                row.append((str(idx), f"hunt_discard_num_{hunt_id}_{eq_id}"))
+                if len(row) == 3:  # 每行3个数字
+                    buttons.append(row)
+                    row = []
+            
+            # 添加最后一行（如果有剩余按钮）
+            if row:
+                buttons.append(row)
+            
+            # 添加返回按钮
+            buttons.append([("🔙 返回背包", f"hunt_inventory_{hunt_id}")])
+            
+            manage_text += f"\n📊 总装备数: {len(equipment_list)}/150"
+            
+            await editMessage(call, manage_text, buttons=ikb(buttons))
+        else:
+            # 没有装备了，返回背包界面
+            await editMessage(
+                call,
+                "🎒 **背包内容**\n\n空空如也...\n\n📊 总数: 0/150\n\n💡 提示：装备仅当天有效",
+                buttons=hunt_inventory_ikb(hunt_id)
+            )
+    else:
+        await callAnswer(call, f"❌ 丢弃 {equipment_name} 失败", show_alert=True)
 
 
 @bot.on_callback_query(filters.regex(r'^hunt_discard_(\d+)_(\d+)$'))
