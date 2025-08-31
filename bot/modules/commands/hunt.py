@@ -84,7 +84,7 @@ async def start_hunt(_, msg):
     # 检查今日游戏次数
     today_count = sql_get_today_hunt_count(msg.from_user.id)
     if today_count >= 5:
-        return await sendMessage(msg, "⏰ 您今日的车库游戏次数已用完，请明日再来！")
+        return await sendMessage(msg, "⏰ 您今日的寻宝游戏次数已用完，请明日再来！")
     
     # 检查是否已有活跃游戏
     active_hunt = sql_get_active_hunt(msg.from_user.id)
@@ -125,7 +125,7 @@ async def start_hunt(_, msg):
     # 开始新游戏
     hunt_id = sql_start_hunt(msg.from_user.id)
     if hunt_id == -1:
-        return await sendMessage(msg, "❌ 您今日的车库游戏次数已达上限！")
+        return await sendMessage(msg, "❌ 您今日的寻宝游戏次数已达上限！")
     elif hunt_id == -2:
         return await sendMessage(msg, "❌ 您已有进行中的游戏，请先结束当前游戏")
     elif hunt_id == 0:
@@ -167,7 +167,8 @@ async def start_hunt(_, msg):
         f"🏎️ **寻宝游戏开始！**\n\n"
         f"👤 **{user_nickname}** 正在寻宝...\n\n"
         f"🎯 今日目标汽车: **{car_name}**\n"
-        f"🔧 需要装备:\n{equipment_display}{reward_text}\n\n"
+        f"{reward_text}\n"
+        f"🔧 需要装备:\n{equipment_display}\n\n"
         f"⏰ 游戏时间: 30分钟\n"
         f"💰 每次寻找消耗 1{sakura_b}\n"
         f"🔄 寻找冷却: 1秒\n"
