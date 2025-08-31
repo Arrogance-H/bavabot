@@ -3,9 +3,9 @@
   "bot_token": "5701:AAEvAHzsg30",
   "owner_api": 73711,
   "owner_hash": "",
-  "owner": xxxxxxx,
+  "owner": "xxxxxxx",
   "group": [
-    -100xxxxxx
+    "-100xxxxxx"
   ],
   "main_group": "Aaaaa_su",
   "chanel": "su_yxfy",
@@ -107,5 +107,45 @@
     "allow_origins": [
       "*"
     ]
+  },
+  "hunt": {
+    "rewards": {
+      "1": {
+        "car_name": "赞德福特蓝M2",
+        "reward_type": "coins",
+        "reward_value": "100", 
+        "reward_description": "组装赞德福特蓝M2获得100金币奖励"
+      },
+      "2": {
+        "car_name": "曼岛绿M3",
+        "reward_type": "coins",
+        "reward_value": "1916",
+        "reward_description": "组装曼岛绿M3获得1916金币奖励"
+      },
+      "3": {
+        "car_name": "圣保罗黄M4", 
+        "reward_type": "code",
+        "reward_value": "1",
+        "reward_description": "组装圣保罗黄M4获得1个注册码"
+      },
+      "4": {
+        "car_name": "风暴灰M5",
+        "reward_type": "white", 
+        "reward_value": "1",
+        "reward_description": "组装风暴灰M5获得1个白名单"
+      }
+    },
+    "buttons": {
+      "1": {
+        "car_name": "赞德福特蓝M2",
+        "button_text": "🎁 领取M2奖励",
+        "button_url": "https://example.com/reward1"
+      },
+      "2": {
+        "car_name": "曼岛绿M3", 
+        "button_text": "🏆 查看M3称号",
+        "button_url": "https://example.com/title2"
+      }
+    }
   }
 }
