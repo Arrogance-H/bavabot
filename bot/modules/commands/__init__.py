@@ -14,7 +14,7 @@ from .view_user import list_whitelist, whitelist_page, list_normaluser, normalus
 from .hunt import (
     start_hunt,              # 开始游戏命令 (/hunt)
     hunt_action, hunt_assembly, hunt_do_assembly, 
-    hunt_end, hunt_game_return, hunt_bulk_action, hunt_manage,
+    hunt_end, hunt_game_return, hunt_bulk_action,
     hunt_discard_equipment_by_number, hunt_discard_equipment,
     keep_equipment, discard_equipment
 )
