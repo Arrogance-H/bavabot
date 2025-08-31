@@ -488,11 +488,19 @@ def sql_get_daily_car(date: str = None):
                     )
                     session.add(daily_car)
                     session.commit()
+                    LOGGER.info(f"创建今日汽车: {selected_car.car_name} (ID: {selected_car.id})")
                     return selected_car
+                else:
+                    LOGGER.error("没有可用的汽车配置")
+                    return None
             else:
                 car = session.query(Car).filter(
                     Car.id == daily_car.car_id
                 ).first()
+                if not car:
+                    LOGGER.error(f"今日汽车配置无效: car_id {daily_car.car_id} 不存在")
+                    return None
+                LOGGER.debug(f"获取今日汽车: {car.car_name} (ID: {car.id})")
                 return car
             
             return None
@@ -511,9 +519,11 @@ def sql_check_car_assembly(tg: int, car_id: int) -> bool:
             # 获取汽车所需装备
             car = session.query(Car).filter(Car.id == car_id).first()
             if not car:
+                LOGGER.error(f"检查汽车组装失败: 汽车 {car_id} 不存在")
                 return False
             
             required_equipment = [int(x.strip()) for x in car.equipment_ids.split(',')]
+            LOGGER.debug(f"用户 {tg} 检查组装 {car.car_name}，需要装备: {required_equipment}")
             
             # 检查用户是否拥有所需装备
             user_equipment = session.query(Equipment).filter(
@@ -524,11 +534,16 @@ def sql_check_car_assembly(tg: int, car_id: int) -> bool:
             for equip in user_equipment:
                 user_equipment_counts[equip.equipment_id] = user_equipment_counts.get(equip.equipment_id, 0) + 1
             
+            LOGGER.debug(f"用户 {tg} 装备统计: {user_equipment_counts}")
+            
             # 检查是否有足够的装备 - 每种装备至少需要1个
             for required_id in required_equipment:
-                if user_equipment_counts.get(required_id, 0) < 1:
+                have_count = user_equipment_counts.get(required_id, 0)
+                if have_count < 1:
+                    LOGGER.debug(f"用户 {tg} 装备不足: 需要装备 {required_id}，拥有 {have_count}")
                     return False
             
+            LOGGER.debug(f"用户 {tg} 可以组装 {car.car_name}")
             return True
         except Exception as e:
             LOGGER.error(f"检查汽车组装失败: {e}")
@@ -544,14 +559,31 @@ def sql_assemble_car(tg: int, car_id: int) -> dict:
             # 获取汽车所需装备
             car = session.query(Car).filter(Car.id == car_id).first()
             if not car:
+                LOGGER.error(f"汽车组装失败: 汽车 {car_id} 不存在")
                 return {"success": False, "message": "汽车不存在"}
             
             required_equipment = [int(x.strip()) for x in car.equipment_ids.split(',')]
+            LOGGER.info(f"用户 {tg} 尝试组装 {car.car_name}，需要装备: {required_equipment}")
+            
+            # 验证所需装备配置是否有效
+            invalid_equipment = []
+            for req_id in required_equipment:
+                equipment_def = session.query(EquipmentDefinition).filter(
+                    EquipmentDefinition.equipment_id == req_id
+                ).first()
+                if not equipment_def:
+                    invalid_equipment.append(req_id)
+            
+            if invalid_equipment:
+                LOGGER.error(f"汽车 {car.car_name} 配置无效，包含不存在的装备: {invalid_equipment}")
+                return {"success": False, "message": f"汽车配置错误：装备 {invalid_equipment} 不存在"}
             
             # 再次检查用户是否有足够的装备
             user_equipment = session.query(Equipment).filter(
                 and_(Equipment.tg == tg, Equipment.obtained_date == today)
             ).all()
+            
+            LOGGER.info(f"用户 {tg} 今日装备总数: {len(user_equipment)}")
             
             user_equipment_counts = {}
             user_equipment_by_id = {}
@@ -561,9 +593,13 @@ def sql_assemble_car(tg: int, car_id: int) -> dict:
                 user_equipment_by_id[equip.equipment_id].append(equip)
                 user_equipment_counts[equip.equipment_id] = user_equipment_counts.get(equip.equipment_id, 0) + 1
             
+            LOGGER.info(f"用户 {tg} 装备统计: {user_equipment_counts}")
+            
             # 检查是否有足够装备
             for required_id in required_equipment:
-                if user_equipment_counts.get(required_id, 0) < 1:
+                have_count = user_equipment_counts.get(required_id, 0)
+                if have_count < 1:
+                    LOGGER.warning(f"用户 {tg} 装备不足: 需要装备 {required_id}，拥有 {have_count}")
                     return {"success": False, "message": f"装备不足：缺少装备 {required_id}"}
             
             # 删除用户的对应装备 - 每种类型删除一个
@@ -576,13 +612,23 @@ def sql_assemble_car(tg: int, car_id: int) -> dict:
                     removed_equipment.append(required_id)
                     LOGGER.info(f"用户 {tg} 组装 {car.car_name}，删除装备 {required_id}")
                 else:
+                    # 添加详细的错误日志
+                    available_in_dict = required_id in user_equipment_by_id
+                    has_items = user_equipment_by_id.get(required_id, [])
+                    LOGGER.error(f"用户 {tg} 无法找到装备 {required_id} 进行删除: 在字典中={available_in_dict}, 数量={len(has_items)}")
                     session.rollback()
                     return {"success": False, "message": f"装备不足：无法找到装备 {required_id}"}
             
+            # 提交装备删除
             session.commit()
+            LOGGER.info(f"用户 {tg} 成功删除装备: {removed_equipment}")
             
             # 发放奖励
             reward_result = sql_give_assembly_reward(tg, car_id)
+            
+            if not reward_result.get("success", False):
+                LOGGER.warning(f"用户 {tg} 组装成功但奖励发放失败: {reward_result.get('message', '未知错误')}")
+                # 奖励失败不影响组装成功，因为装备已经消耗
             
             return {
                 "success": True,
@@ -593,8 +639,8 @@ def sql_assemble_car(tg: int, car_id: int) -> dict:
             }
         except Exception as e:
             session.rollback()
-            LOGGER.error(f"组装汽车失败: {e}")
-            return {"success": False, "message": "组装失败"}
+            LOGGER.error(f"用户 {tg} 组装汽车失败，异常: {str(e)}", exc_info=True)
+            return {"success": False, "message": f"组装失败：{str(e)}"}
 
 
 # 向后兼容的组装函数
