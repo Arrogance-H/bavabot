@@ -2,6 +2,8 @@
 车库游戏管理命令
 """
 import datetime
+import json
+import os
 from pyrogram import filters
 from bot import bot, prefixes, sakura_b, LOGGER
 from bot.func_helper.filters import user_in_group_on_filter
@@ -10,7 +12,7 @@ from bot.sql_helper.sql_emby import sql_get_emby
 from bot.sql_helper.sql_hunt import (
     sql_update_reward_config, sql_get_reward_config, 
     sql_get_probability_stats, Car, RewardConfig,
-    sql_set_reward_button, sql_get_reward_button
+    sql_set_reward_button, sql_get_reward_button, RewardButton
 )
 from bot.sql_helper import Session
 
@@ -38,13 +40,15 @@ async def config_hunt_reward(_, msg):
 
 **参数说明:**
 - 车型ID: 1=赞德福特蓝M2, 2=曼岛绿M3, 3=圣保罗黄M4, 4=风暴灰M5
-- 奖励类型: coins({sakura_b}), title(称号), badge(徽章)
-- 奖励值: {sakura_b}数量或称号名称
+- 奖励类型: coins({sakura_b}), title(称号), badge(徽章), code(注册码), white(白名单)
+- 奖励值: {sakura_b}数量、称号名称、注册码数量或白名单数量
 - 描述: 可选的奖励描述
 
 **示例:**
 `/hunt_config_reward 1 coins 100 组装M2获得100{sakura_b}`
 `/hunt_config_reward 2 title M3车主 曼岛绿M3专属称号`
+`/hunt_config_reward 3 code 1 组装M4获得1个注册码`
+`/hunt_config_reward 4 white 1 组装M5获得1个白名单`
         """
         return await sendMessage(msg, help_text)
     
@@ -59,17 +63,27 @@ async def config_hunt_reward(_, msg):
             return await sendMessage(msg, "❌ 车型ID必须为1-4之间")
         
         # 验证奖励类型
-        if reward_type not in ['coins', 'title', 'badge']:
-            return await sendMessage(msg, "❌ 奖励类型必须为 coins, title 或 badge")
+        if reward_type not in ['coins', 'title', 'badge', 'code', 'white']:
+            return await sendMessage(msg, "❌ 奖励类型必须为 coins, title, badge, code 或 white")
         
-        # 验证金币奖励值
-        if reward_type == 'coins':
+        # 验证数值类型的奖励值
+        if reward_type in ['coins', 'code', 'white']:
             try:
-                coin_amount = int(reward_value)
-                if coin_amount <= 0:
-                    return await sendMessage(msg, f"❌ {sakura_b}数量必须大于0")
+                amount = int(reward_value)
+                if amount <= 0:
+                    reward_name = {
+                        'coins': f"{sakura_b}数量",
+                        'code': "注册码数量", 
+                        'white': "白名单数量"
+                    }[reward_type]
+                    return await sendMessage(msg, f"❌ {reward_name}必须大于0")
             except ValueError:
-                return await sendMessage(msg, f"❌ {sakura_b}数量必须为有效数字")
+                reward_name = {
+                    'coins': f"{sakura_b}数量",
+                    'code': "注册码数量",
+                    'white': "白名单数量"
+                }[reward_type]
+                return await sendMessage(msg, f"❌ {reward_name}必须为有效数字")
         
         # 更新奖励配置
         if sql_update_reward_config(car_id, reward_type, reward_value, reward_description):
@@ -320,3 +334,81 @@ async def view_hunt_button(_, msg):
     except Exception as e:
         LOGGER.error(f"查看奖励按钮配置失败: {e}")
         await sendMessage(msg, "❌ 获取配置信息失败")
+
+
+@bot.on_message(filters.command('hunt_export_config', prefixes) & user_in_group_on_filter)
+async def export_hunt_config(_, msg):
+    """导出车库游戏配置到config.json"""
+    await msg.delete()
+    
+    user = sql_get_emby(msg.from_user.id)
+    if not user:
+        return await sendMessage(msg, "❌ 请先私聊机器人进行注册")
+    
+    try:
+        config_path = "/home/runner/work/bavabot/bavabot/config.json"
+        
+        # 读取现有配置或创建新配置
+        if os.path.exists(config_path):
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+        else:
+            config = {}
+        
+        # 获取当前的奖励配置
+        with Session() as session:
+            reward_configs = session.query(RewardConfig).filter(
+                RewardConfig.is_active == True
+            ).all()
+            
+            button_configs = session.query(RewardButton).filter(
+                RewardButton.is_active == True  
+            ).all()
+            
+            cars = session.query(Car).all()
+            car_dict = {car.id: car.car_name for car in cars}
+        
+        # 构建hunt配置结构
+        hunt_config = {
+            "rewards": {},
+            "buttons": {}
+        }
+        
+        # 添加奖励配置
+        for reward in reward_configs:
+            car_name = car_dict.get(reward.car_id, f"Car_{reward.car_id}")
+            hunt_config["rewards"][str(reward.car_id)] = {
+                "car_name": car_name,
+                "reward_type": reward.reward_type,
+                "reward_value": reward.reward_value,
+                "reward_description": reward.reward_description
+            }
+        
+        # 添加按钮配置
+        for button in button_configs:
+            car_name = car_dict.get(button.car_id, f"Car_{button.car_id}")
+            hunt_config["buttons"][str(button.car_id)] = {
+                "car_name": car_name,
+                "button_text": button.button_text,
+                "button_url": button.button_url
+            }
+        
+        # 更新配置文件
+        config["hunt"] = hunt_config
+        
+        # 写入配置文件
+        with open(config_path, 'w', encoding='utf-8') as f:
+            json.dump(config, f, ensure_ascii=False, indent=2)
+        
+        await sendMessage(
+            msg,
+            f"✅ **车库配置导出成功！**\n\n"
+            f"📄 配置文件: {config_path}\n"
+            f"🎁 奖励配置: {len(hunt_config['rewards'])} 项\n"
+            f"🔘 按钮配置: {len(hunt_config['buttons'])} 项\n\n"
+            f"💡 配置已保存到 config.json 的 hunt 字段中"
+        )
+        
+    except Exception as e:
+        LOGGER.error(f"导出车库配置失败: {e}")
+        await sendMessage(msg, f"❌ 导出配置失败: {str(e)}")
