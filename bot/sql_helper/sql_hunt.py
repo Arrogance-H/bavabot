@@ -394,9 +394,9 @@ def sql_add_equipment(tg: int, hunt_session_id: int, equipment_id: int) -> bool:
             today = datetime.datetime.now().strftime("%Y-%m-%d")
             current_time = datetime.datetime.now()
             
-            # 检查用户今日装备数量是否已达到30个上限
+            # 检查用户今日装备数量是否已达到150个上限
             current_count = sql_count_user_equipment(tg, today_only=True)
-            if current_count >= 30:
+            if current_count >= 150:
                 return False  # 背包已满
             
             equipment = Equipment(
