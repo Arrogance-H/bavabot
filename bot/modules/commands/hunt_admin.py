@@ -128,13 +128,13 @@ async def list_hunt_rewards(_, msg):
                     reward_text += f"   描述: {config.reward_description}\n"
                 reward_text += "\n"
             
-            # 添加概率信息
+            # 添加概率信息 - 按高到低排序显示
             prob_stats = sql_get_probability_stats()
             reward_text += "📊 **装备概率信息**\n"
-            reward_text += f"🟣 紫色: {prob_stats['purple']['probability']}\n"
-            reward_text += f"🟡 金色: {prob_stats['gold']['probability']}\n"
+            reward_text += f"🔵 蓝色: {prob_stats['blue']['probability']}\n"
             reward_text += f"🟢 绿色: {prob_stats['green']['probability']}\n"
-            reward_text += f"🔵 蓝色: {prob_stats['blue']['probability']}"
+            reward_text += f"🟡 金色: {prob_stats['gold']['probability']}\n"
+            reward_text += f"🟣 紫色: {prob_stats['purple']['probability']}"
             
             await sendMessage(msg, reward_text)
             
