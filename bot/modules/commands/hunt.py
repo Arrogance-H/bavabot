@@ -27,11 +27,14 @@ def hunt_game_ikb(hunt_id: int, last_hunt_time: int = 0):
     
     if can_hunt:
         hunt_btn_text = "🔍 寻找装备"
+        bulk_hunt_btn_text = "💎 批量寻找(50次)"
     else:
         hunt_btn_text = f"⏰ 寻找装备 ({cooldown_remaining}s)"
+        bulk_hunt_btn_text = f"⏰ 批量寻找 ({cooldown_remaining}s)"
     
     return ikb([
         [(hunt_btn_text, f"hunt_action_{hunt_id}")],
+        [(bulk_hunt_btn_text, f"hunt_bulk_action_{hunt_id}")],
         [("🎒 背包", f"hunt_inventory_{hunt_id}"), ("🔧 组装", f"hunt_assembly_{hunt_id}")],
         [("❌ 结束游戏", f"hunt_end_{hunt_id}")]
     ])
@@ -40,6 +43,7 @@ def hunt_game_ikb(hunt_id: int, last_hunt_time: int = 0):
 def hunt_inventory_ikb(hunt_id: int):
     """背包界面按钮"""
     return ikb([
+        [("🗑️ 管理装备", f"hunt_manage_{hunt_id}")],
         [("🔧 组装汽车", f"hunt_assembly_{hunt_id}")],
         [("🔙 返回车库", f"hunt_game_{hunt_id}")]
     ])
@@ -117,8 +121,8 @@ async def start_hunt(_, msg):
                 f"🏎️ **车库游戏进行中**\n\n"
                 f"🎯 今日目标汽车: **{car_name}**\n"
                 f"⏰ 剩余时间: {remaining_minutes}分{remaining_seconds}秒\n"
-                f"💰 每次寻找消耗 1{sakura_b}\n"
-                f"🎒 背包装备: {equipment_count}/30\n"
+                f"💰 单次寻找消耗 1{sakura_b}，批量寻找消耗 50{sakura_b}\n"
+                f"🎒 背包装备: {equipment_count}/150\n"
                 f"🔍 找到的装备: {active_hunt.equipment_found}个\n\n"
                 f"点击下方按钮进行寻找装备！",
                 buttons=hunt_game_ikb(active_hunt.id)
@@ -154,13 +158,122 @@ async def start_hunt(_, msg):
         f"🎯 今日目标汽车: **{car_name}**\n"
         f"🔧 需要装备: {required_equipment}{reward_text}\n"
         f"⏰ 游戏时间: 30分钟\n"
-        f"💰 每次寻找消耗 1{sakura_b}\n"
+        f"💰 单次寻找消耗 1{sakura_b}，批量寻找消耗 50{sakura_b}\n"
         f"🔄 寻找冷却: 1秒\n"
-        f"🎒 背包容量: 30个装备\n"
-        f"📅 装备仅当天有效\n\n"
+        f"🎒 背包容量: 150个装备\n"
+        f"📅 装备仅当天有效\n"
+        f"🗑️ 可在背包中管理装备\n\n"
         f"**今日剩余游戏次数: {5 - today_count - 1}**\n\n"
         f"点击下方按钮开始寻找装备！",
         buttons=hunt_game_ikb(hunt_id)
+    )
+
+
+@bot.on_callback_query(filters.regex(r'^hunt_bulk_action_(\d+)$'))
+async def hunt_bulk_action(_, call):
+    """批量寻找装备动作 - 50次寻找"""
+    hunt_id = int(call.matches[0].group(1))
+    
+    # 验证游戏会话
+    hunt = sql_get_active_hunt(call.from_user.id)
+    if not hunt or hunt.id != hunt_id:
+        return await callAnswer(call, "❌ 游戏会话无效", show_alert=True)
+    
+    # 检查游戏是否超时
+    start_time = hunt.start_time
+    current_time = datetime.datetime.now()
+    if (current_time - start_time).total_seconds() > 1800:  # 30分钟
+        sql_end_hunt(hunt_id)
+        return await editMessage(call, "⏰ 车库游戏时间已结束！\n\n感谢参与，请明日再来！")
+    
+    # 检查1秒冷却时间
+    if hunt.last_hunt_time:
+        time_since_last = (current_time - hunt.last_hunt_time).total_seconds()
+        if time_since_last < 1:
+            remaining = 1 - time_since_last
+            return await callAnswer(call, f"⏰ 请等待 {remaining:.1f} 秒后再寻找", show_alert=True)
+    
+    # 检查用户金币
+    user = sql_get_emby(call.from_user.id)
+    if not user or user.iv < 50:
+        return await callAnswer(call, f"❌ {sakura_b}不足，需要 50{sakura_b}", show_alert=True)
+    
+    # 检查背包是否已满
+    current_equipment_count = sql_count_user_equipment(call.from_user.id, today_only=True)
+    if current_equipment_count >= 150:
+        return await callAnswer(call, "❌ 背包已满！请先丢弃一些装备", show_alert=True)
+    
+    # 批量寻找装备
+    await callAnswer(call, "🔍 开始批量寻找装备...")
+    
+    # 扣除金币
+    if not sql_update_emby(Emby.tg == call.from_user.id, iv=user.iv - 50):
+        return await callAnswer(call, "❌ 扣除金币失败", show_alert=True)
+    
+    # 执行50次寻找
+    found_equipment = []
+    actual_searches = 0
+    
+    for i in range(50):
+        # 每次检查背包是否已满
+        current_count = sql_count_user_equipment(call.from_user.id, today_only=True)
+        if current_count >= 150:
+            break
+        
+        # 随机获得装备
+        equipment_id = sql_random_equipment_by_rarity()
+        if equipment_id:
+            # 添加装备到背包
+            if sql_add_equipment(call.from_user.id, hunt_id, equipment_id):
+                equipment_def = sql_get_equipment_definition(equipment_id)
+                if equipment_def:
+                    found_equipment.append({
+                        'id': equipment_id,
+                        'name': equipment_def.equipment_name,
+                        'category': equipment_def.category
+                    })
+                actual_searches += 1
+    
+    # 如果实际寻找次数少于50次，退还剩余金币
+    if actual_searches < 50:
+        refund_coins = 50 - actual_searches
+        current_user = sql_get_emby(call.from_user.id)
+        if current_user:
+            sql_update_emby(Emby.tg == call.from_user.id, iv=current_user.iv + refund_coins)
+    
+    # 统计获得的装备
+    equipment_counts = {}
+    for item in found_equipment:
+        key = f"{item['name']}"
+        equipment_counts[key] = equipment_counts.get(key, 0) + 1
+    
+    # 构建结果消息
+    result_text = f"🎉 **批量寻找完成！**\n\n"
+    result_text += f"🔍 实际寻找: {actual_searches}/50 次\n"
+    if actual_searches < 50:
+        result_text += f"💰 退还金币: {50 - actual_searches}{sakura_b}\n"
+    result_text += f"🎁 获得装备: {len(found_equipment)}个\n\n"
+    
+    if equipment_counts:
+        result_text += "📦 **获得的装备:**\n"
+        for equipment_name, count in equipment_counts.items():
+            result_text += f"• {equipment_name}: {count}个\n"
+    else:
+        result_text += "😅 很遗憾，这次没有找到任何装备...\n"
+    
+    # 获取当前状态
+    final_equipment_count = sql_count_user_equipment(call.from_user.id, today_only=True)
+    user = sql_get_emby(call.from_user.id)
+    current_coins = user.iv if user else 0
+    
+    result_text += f"\n🎒 当前背包: {final_equipment_count}/150\n"
+    result_text += f"💰 剩余{sakura_b}: {current_coins}\n\n"
+    result_text += f"继续寻找装备吧！"
+    
+    await editMessage(
+        call,
+        result_text,
+        buttons=hunt_game_ikb(hunt_id, int(datetime.datetime.now().timestamp()))
     )
 
 
@@ -195,7 +308,7 @@ async def hunt_action(_, call):
     
     # 检查背包是否已满
     current_equipment_count = sql_count_user_equipment(call.from_user.id, today_only=True)
-    if current_equipment_count >= 30:
+    if current_equipment_count >= 150:
         return await callAnswer(call, "❌ 背包已满！请先丢弃一些装备", show_alert=True)
     
     # 扣除金币
@@ -220,7 +333,7 @@ async def hunt_action(_, call):
                 f"🔍 **发现装备！**\n\n"
                 f"{color_emoji} **{equipment_name}**\n"
                 f"📝 {equipment_def.description}\n\n"
-                f"🎒 当前背包: {current_equipment_count}/30\n\n"
+                f"🎒 当前背包: {current_equipment_count}/150\n\n"
                 f"是否保留这个装备？",
                 buttons=equipment_choice_ikb(hunt_id, equipment_id)
             )
@@ -247,7 +360,7 @@ async def keep_equipment(_, call):
     
     # 再次检查背包容量
     current_equipment_count = sql_count_user_equipment(call.from_user.id, today_only=True)
-    if current_equipment_count >= 30:
+    if current_equipment_count >= 150:
         return await callAnswer(call, "❌ 背包已满！无法保留装备", show_alert=True)
     
     # 添加装备到背包
@@ -279,7 +392,7 @@ async def keep_equipment(_, call):
             f"🎯 今日目标汽车: **{car_name}**\n"
             f"⏰ 剩余时间: {remaining_minutes}分{remaining_seconds}秒\n"
             f"💰 当前{sakura_b}: {current_coins}\n"
-            f"🎒 背包装备: {current_equipment_count + 1}/30\n"
+            f"🎒 背包装备: {current_equipment_count + 1}/150\n"
             f"🔍 找到的装备: {hunt.equipment_found}个\n"
             f"🆕 刚保留: {equipment_name}\n\n"
             f"继续寻找装备吧！",
@@ -325,7 +438,7 @@ async def discard_equipment(_, call):
         f"🎯 今日目标汽车: **{car_name}**\n"
         f"⏰ 剩余时间: {remaining_minutes}分{remaining_seconds}秒\n"
         f"💰 当前{sakura_b}: {current_coins}\n"
-        f"🎒 背包装备: {current_equipment_count}/30\n"
+        f"🎒 背包装备: {current_equipment_count}/150\n"
         f"🔍 找到的装备: {hunt.equipment_found}个\n"
         f"🗑️ 刚丢弃: {equipment_name}\n\n"
         f"继续寻找装备吧！",
@@ -366,7 +479,7 @@ async def hunt_inventory(_, call):
             else:
                 inventory_text += f"⚪ 装备 {equipment_id}: {count}个\n"
         
-        inventory_text += f"\n📊 总数: {len(equipment_list)}/30"
+        inventory_text += f"\n📊 总数: {len(equipment_list)}/150"
     else:
         inventory_text += "空空如也...\n"
     
@@ -374,6 +487,116 @@ async def hunt_inventory(_, call):
     
     await callAnswer(call, "🎒 查看背包")
     await editMessage(call, inventory_text, buttons=hunt_inventory_ikb(hunt_id))
+
+
+@bot.on_callback_query(filters.regex(r'^hunt_manage_(\d+)$'))
+async def hunt_manage(_, call):
+    """装备管理界面"""
+    hunt_id = int(call.matches[0].group(1))
+    
+    # 验证游戏会话
+    hunt = sql_get_active_hunt(call.from_user.id)
+    if not hunt or hunt.id != hunt_id:
+        return await callAnswer(call, "❌ 游戏会话无效", show_alert=True)
+    
+    # 获取用户装备
+    equipment_list = sql_get_user_equipment(call.from_user.id, today_only=True)
+    
+    if not equipment_list:
+        await callAnswer(call, "❌ 背包为空，无装备可管理", show_alert=True)
+        return
+    
+    # 统计装备类型
+    equipment_counts = {}
+    for equip in equipment_list:
+        equipment_counts[equip.equipment_id] = equipment_counts.get(equip.equipment_id, 0) + 1
+    
+    # 创建装备管理界面
+    manage_text = "🗑️ **装备管理**\n\n"
+    manage_text += "选择要丢弃的装备类型：\n\n"
+    
+    buttons = []
+    for equipment_id in sorted(equipment_counts.keys()):
+        count = equipment_counts[equipment_id]
+        # 获取装备定义以显示更好的名称和颜色
+        equipment_def = sql_get_equipment_definition(equipment_id)
+        if equipment_def:
+            equipment_name = equipment_def.equipment_name
+            color_emoji = get_equipment_color_emoji(equipment_def.category)
+            button_text = f"{color_emoji} {equipment_name} ({count}个)"
+        else:
+            button_text = f"⚪ 装备 {equipment_id} ({count}个)"
+        
+        buttons.append([(button_text, f"hunt_discard_{hunt_id}_{equipment_id}")])
+    
+    # 添加返回按钮
+    buttons.append([("🔙 返回背包", f"hunt_inventory_{hunt_id}")])
+    
+    manage_text += f"📊 总装备数: {len(equipment_list)}/150"
+    
+    await callAnswer(call, "🗑️ 装备管理")
+    await editMessage(call, manage_text, buttons=ikb(buttons))
+
+
+@bot.on_callback_query(filters.regex(r'^hunt_discard_(\d+)_(\d+)$'))
+async def hunt_discard_equipment(_, call):
+    """丢弃指定装备"""
+    hunt_id = int(call.matches[0].group(1))
+    equipment_id = int(call.matches[0].group(2))
+    
+    # 验证游戏会话
+    hunt = sql_get_active_hunt(call.from_user.id)
+    if not hunt or hunt.id != hunt_id:
+        return await callAnswer(call, "❌ 游戏会话无效", show_alert=True)
+    
+    # 获取装备信息
+    equipment_def = sql_get_equipment_definition(equipment_id)
+    equipment_name = equipment_def.equipment_name if equipment_def else f"装备 {equipment_id}"
+    
+    # 丢弃装备
+    if sql_discard_equipment(call.from_user.id, equipment_id, today_only=True):
+        await callAnswer(call, f"✅ 已丢弃 {equipment_name}")
+        
+        # 获取更新后的装备列表
+        equipment_list = sql_get_user_equipment(call.from_user.id, today_only=True)
+        equipment_counts = {}
+        for equip in equipment_list:
+            equipment_counts[equip.equipment_id] = equipment_counts.get(equip.equipment_id, 0) + 1
+        
+        # 重新显示管理界面
+        if equipment_counts:
+            manage_text = "🗑️ **装备管理**\n\n"
+            manage_text += "选择要丢弃的装备类型：\n\n"
+            
+            buttons = []
+            for eq_id in sorted(equipment_counts.keys()):
+                count = equipment_counts[eq_id]
+                # 获取装备定义
+                eq_def = sql_get_equipment_definition(eq_id)
+                if eq_def:
+                    eq_name = eq_def.equipment_name
+                    color_emoji = get_equipment_color_emoji(eq_def.category)
+                    button_text = f"{color_emoji} {eq_name} ({count}个)"
+                else:
+                    button_text = f"⚪ 装备 {eq_id} ({count}个)"
+                
+                buttons.append([(button_text, f"hunt_discard_{hunt_id}_{eq_id}")])
+            
+            # 添加返回按钮
+            buttons.append([("🔙 返回背包", f"hunt_inventory_{hunt_id}")])
+            
+            manage_text += f"📊 总装备数: {len(equipment_list)}/150"
+            
+            await editMessage(call, manage_text, buttons=ikb(buttons))
+        else:
+            # 没有装备了，返回背包界面
+            await editMessage(
+                call,
+                "🎒 **背包内容**\n\n空空如也...\n\n📊 总数: 0/150\n\n💡 提示：装备仅当天有效",
+                buttons=hunt_inventory_ikb(hunt_id)
+            )
+    else:
+        await callAnswer(call, f"❌ 丢弃 {equipment_name} 失败", show_alert=True)
 
 
 @bot.on_callback_query(filters.regex(r'^hunt_assembly_(\d+)$'))
@@ -574,7 +797,7 @@ async def hunt_game_return(_, call):
         f"🎯 今日目标汽车: **{car_name}**\n"
         f"⏰ 剩余时间: {remaining_minutes}分{remaining_seconds}秒\n"
         f"💰 当前{sakura_b}: {current_coins}\n"
-        f"🎒 背包装备: {equipment_count}/30\n"
+        f"🎒 背包装备: {equipment_count}/150\n"
         f"🔍 找到的装备: {hunt.equipment_found}个\n\n"
         f"点击下方按钮继续寻找装备！",
         buttons=hunt_game_ikb(hunt_id)
