@@ -445,3 +445,35 @@ async def set_activity_check_days(_, call):
                               f"🕰️ 【活跃检测天数】\n\n{days}天 **Done!**",
                               buttons=back_config_p_ikb)
             LOGGER.info(f"【admin】：{call.from_user.id} - 更新活跃检测天数为{days}天完成")
+
+
+@bot.on_callback_query(filters.regex('set_hunt_daily_limit') & admins_on_filter)
+async def set_hunt_daily_limit(_, call):
+    await callAnswer(call, '🎯 设置寻宝游戏每日限制')
+    send = await editMessage(call,
+                             f"🎮【设置寻宝游戏每日限制】\n\n请输入一个数字（建议范围：10-100）\n取消点击 /cancel\n\n当前每日游戏限制: {config.hunt_daily_limit}次")
+    if send is False:
+        return
+    txt = await callListen(call, 120, back_set_ikb('set_hunt_daily_limit'))
+    if txt is False:
+        return
+
+    elif txt.text == '/cancel':
+        await txt.delete()
+        await editMessage(call, '__您已经取消输入__ **会话已结束！**', buttons=back_set_ikb('set_hunt_daily_limit'))
+    else:
+        await txt.delete()
+        try:
+            limit = int(txt.text)
+            if limit <= 0:
+                raise ValueError("次数必须大于0")
+        except ValueError:
+            await editMessage(call, f"请注意格式! 请输入大于0的数字。您的输入如下: \n\n`{txt.text}`",
+                              buttons=back_set_ikb('set_hunt_daily_limit'))
+        else:
+            config.hunt_daily_limit = limit
+            save_config()
+            await editMessage(call,
+                              f"🎯 【寻宝游戏每日限制】\n\n{limit}次 **Done!**",
+                              buttons=back_config_p_ikb)
+            LOGGER.info(f"【admin】：{call.from_user.id} - 更新寻宝游戏每日限制为{limit}次完成")
