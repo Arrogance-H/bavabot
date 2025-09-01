@@ -7,7 +7,7 @@ import os
 from pyrogram import filters
 from bot import bot, prefixes, sakura_b, LOGGER, config
 from bot.func_helper.filters import user_in_group_on_filter
-from bot.func_helper.msg_utils import sendMessage
+from bot.func_helper.msg_utils import sendMessage, deleteMessage
 from bot.sql_helper.sql_emby import sql_get_emby
 from bot.sql_helper.sql_hunt import (
     sql_update_reward_config, sql_get_reward_config, 
@@ -15,6 +15,7 @@ from bot.sql_helper.sql_hunt import (
     sql_set_reward_button, sql_get_reward_button, RewardButton
 )
 from bot.sql_helper import Session
+from sqlalchemy import func
 
 
 @bot.on_message(filters.command('hunt_config_reward', prefixes) & user_in_group_on_filter)
@@ -173,7 +174,7 @@ async def hunt_statistics(_, msg):
             # 今日游戏统计
             today_hunts = session.query(Hunt).filter(Hunt.game_date == today).count()
             today_equipment = session.query(Equipment).filter(Equipment.obtained_date == today).count()
-            today_assemblies = session.query(AssemblyReward).filter(AssemblyReward.obtained_date == today).count()
+            today_reward_users = session.query(func.count(func.distinct(AssemblyReward.tg))).filter(AssemblyReward.obtained_date == today).scalar()
             
             # 用户个人统计
             user_today_hunts = session.query(Hunt).filter(
@@ -187,17 +188,19 @@ async def hunt_statistics(_, msg):
             user_today_rewards = session.query(AssemblyReward).filter(
                 AssemblyReward.tg == msg.from_user.id, AssemblyReward.obtained_date == today
             ).count()
+            # Convert to 0 or 1 to show if user has received any rewards
+            user_has_rewards = 1 if user_today_rewards > 0 else 0
             
             stats_text = f"📊 **车库游戏统计**\n\n"
             stats_text += f"📅 **今日全服数据:**\n"
             stats_text += f"🎮 游戏场次: {today_hunts}\n"
             stats_text += f"🔍 发现装备: {today_equipment}\n"
-            stats_text += f"🏎️ 完成组装: {today_assemblies}\n\n"
+            stats_text += f"🏆 获奖用户数: {today_reward_users}\n\n"
             
             stats_text += f"👤 **您的今日数据:**\n"
             stats_text += f"🎮 游戏场次: {user_today_hunts}/{config.hunt_daily_limit}\n"
             stats_text += f"🔍 发现装备: {user_today_equipment}\n"
-            stats_text += f"🏎️ 完成组装: {user_today_rewards}\n"
+            stats_text += f"🏆 是否获奖: {'是' if user_has_rewards else '否'}\n"
             
             stats_msg = await sendMessage(msg, stats_text)
             
