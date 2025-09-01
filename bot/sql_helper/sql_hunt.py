@@ -446,6 +446,18 @@ def sql_get_active_hunt(tg: int):
             return None
 
 
+def sql_get_hunt_by_id(hunt_id: int):
+    """根据hunt_id获取游戏会话（任何用户）"""
+    with Session() as session:
+        try:
+            hunt = session.query(Hunt).filter(
+                and_(Hunt.id == hunt_id, Hunt.is_active == True)
+            ).first()
+            return hunt
+        except:
+            return None
+
+
 def sql_get_cached_daily_car(hunt):
     """获取游戏会话中缓存的每日汽车信息"""
     if not hunt or not hunt.daily_car_info:
@@ -850,29 +862,40 @@ def sql_set_reward_button(car_id: int, button_text: str, button_url: str) -> boo
             return False
 
 
+# 概率配置常量 - 修改概率时只需更改这里
+PROBABILITY_THRESHOLDS = {
+    'M5_PURPLE': 0.02,    # M5风暴灰车漆: 0.02%
+    'M4_PURPLE': 0.25,    # M4圣保罗黄车漆: 0.23% (0.02-0.25)
+    'M3_PURPLE': 1.55,    # M3曼岛绿车漆: 1.3% (0.25-1.55)
+    'M2_PURPLE': 3.9,     # M2赞德福特蓝车漆: 2.35% (1.55-3.9)
+    'GOLD': 8.91,         # 金色装备: 5.01% (3.9-8.91)
+    'GREEN': 15.92,       # 绿色装备: 7.01% (8.91-15.92)
+    # 蓝色装备: 84.08% (15.92-100)
+}
+
 def sql_random_equipment_by_rarity():
     """根据稀有度权重随机选择装备"""
     with Session() as session:
         try:
             import random
             
-            # 优化概率分布，按从高到低排序: 蓝色 > 绿色 > 金色 > 紫色(3.9%)
+            # 优化概率分布，按从高到低排序: 蓝色 > 绿色 > 金色 > 紫色
             rand_value = random.random() * 100  # 0-100的随机数
             
             # 紫色装备个别概率判断 
-            if rand_value < 0.02:  # 0.05% M5紫色装备
+            if rand_value < PROBABILITY_THRESHOLDS['M5_PURPLE']:  # M5紫色装备
                 return 4  
-            elif rand_value < 0.25:  # 0.5% M4紫色装备
+            elif rand_value < PROBABILITY_THRESHOLDS['M4_PURPLE']:  # M4紫色装备
                return 3  
-            elif rand_value < 1.55:  # 1.0% M3紫色装备
+            elif rand_value < PROBABILITY_THRESHOLDS['M3_PURPLE']:  # M3紫色装备
                return 2  
-            elif rand_value < 3.9:  # 2.35% M2紫色装备
+            elif rand_value < PROBABILITY_THRESHOLDS['M2_PURPLE']:  # M2紫色装备
                 return 1  
-            elif rand_value < 8.91:  # 5.0% 概率获得金色装备
+            elif rand_value < PROBABILITY_THRESHOLDS['GOLD']:  # 概率获得金色装备
                 category = 'gold'
-            elif rand_value < 15.92:  # 7.0% 概率获得绿色装备
+            elif rand_value < PROBABILITY_THRESHOLDS['GREEN']:  # 概率获得绿色装备
                 category = 'green'
-            else:  # 84.1% 概率获得蓝色装备
+            else:  # 概率获得蓝色装备
                 category = 'blue'
             
             # 从选定类别中随机选择装备
@@ -1093,21 +1116,33 @@ def sql_update_reward_config(car_id: int, reward_type: str, reward_value: str, r
 
 
 def sql_get_probability_stats():
-    """获取装备抽取概率统计信息"""
+    """获取装备抽取概率统计信息 - 自动从概率配置计算"""
+    # 计算各个装备的实际概率
+    m5_prob = PROBABILITY_THRESHOLDS['M5_PURPLE']
+    m4_prob = PROBABILITY_THRESHOLDS['M4_PURPLE'] - PROBABILITY_THRESHOLDS['M5_PURPLE']
+    m3_prob = PROBABILITY_THRESHOLDS['M3_PURPLE'] - PROBABILITY_THRESHOLDS['M4_PURPLE']
+    m2_prob = PROBABILITY_THRESHOLDS['M2_PURPLE'] - PROBABILITY_THRESHOLDS['M3_PURPLE']
+    
+    # 计算各个稀有度的总概率
+    total_purple = PROBABILITY_THRESHOLDS['M2_PURPLE']
+    gold_prob = PROBABILITY_THRESHOLDS['GOLD'] - PROBABILITY_THRESHOLDS['M2_PURPLE']
+    green_prob = PROBABILITY_THRESHOLDS['GREEN'] - PROBABILITY_THRESHOLDS['GOLD']
+    blue_prob = 100.0 - PROBABILITY_THRESHOLDS['GREEN']
+    
     return {
         "purple": {
-            "probability": "3.9%", 
+            "probability": f"{total_purple:.1f}%", 
             "description": "专属车漆奖励",
             "details": {
-                "M2_赞德福特蓝车漆": "2.0%",
-                "M3_曼岛绿车漆": "1.0%", 
-                "M4_圣保罗黄车漆": "0.8%",
-                "M5_风暴灰车漆": "0.1%"
+                "M2_赞德福特蓝车漆": f"{m2_prob:.1f}%",
+                "M3_曼岛绿车漆": f"{m3_prob:.1f}%", 
+                "M4_圣保罗黄车漆": f"{m4_prob:.2f}%",
+                "M5_风暴灰车漆": f"{m5_prob:.2f}%"
             }
         },
-        "gold": {"probability": "5.0%", "description": "高级组件"},
-        "green": {"probability": "7.0%", "description": "车漆变体"},
-        "blue": {"probability": "84.1%", "description": "常见物品"}
+        "gold": {"probability": f"{gold_prob:.1f}%", "description": "高级组件"},
+        "green": {"probability": f"{green_prob:.1f}%", "description": "车漆变体"},
+        "blue": {"probability": f"{blue_prob:.1f}%", "description": "常见物品"}
     }
 
 

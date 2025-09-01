@@ -11,7 +11,7 @@ from bot.func_helper.msg_utils import sendMessage, editMessage, callAnswer, dele
 from bot.func_helper.fix_bottons import ikb
 from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby
 from bot.sql_helper.sql_hunt import (
-    sql_start_hunt, sql_end_hunt, sql_get_active_hunt, sql_add_equipment,
+    sql_start_hunt, sql_end_hunt, sql_get_active_hunt, sql_get_hunt_by_id, sql_add_equipment,
     sql_get_user_equipment, sql_get_today_hunt_count, sql_get_total_hunt_actions, sql_get_daily_car,
     sql_get_equipment_definition, sql_random_equipment_by_rarity, sql_count_user_equipment,
     sql_update_hunt_stats, sql_get_cached_daily_car, sql_update_bulk_hunt_stats, sql_check_and_fix_hunt_table,
@@ -26,6 +26,36 @@ async def delete_message_after_delay(message, delay_seconds: int):
         await deleteMessage(message)
     except Exception as e:
         LOGGER.error(f"删除延迟消息失败: {e}")
+
+
+async def validate_hunt_session(call, hunt_id: int) -> tuple[bool, any]:
+    """
+    验证车库游戏会话
+    返回 (is_valid, hunt_object)
+    - 如果会话有效且属于当前用户，返回 (True, hunt)
+    - 如果会话有效但属于别人，显示提示并返回 (False, None)
+    - 如果会话无效，删除消息并返回 (False, None)
+    """
+    # 首先检查用户自己的活跃游戏
+    user_hunt = sql_get_active_hunt(call.from_user.id)
+    if user_hunt and user_hunt.id == hunt_id:
+        # 会话有效且属于当前用户
+        return True, user_hunt
+    
+    # 检查该hunt_id是否属于其他用户
+    other_hunt = sql_get_hunt_by_id(hunt_id)
+    if other_hunt and other_hunt.tg != call.from_user.id:
+        # 会话存在但属于别人
+        await callAnswer(call, "❌ 这是别人的寻宝图，请启动自己的游戏", show_alert=True)
+        return False, None
+    
+    # 会话不存在或已过期，删除消息
+    await callAnswer(call, "❌ 游戏会话无效", show_alert=True)
+    try:
+        await deleteMessage(call.message)
+    except:
+        pass
+    return False, None
 
 
 # 车库游戏按钮
@@ -334,14 +364,8 @@ async def hunt_bulk_action(_, call):
         return await callAnswer(call, "❌ 无效的批量数量", show_alert=True)
     
     # 验证游戏会话
-    hunt = sql_get_active_hunt(call.from_user.id)
-    if not hunt or hunt.id != hunt_id:
-        # 游戏会话无效时立即删除消息
-        await callAnswer(call, "❌ 游戏会话无效", show_alert=True)
-        try:
-            await deleteMessage(call.message)
-        except:
-            pass
+    is_valid, hunt = await validate_hunt_session(call, hunt_id)
+    if not is_valid:
         return
     
     # 计算所需金币 (每次1金币)
@@ -446,14 +470,8 @@ async def hunt_action(_, call):
     hunt_id = int(call.matches[0].group(1))
     
     # 验证游戏会话
-    hunt = sql_get_active_hunt(call.from_user.id)
-    if not hunt or hunt.id != hunt_id:
-        # 游戏会话无效时立即删除消息
-        await callAnswer(call, "❌ 游戏会话无效", show_alert=True)
-        try:
-            await deleteMessage(call.message)
-        except:
-            pass
+    is_valid, hunt = await validate_hunt_session(call, hunt_id)
+    if not is_valid:
         return
     
     # 检查1秒冷却时间
@@ -591,14 +609,8 @@ async def hunt_end(_, call):
     hunt_id = int(call.matches[0].group(1))
     
     # 验证游戏会话
-    hunt = sql_get_active_hunt(call.from_user.id)
-    if not hunt or hunt.id != hunt_id:
-        # 游戏会话无效时立即删除消息
-        await callAnswer(call, "❌ 游戏会话无效", show_alert=True)
-        try:
-            await deleteMessage(call.message)
-        except:
-            pass
+    is_valid, hunt = await validate_hunt_session(call, hunt_id)
+    if not is_valid:
         return
     
     # 结束游戏
@@ -659,14 +671,8 @@ async def hunt_game_return(_, call):
     hunt_id = int(call.matches[0].group(1))
     
     # 验证游戏会话
-    hunt = sql_get_active_hunt(call.from_user.id)
-    if not hunt or hunt.id != hunt_id:
-        # 游戏会话无效时立即删除消息
-        await callAnswer(call, "❌ 游戏会话无效", show_alert=True)
-        try:
-            await deleteMessage(call.message)
-        except:
-            pass
+    is_valid, hunt = await validate_hunt_session(call, hunt_id)
+    if not is_valid:
         return
     
     # 获取缓存的每日汽车
