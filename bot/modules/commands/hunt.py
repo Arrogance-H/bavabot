@@ -162,47 +162,36 @@ async def start_hunt(_, msg):
     # 检查是否已有活跃游戏
     active_hunt = sql_get_active_hunt(msg.from_user.id)
     if active_hunt:
-        start_time = active_hunt.start_time
-        current_time = datetime.datetime.now()
-        if (current_time - start_time).total_seconds() > 1800:  # 30分钟
-            sql_end_hunt(active_hunt.id)
-            return await sendMessage(msg, "⏰ 您的上一场寻宝游戏已超时结束，请重新开始", timer=300)
-        else:
-            remaining_time = 1800 - int((current_time - start_time).total_seconds())
-            remaining_minutes = remaining_time // 60
-            remaining_seconds = remaining_time % 60
-            
-            # 获取今日汽车
-            daily_car = sql_get_daily_car()
-            car_name = daily_car.car_name if daily_car else "未知"
-            
-            # 获取目标装备数量
-            equipment_count = sql_count_user_equipment(msg.from_user.id, today_only=True)
-            
-            # 获取目标装备显示信息
-            target_equipment_ids = []
-            equipment_display = ""
-            assembly_ready = False
-            if daily_car:
-                target_equipment_ids = [int(x) for x in daily_car.equipment_ids.split(',')]
-                equipment_display, assembly_ready = get_user_target_equipment_display(msg.from_user.id, target_equipment_ids)
-            
-            # 获取用户昵称
-            user_nickname = msg.from_user.first_name
-            
-            return await sendMessage(
-                msg,
-                f"🏎️ **寻宝游戏进行中**\n\n"
-                f"👤 **{user_nickname}** 正在寻宝...\n\n"
-                f"🎯 今日目标汽车: **{car_name}**\n"
-                f"⏰ 剩余时间: {remaining_minutes}分{remaining_seconds}秒\n"
-                f"💰 当前{sakura_b}: {user.iv}\n"
-                f"🔍 找到装备: {active_hunt.equipment_found}个\n"
-                f"📊 总寻宝次数: {sql_get_total_hunt_count(msg.from_user.id)}次\n\n"
-                f"{equipment_display}\n\n"
-                f"继续您的寻宝之旅吧！",
-                buttons=hunt_game_ikb(active_hunt.id)
-            )
+        # 获取今日汽车
+        daily_car = sql_get_daily_car()
+        car_name = daily_car.car_name if daily_car else "未知"
+        
+        # 获取目标装备数量
+        equipment_count = sql_count_user_equipment(msg.from_user.id, today_only=True)
+        
+        # 获取目标装备显示信息
+        target_equipment_ids = []
+        equipment_display = ""
+        assembly_ready = False
+        if daily_car:
+            target_equipment_ids = [int(x) for x in daily_car.equipment_ids.split(',')]
+            equipment_display, assembly_ready = get_user_target_equipment_display(msg.from_user.id, target_equipment_ids)
+        
+        # 获取用户昵称
+        user_nickname = msg.from_user.first_name
+        
+        return await sendMessage(
+            msg,
+            f"🏎️ **寻宝游戏进行中**\n\n"
+            f"👤 **{user_nickname}** 正在寻宝...\n\n"
+            f"🎯 今日目标汽车: **{car_name}**\n"
+            f"💰 当前{sakura_b}: {user.iv}\n"
+            f"🔍 找到装备: {active_hunt.equipment_found}个\n"
+            f"📊 总寻宝次数: {sql_get_total_hunt_count(msg.from_user.id)}次\n\n"
+            f"{equipment_display}\n\n"
+            f"继续您的寻宝之旅吧！",
+            buttons=hunt_game_ikb(active_hunt.id)
+        )
     
     # 开始新游戏
     hunt_id = sql_start_hunt(msg.from_user.id)
@@ -251,7 +240,6 @@ async def start_hunt(_, msg):
         f"🎯 今日目标汽车: **{car_name}**\n"
         f"{reward_text}\n"
         f"🔧 需要装备:\n{equipment_display}\n\n"
-        f"⏰ 游戏时间: 30分钟\n"
         f"💰 每次寻找消耗 1{sakura_b}\n"
         f"**今日剩余游戏次数: {config.hunt_daily_limit - today_count - 1}**\n"
         f"📊 总寻宝次数: {total_count + 1}次\n\n"
@@ -271,13 +259,6 @@ async def hunt_bulk_action(_, call):
     hunt = sql_get_active_hunt(call.from_user.id)
     if not hunt or hunt.id != hunt_id:
         return await callAnswer(call, "❌ 游戏会话无效", show_alert=True)
-    
-    # 检查游戏是否超时
-    start_time = hunt.start_time
-    current_time = datetime.datetime.now()
-    if (current_time - start_time).total_seconds() > 1800:  # 30分钟
-        sql_end_hunt(hunt_id)
-        return await editMessage(call, "⏰ 寻宝游戏时间已结束！", timer=300)
     
     # 检查用户金币（批量寻找消耗10金币）
     user = sql_get_emby(call.from_user.id)
@@ -326,7 +307,7 @@ async def hunt_bulk_action(_, call):
                 })
     
     # 更新寻找统计
-    sql_update_hunt_stats(hunt_id, current_time)
+    sql_update_hunt_stats(hunt_id, datetime.datetime.now())
     
     # 构建结果消息
     result_text = f"💎 **批量寻找完成！**\n\n"
@@ -342,10 +323,6 @@ async def hunt_bulk_action(_, call):
             result_text += f"{status} {color_emoji} {item['name']}\n"
     
     # 获取最新状态
-    remaining_time = 1800 - int((current_time - start_time).total_seconds())
-    remaining_minutes = remaining_time // 60
-    remaining_seconds = remaining_time % 60
-    
     car_name = daily_car.car_name if daily_car else "未知"
     hunt = sql_get_active_hunt(call.from_user.id)  # 刷新统计
     
@@ -369,7 +346,6 @@ async def hunt_bulk_action(_, call):
     result_text += f"\n🏎️ **当前状态:**\n"
     result_text += f"👤 **{call.from_user.first_name}** 正在寻宝...\n"
     result_text += f"🎯 目标汽车: {car_name}\n"
-    result_text += f"⏰ 剩余时间: {remaining_minutes}分{remaining_seconds}秒\n"
     result_text += f"💰 当前{sakura_b}: {user.iv - 10}\n"
     result_text += f"🔍 总计找到: {hunt.equipment_found}个\n"
     result_text += f"📊 总寻宝次数: {sql_get_total_hunt_count(call.from_user.id)}次\n\n"
@@ -377,7 +353,7 @@ async def hunt_bulk_action(_, call):
     result_text += f"继续寻找装备吧！"
     
     await callAnswer(call, "💎 批量寻找完成！")
-    await editMessage(call, result_text, buttons=hunt_game_ikb(hunt_id, int(current_time.timestamp())))
+    await editMessage(call, result_text, buttons=hunt_game_ikb(hunt_id, int(datetime.datetime.now().timestamp())))
 
 
 @bot.on_callback_query(filters.regex(r'^hunt_action_(\d+)$'))
@@ -390,14 +366,8 @@ async def hunt_action(_, call):
     if not hunt or hunt.id != hunt_id:
         return await callAnswer(call, "❌ 游戏会话无效", show_alert=True)
     
-    # 检查游戏是否超时
-    start_time = hunt.start_time
-    current_time = datetime.datetime.now()
-    if (current_time - start_time).total_seconds() > 1800:  # 30分钟
-        sql_end_hunt(hunt_id)
-        return await editMessage(call, "⏰ 寻宝游戏时间已结束！", timer=300)
-    
     # 检查1秒冷却时间
+    current_time = datetime.datetime.now()
     if hunt.last_hunt_time:
         time_since_last = (current_time - hunt.last_hunt_time).total_seconds()
         if time_since_last < 1:
@@ -440,10 +410,6 @@ async def hunt_action(_, call):
                     await callAnswer(call, f"🎉 发现目标装备！已自动保留 {equipment_name}")
                     
                     # 更新游戏界面
-                    remaining_time = 1800 - int((current_time - start_time).total_seconds())
-                    remaining_minutes = remaining_time // 60
-                    remaining_seconds = remaining_time % 60
-                    
                     car_name = daily_car.car_name if daily_car else "未知"
                     
                     # 获取目标装备显示信息
@@ -475,7 +441,6 @@ async def hunt_action(_, call):
                         f"🏎️ **寻宝游戏进行中**\n\n"
                         f"👤 **{user_nickname}** 正在寻宝...\n\n"
                         f"🎯 今日目标汽车: **{car_name}**\n"
-                        f"⏰ 剩余时间: {remaining_minutes}分{remaining_seconds}秒\n"
                         f"💰 当前{sakura_b}: {user.iv - 1}\n"
                         f"🔍 找到装备: {hunt.equipment_found}个\n"
                         f"📊 总寻宝次数: {sql_get_total_hunt_count(call.from_user.id)}次\n"
@@ -491,10 +456,6 @@ async def hunt_action(_, call):
                 await callAnswer(call, f"🗑️ 发现非目标装备 {equipment_name}，已自动丢弃")
                 
                 # 更新游戏界面
-                remaining_time = 1800 - int((current_time - start_time).total_seconds())
-                remaining_minutes = remaining_time // 60
-                remaining_seconds = remaining_time % 60
-                
                 car_name = daily_car.car_name if daily_car else "未知"
                 
                 # 获取目标装备显示信息
@@ -516,7 +477,6 @@ async def hunt_action(_, call):
                     f"🏎️ **寻宝游戏进行中**\n\n"
                     f"👤 **{user_nickname}** 正在寻宝...\n\n"
                     f"🎯 今日目标汽车: **{car_name}**\n"
-                    f"⏰ 剩余时间: {remaining_minutes}分{remaining_seconds}秒\n"
                     f"💰 当前{sakura_b}: {user.iv - 1}\n"
                     f"🔍 找到装备: {hunt.equipment_found}个\n"
                     f"📊 总寻宝次数: {sql_get_total_hunt_count(call.from_user.id)}次\n"
@@ -610,17 +570,6 @@ async def hunt_game_return(_, call):
     if not hunt or hunt.id != hunt_id:
         return await callAnswer(call, "❌ 游戏会话无效", show_alert=True)
     
-    # 检查游戏是否超时
-    start_time = hunt.start_time
-    current_time = datetime.datetime.now()
-    if (current_time - start_time).total_seconds() > 1800:  # 30分钟
-        sql_end_hunt(hunt_id)
-        return await editMessage(call, "⏰ 车库游戏时间已结束！", timer=300)
-    
-    remaining_time = 1800 - int((current_time - start_time).total_seconds())
-    remaining_minutes = remaining_time // 60
-    remaining_seconds = remaining_time % 60
-    
     # 获取今日汽车
     daily_car = sql_get_daily_car()
     car_name = daily_car.car_name if daily_car else "未知"
@@ -643,7 +592,6 @@ async def hunt_game_return(_, call):
         f"🏎️ **车库游戏进行中**\n\n"
         f"👤 **{call.from_user.first_name}** 正在寻宝...\n\n"
         f"🎯 今日目标汽车: **{car_name}**\n"
-        f"⏰ 剩余时间: {remaining_minutes}分{remaining_seconds}秒\n"
         f"💰 当前{sakura_b}: {current_coins}\n"
         f"🔍 找到的装备: {hunt.equipment_found}个\n"
         f"📊 总寻宝次数: {sql_get_total_hunt_count(call.from_user.id)}次\n\n"
