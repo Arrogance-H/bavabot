@@ -14,7 +14,7 @@ from bot.sql_helper.sql_hunt import (
     sql_start_hunt, sql_end_hunt, sql_get_active_hunt, sql_add_equipment,
     sql_get_user_equipment, sql_get_today_hunt_count, sql_get_total_hunt_actions, sql_get_daily_car,
     sql_get_equipment_definition, sql_random_equipment_by_rarity, sql_count_user_equipment,
-    sql_update_hunt_stats, sql_get_cached_daily_car, sql_update_bulk_hunt_stats
+    sql_update_hunt_stats, sql_get_cached_daily_car, sql_update_bulk_hunt_stats, sql_check_and_fix_hunt_table
 )
 
 
@@ -197,8 +197,23 @@ async def start_hunt(_, msg):
         return await sendMessage(msg, "❌ 您今日的寻宝游戏次数已达上限！")
     elif hunt_id == -2:
         return await sendMessage(msg, "❌ 您已有进行中的游戏，请先结束当前游戏")
+    elif hunt_id == -3:
+        # 数据库结构问题，尝试修复
+        if sql_check_and_fix_hunt_table():
+            # 修复成功，重试开始游戏
+            hunt_id = sql_start_hunt(msg.from_user.id)
+            if hunt_id > 0:
+                # 成功了，继续正常流程
+                pass
+            else:
+                return await sendMessage(msg, "❌ 数据库已修复，但游戏启动仍失败，请联系管理员")
+        else:
+            return await sendMessage(msg, "❌ 数据库结构需要更新，请联系管理员运行数据库迁移")
     elif hunt_id == 0:
         return await sendMessage(msg, "❌ 开始游戏失败，请稍后再试")
+    
+    if hunt_id <= 0:
+        return  # 如果还是失败，直接返回
     
     # 获取今日汽车和装备信息
     daily_car = sql_get_daily_car()
