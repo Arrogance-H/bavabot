@@ -860,17 +860,17 @@ def sql_random_equipment_by_rarity():
             rand_value = random.random() * 100  # 0-100的随机数
             
             # 紫色装备个别概率判断 
-            if rand_value < 0.05:  # 0.05% M5紫色装备
+            if rand_value < 0.02:  # 0.05% M5紫色装备
                 return 4  
-            elif rand_value < 0.55:  # 0.5% M4紫色装备
+            elif rand_value < 0.25:  # 0.5% M4紫色装备
                return 3  
             elif rand_value < 1.55:  # 1.0% M3紫色装备
                return 2  
             elif rand_value < 3.9:  # 2.35% M2紫色装备
                 return 1  
-            elif rand_value < 8.9:  # 5.0% 概率获得金色装备
+            elif rand_value < 8.91:  # 5.0% 概率获得金色装备
                 category = 'gold'
-            elif rand_value < 15.9:  # 7.0% 概率获得绿色装备
+            elif rand_value < 15.92:  # 7.0% 概率获得绿色装备
                 category = 'green'
             else:  # 84.1% 概率获得蓝色装备
                 category = 'blue'
