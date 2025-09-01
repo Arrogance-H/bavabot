@@ -13,8 +13,8 @@ from .view_user import list_whitelist, whitelist_page, list_normaluser, normalus
 # 车库游戏用户命令 (Hunt Game User Commands)
 from .hunt import (
     start_hunt,              # 开始游戏命令 (/hunt)
-    hunt_action, hunt_bulk_action,
-    hunt_end, hunt_game_return
+    hunt_action, hunt_assembly, hunt_do_assembly, 
+    hunt_end, hunt_game_return, hunt_bulk_action
 )
 
 # 车库游戏管理员命令 (Hunt Game Admin Commands)  
