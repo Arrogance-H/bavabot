@@ -865,7 +865,7 @@ def sql_random_equipment_by_rarity():
             rand_value = random.random() * 100  # 0-100的随机数
             
             # 紫色装备个别概率判断 (M2 > M3 > M4 > M5) - 保持3.9%总概率
-           if rand_value < 0.05:  # 0.05% M5紫色装备 (风暴灰车漆, equipment_id=4)
+            if rand_value < 0.05:  # 0.05% M5紫色装备 (风暴灰车漆, equipment_id=4)
                 return 4  # 直接返回M5专属紫色装备ID
             elif rand_value < 0.55:  # 0.5% M4紫色装备 (圣保罗黄车漆, equipment_id=3)
                return 3  # 直接返回M4专属紫色装备ID
