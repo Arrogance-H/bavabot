@@ -35,13 +35,13 @@ def hunt_game_ikb(hunt_id: int, last_hunt_time: int = 0):
     can_hunt = cooldown_remaining == 0
     
     if can_hunt:
-        hunt_btn_text = "🔍 寻找装备"
-        bulk_10_text = "💎 批量10次"
-        bulk_50_text = "💎 批量50次"
+        hunt_btn_text = "🔍 开始寻宝"
+        bulk_10_text = "💎 寻找10次"
+        bulk_50_text = "💎 寻找50次"
     else:
-        hunt_btn_text = f"⏰ 寻找装备"
-        bulk_10_text = f"⏰ 批量10次"
-        bulk_50_text = f"⏰ 批量50次"
+        hunt_btn_text = f"⏰ 寻找寻宝"
+        bulk_10_text = f"⏰ 寻找10次"
+        bulk_50_text = f"⏰ 寻找50次"
     
     return ikb([
         [(hunt_btn_text, f"hunt_action_{hunt_id}")],
@@ -135,7 +135,7 @@ async def handle_game_completion(call, hunt_id: int, daily_car, equipment_found_
     notification_text += f"💰 **消耗JOY币:** {hunt.coins_spent}\n\n"
     notification_text += f"🎁 **获得奖励:** {reward_description}\n\n"
     notification_text += f"📋 **领奖信息:** {claim_info}\n\n"
-    notification_text += f"🎮 恭喜完成今日寻宝挑战！"
+    notification_text += f"🎮 恭喜完成寻宝挑战！"
     
     # 发送独立的通知消息
     try:
@@ -305,13 +305,11 @@ async def start_hunt(_, msg):
         f"👤 **{user_nickname}** 正在寻宝...\n\n"
         f"🎯 今日目标汽车: **{car_name}**\n"
         f"{reward_text}\n"
-        f"🔧 需要装备:\n{equipment_display}\n\n"
-        f"💰 每次寻找消耗 1{sakura_b}，批量寻找(10/50次)分别消耗对应数量\n"
-        f"**今日剩余游戏次数: {config.hunt_daily_limit - today_count - 1}**\n"
+        f"🔧 需要装备:\n{equipment_display}\n"
+        f"💰 每次寻找消耗 1{sakura_b}\n"
+        f"🕹️ 今日剩余游戏次数: {config.hunt_daily_limit - today_count - 1}\n"
         f"📊 总寻宝次数: {sql_get_total_hunt_actions(msg.from_user.id)}次\n\n"
-        f"💡 提示: 非目标装备将自动丢弃\n"
-        f"🎉 收集齐全部装备后游戏将自动完成！\n"
-        f"点击下方按钮开始寻找装备！",
+        f"👇 点击下方按钮开始寻找装备！",
         buttons=hunt_game_ikb(hunt_id)
     )
 
@@ -388,7 +386,7 @@ async def hunt_bulk_action(_, call):
     sql_update_bulk_hunt_stats(hunt_id, datetime.datetime.now(), quantity)
     
     # 构建结果消息
-    result_text = f"💎 **批量寻找完成！**\n\n"
+    result_text = f"⏳ **寻宝完成！**\n\n"
     result_text += f"🔍 寻找次数: {quantity}次\n"
     result_text += f"✅ 获得目标装备: {target_found}个\n"
     result_text += f"🗑️ 自动丢弃非目标装备: {non_target_found}个\n\n"
@@ -429,7 +427,7 @@ async def hunt_bulk_action(_, call):
     result_text += f"{equipment_display}\n\n"
     result_text += f"继续寻找装备吧！"
     
-    await callAnswer(call, f"💎 批量寻找{quantity}次完成！")
+    await callAnswer(call, f"⏳ 批量寻找{quantity}次完成！")
     await editMessage(call, result_text, buttons=hunt_game_ikb(hunt_id, int(datetime.datetime.now().timestamp())))
 
 
@@ -614,7 +612,7 @@ async def hunt_end(_, call):
         for equip in equipment_list:
             equipment_counts[equip.equipment_id] = equipment_counts.get(equip.equipment_id, 0) + 1
         
-        result_text = f"🏁 **车库游戏结束**\n\n"
+        result_text = f"🏁 **寻宝结束**\n\n"
         result_text += f"👤 **{user_nickname}** 已经结束寻宝\n\n"
         result_text += f"⏱️ 游戏时长: {duration_minutes}分{duration_seconds}秒\n"
         result_text += f"💰 消耗{sakura_b}: {hunt.coins_spent}\n\n"
@@ -681,12 +679,12 @@ async def hunt_game_return(_, call):
     await callAnswer(call, "🏎️ 返回车库")
     await editMessage(
         call,
-        f"🏎️ **车库游戏进行中**\n\n"
+        f"🏎️ **寻宝进行中**\n\n"
         f"👤 **{call.from_user.first_name}** 正在寻宝...\n\n"
         f"🎯 今日目标汽车: **{car_name}**\n"
         f"💰 当前{sakura_b}: {current_coins}\n"
         f"📊 总寻宝次数: {sql_get_total_hunt_actions(call.from_user.id)}次\n\n"
         f"{equipment_display}\n\n"
-        f"点击下方按钮继续寻找装备！",
+        f"👇 点击下方按钮继续寻找装备！",
         buttons=hunt_game_ikb(hunt_id)
     )
