@@ -56,6 +56,8 @@ This is a garage game feature developed for bavabot. Users can start garage game
 - equipment_found: 找到的装备数量
 - coins_spent: 消耗的金币数量
 - last_hunt_time: 上次寻找时间
+- hunt_actions: 寻找装备的次数 (Integer, default=0)
+- daily_car_info: 缓存的每日汽车信息 (Text, nullable=True)
 ```
 
 ### Equipment Table (装备表)
@@ -157,6 +159,41 @@ bot/
 - 背包最多存放30个装备
 - 获得装备时可选择保留或丢弃
 - 每日随机选择目标汽车
+
+## 数据库迁移 (Database Migration)
+
+如果遇到以下错误：
+```
+(pymysql.err.OperationalError) (1054, "Unknown column 'hunt.hunt_actions' in 'field list'")
+```
+
+这意味着数据库表结构过时，需要运行迁移脚本：
+
+### 方法一：使用Python迁移脚本 (推荐)
+```bash
+cd /path/to/bavabot
+python3 migrate_hunt_table.py
+```
+
+### 方法二：直接执行SQL
+```bash
+mysql -u username -p database_name < migrate_hunt_table.sql
+```
+
+迁移脚本会安全地添加缺失的列：
+- `hunt_actions` (INT, DEFAULT 0) - 寻找装备的次数
+- `daily_car_info` (TEXT, NULL) - 缓存的每日汽车信息
+
+### 迁移前后对比
+**迁移前的错误：**
+- 代码模型定义了新列但数据库表中不存在
+- SQLAlchemy查询会失败
+
+**迁移后：**
+- 数据库表结构与代码模型一致
+- 游戏功能正常运行
+
+---
 
 ## 配置扩展 (Configuration & Extension)
 
