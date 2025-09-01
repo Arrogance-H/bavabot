@@ -191,11 +191,11 @@ async def hunt_statistics(_, msg):
             # Convert to 0 or 1 to show if user has received any rewards
             user_has_rewards = 1 if user_today_rewards > 0 else 0
             
-            stats_text = f"📊 **车库游戏统计**\n\n"
+            stats_text = f"📊 **寻宝游戏统计**\n\n"
             stats_text += f"📅 **今日全服数据:**\n"
             stats_text += f"🎮 游戏场次: {today_hunts}\n"
             stats_text += f"🔍 发现装备: {today_equipment}\n"
-            stats_text += f"🏆 获奖用户数: {today_reward_users}\n\n"
+            stats_text += f"🏆 获奖用户: {today_reward_users}\n\n"
             
             stats_text += f"👤 **您的今日数据:**\n"
             stats_text += f"🎮 游戏场次: {user_today_hunts}/{config.hunt_daily_limit}\n"
