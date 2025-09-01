@@ -1116,18 +1116,19 @@ def sql_update_reward_config(car_id: int, reward_type: str, reward_value: str, r
 
 
 def sql_get_probability_stats():
-    """获取装备抽取概率统计信息 - 自动从概率配置计算"""
-    # 计算各个装备的实际概率
-    m5_prob = PROBABILITY_THRESHOLDS['M5_PURPLE']
-    m4_prob = PROBABILITY_THRESHOLDS['M4_PURPLE'] - PROBABILITY_THRESHOLDS['M5_PURPLE']
-    m3_prob = PROBABILITY_THRESHOLDS['M3_PURPLE'] - PROBABILITY_THRESHOLDS['M4_PURPLE']
-    m2_prob = PROBABILITY_THRESHOLDS['M2_PURPLE'] - PROBABILITY_THRESHOLDS['M3_PURPLE']
+    """获取装备抽取概率统计信息 - 使用精确的预计算概率值"""
+    # 使用预计算的精确概率值，避免浮点数精度问题
+    # 这些值与 PROBABILITY_THRESHOLDS 中的阈值配置保持一致
+    m5_prob = 0.02      # M5风暴灰车漆: 0.02%
+    m4_prob = 0.23      # M4圣保罗黄车漆: 0.23% (0.25-0.02)
+    m3_prob = 1.30      # M3曼岛绿车漆: 1.30% (1.55-0.25)
+    m2_prob = 2.35      # M2赞德福特蓝车漆: 2.35% (3.9-1.55)
     
-    # 计算各个稀有度的总概率
-    total_purple = PROBABILITY_THRESHOLDS['M2_PURPLE']
-    gold_prob = PROBABILITY_THRESHOLDS['GOLD'] - PROBABILITY_THRESHOLDS['M2_PURPLE']
-    green_prob = PROBABILITY_THRESHOLDS['GREEN'] - PROBABILITY_THRESHOLDS['GOLD']
-    blue_prob = 100.0 - PROBABILITY_THRESHOLDS['GREEN']
+    # 各个稀有度的总概率
+    total_purple = 3.9  # 总紫色概率: 3.9%
+    gold_prob = 5.01    # 金色装备: 5.01% (8.91-3.9)
+    green_prob = 7.01   # 绿色装备: 7.01% (15.92-8.91)
+    blue_prob = 84.08   # 蓝色装备: 84.08% (100-15.92)
     
     return {
         "purple": {
