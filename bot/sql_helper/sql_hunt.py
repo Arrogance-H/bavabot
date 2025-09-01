@@ -712,6 +712,24 @@ def sql_cleanup_expired_equipment():
             pass
 
 
+def sql_clear_user_equipment(tg: int, today_only: bool = True) -> bool:
+    """清空用户的所有装备 - 用于完成寻宝后重置"""
+    with Session() as session:
+        try:
+            query = session.query(Equipment).filter(Equipment.tg == tg)
+            
+            if today_only:
+                today = datetime.datetime.now().strftime("%Y-%m-%d")
+                query = query.filter(Equipment.obtained_date == today)
+            
+            deleted_count = query.delete()
+            session.commit()
+            return True
+        except Exception as e:
+            LOGGER.error(f"清空用户装备失败: {e}")
+            return False
+
+
 def sql_cleanup_timed_out_hunts():
     """清理超时的车库游戏"""
     with Session() as session:
