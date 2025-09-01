@@ -37,8 +37,8 @@ def hunt_game_ikb(hunt_id: int, last_hunt_time: int = 0):
     
     if can_hunt:
         hunt_btn_text = "🔍 开始寻宝"
-        bulk_10_text = "💎 寻找10次"
-        bulk_50_text = "💎 寻找50次"
+        bulk_10_text = "🔍 寻找10次"
+        bulk_50_text = "🔍 寻找50次"
     else:
         hunt_btn_text = f"⏰ 寻找寻宝"
         bulk_10_text = f"⏰ 寻找10次"
@@ -241,7 +241,7 @@ async def start_hunt(_, msg):
             f"💰 当前{sakura_b}: {user.iv}\n"
             f"📊 总寻宝次数: {sql_get_total_hunt_actions(msg.from_user.id)}次\n\n"
             f"{equipment_display}\n\n"
-            f"继续您的寻宝之旅吧！",
+            f"💪 继续您的寻宝之旅吧！",
             buttons=hunt_game_ikb(active_hunt.id)
         )
     
@@ -398,7 +398,7 @@ async def hunt_bulk_action(_, call):
     result_text = f"⏳ **寻宝完成！**\n\n"
     result_text += f"🔍 寻找次数: {quantity}次\n"
     result_text += f"✅ 获得目标装备: {target_found}个\n"
-    result_text += f"🗑️ 自动丢弃非目标装备: {non_target_found}个\n\n"
+    result_text += f"🗑️ 丢弃非目标装备: {non_target_found}个\n\n"
     
     if found_equipment:
         result_text += "📦 **发现的装备:**\n"
@@ -422,7 +422,7 @@ async def hunt_bulk_action(_, call):
     # 检查是否装备齐全，自动完成游戏
     if assembly_ready and daily_car and target_found > 0:
         # 调用游戏完成处理函数
-        await callAnswer(call, f"🎉 批量寻找{quantity}次完成并已收集齐全！游戏完成！")
+        await callAnswer(call, f"🎉 批量寻找{quantity}次完成并已收集齐全！游戏结束！")
         completion_success = await handle_game_completion(call, hunt_id, daily_car, result_text + "\n\n")
         if completion_success:
             return  # 游戏完成，直接返回
@@ -434,7 +434,7 @@ async def hunt_bulk_action(_, call):
     result_text += f"💰 当前{sakura_b}: {user.iv - required_coins}\n"
     result_text += f"📊 总寻宝次数: {sql_get_total_hunt_actions(call.from_user.id)}次\n\n"
     result_text += f"{equipment_display}\n\n"
-    result_text += f"继续寻找装备吧！"
+    result_text += f"💪 继续寻找装备吧！"
     
     await callAnswer(call, f"⏳ 批量寻找{quantity}次完成！")
     await editMessage(call, result_text, buttons=hunt_game_ikb(hunt_id, int(datetime.datetime.now().timestamp())))
@@ -513,7 +513,7 @@ async def hunt_action(_, call):
                     # 检查是否装备齐全，自动完成游戏
                     if assembly_ready and daily_car:
                         # 调用游戏完成处理函数
-                        await callAnswer(call, f"🎉 发现目标装备并已收集齐全！游戏完成！")
+                        await callAnswer(call, f"🎉 发现目标装备并已收集齐全！游戏结束！")
                         completion_success = await handle_game_completion(call, hunt_id, daily_car, 
                                                                          f"✅ 最后获得: {color_emoji} {equipment_name}\n\n")
                         if completion_success:
@@ -535,7 +535,7 @@ async def hunt_action(_, call):
                         f"📊 总寻宝次数: {sql_get_total_hunt_actions(call.from_user.id)}次\n"
                         f"✅ 刚获得: {color_emoji} {equipment_name} (目标装备)\n\n"
                         f"{equipment_display}\n\n"
-                        f"继续寻找装备吧！",
+                        f"💪 继续寻找装备吧！",
                         buttons=hunt_game_ikb(hunt_id, int(current_time.timestamp()))
                     )
                 else:
@@ -570,7 +570,7 @@ async def hunt_action(_, call):
                     f"📊 总寻宝次数: {sql_get_total_hunt_actions(call.from_user.id)}次\n"
                     f"🗑️ 刚丢弃: {color_emoji} {equipment_name} (非目标装备)\n\n"
                     f"{equipment_display}\n\n"
-                    f"继续寻找装备吧！",
+                    f"💪 继续寻找装备吧！",
                     buttons=hunt_game_ikb(hunt_id, int(current_time.timestamp()))
                 )
         else:
@@ -641,7 +641,7 @@ async def hunt_end(_, call):
         else:
             result_text += "空空如也...\n"
         
-        result_text += f"\n💡 记住：装备仅当天有效哦！\n感谢参与寻宝游戏！"
+        result_text += f"\n💡 记住：装备仅当天有效哦！\n☺️ 参与寻宝游戏！"
         
         await callAnswer(call, "🏁 游戏结束")
         await editMessage(call, result_text)
