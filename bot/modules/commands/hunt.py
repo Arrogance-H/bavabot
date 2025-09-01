@@ -14,7 +14,8 @@ from bot.sql_helper.sql_hunt import (
     sql_start_hunt, sql_end_hunt, sql_get_active_hunt, sql_add_equipment,
     sql_get_user_equipment, sql_get_today_hunt_count, sql_get_total_hunt_actions, sql_get_daily_car,
     sql_get_equipment_definition, sql_random_equipment_by_rarity, sql_count_user_equipment,
-    sql_update_hunt_stats, sql_get_cached_daily_car, sql_update_bulk_hunt_stats, sql_check_and_fix_hunt_table
+    sql_update_hunt_stats, sql_get_cached_daily_car, sql_update_bulk_hunt_stats, sql_check_and_fix_hunt_table,
+    sql_clear_user_equipment
 )
 
 
@@ -80,6 +81,7 @@ async def handle_game_completion(call, hunt_id: int, daily_car, equipment_found_
     message_text += f"🏎️ 目标汽车: **{daily_car.car_name}**\n"
     message_text += f"📝 {daily_car.description}\n"
     message_text += f"\n✨ **装备已收集完成，游戏自动结束！**\n"
+    message_text += f"🧹 **装备已清空，可以重新开始游戏！**\n"
     message_text += f"🎮 感谢参与寻宝游戏！"
     
     # 处理奖励发放（用于独立通知消息）
@@ -113,6 +115,13 @@ async def handle_game_completion(call, hunt_id: int, daily_car, equipment_found_
     
     # 结束游戏
     sql_end_hunt(hunt_id)
+    
+    # 清空用户装备，为下次游戏做准备
+    equipment_cleared = sql_clear_user_equipment(call.from_user.id, today_only=True)
+    if equipment_cleared:
+        LOGGER.info(f"已清空用户 {call.from_user.id} 的所有装备")
+    else:
+        LOGGER.warning(f"清空用户 {call.from_user.id} 装备失败")
     
     # 编辑当前消息显示简化的完成信息
     await editMessage(call, message_text)
