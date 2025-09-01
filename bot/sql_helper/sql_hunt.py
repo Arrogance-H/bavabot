@@ -564,11 +564,29 @@ def sql_get_daily_car(date: str = None):
             ).first()
             
             if not daily_car:
-                # 随机选择一个汽车作为今日汽车
+                # 确保每日汽车的多样性
                 import random
                 cars = session.query(Car).all()
                 if cars:
-                    selected_car = random.choice(cars)
+                    # 获取前一天的汽车ID，避免连续重复
+                    yesterday = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+                    yesterday_car = session.query(DailyCar).filter(
+                        DailyCar.date == yesterday
+                    ).first()
+                    
+                    yesterday_car_id = yesterday_car.car_id if yesterday_car else None
+                    
+                    # 如果有多辆车，避免选择昨天的车
+                    available_cars = cars
+                    if len(cars) > 1 and yesterday_car_id:
+                        available_cars = [car for car in cars if car.id != yesterday_car_id]
+                    
+                    # 使用基于日期的种子以确保同一天相同结果，但不同天不同结果
+                    import hashlib
+                    date_seed = int(hashlib.md5(date.encode()).hexdigest()[:8], 16)
+                    random.seed(date_seed)
+                    
+                    selected_car = random.choice(available_cars)
                     daily_car = DailyCar(
                         date=date,
                         car_id=selected_car.id
@@ -740,6 +758,7 @@ def sql_update_bulk_hunt_stats(hunt_id: int, last_hunt_time: datetime.datetime, 
             if hunt:
                 hunt.last_hunt_time = last_hunt_time
                 hunt.hunt_actions = (hunt.hunt_actions or 0) + action_count  # 增加批量寻找次数
+                hunt.coins_spent = (hunt.coins_spent or 0) + action_count  # 增加金币消耗记录
                 session.commit()
                 return True
             return False

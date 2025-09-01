@@ -29,20 +29,26 @@ async def delete_message_after_delay(message, delay_seconds: int):
 
 # 车库游戏按钮
 def hunt_game_ikb(hunt_id: int, last_hunt_time: int = 0):
-    """创建车库游戏按钮 - 每行2个按钮"""
+    """创建车库游戏按钮 - 包含批量寻找选项"""
     current_time = int(datetime.datetime.now().timestamp())
     cooldown_remaining = max(0, 1 - (current_time - last_hunt_time))  # 1秒冷却
     can_hunt = cooldown_remaining == 0
     
     if can_hunt:
         hunt_btn_text = "🔍 寻找装备"
-        bulk_hunt_btn_text = "💎 批量寻找"
+        bulk_10_text = "💎 批量10次"
+        bulk_30_text = "💎 批量30次"
+        bulk_50_text = "💎 批量50次"
     else:
-        hunt_btn_text = f"⏰ 寻找装备)"
-        bulk_hunt_btn_text = f"⏰ 批量寻找)"
+        hunt_btn_text = f"⏰ 寻找装备"
+        bulk_10_text = f"⏰ 批量10次"
+        bulk_30_text = f"⏰ 批量30次"
+        bulk_50_text = f"⏰ 批量50次"
     
     return ikb([
-        [(hunt_btn_text, f"hunt_action_{hunt_id}"), (bulk_hunt_btn_text, f"hunt_bulk_action_{hunt_id}")],
+        [(hunt_btn_text, f"hunt_action_{hunt_id}")],
+        [(bulk_10_text, f"hunt_bulk_action_{hunt_id}_10"), (bulk_30_text, f"hunt_bulk_action_{hunt_id}_30")],
+        [(bulk_50_text, f"hunt_bulk_action_{hunt_id}_50")],
         [("❌ 结束游戏", f"hunt_end_{hunt_id}")]
     ])
 
@@ -261,7 +267,7 @@ async def start_hunt(_, msg):
         f"🎯 今日目标汽车: **{car_name}**\n"
         f"{reward_text}\n"
         f"🔧 需要装备:\n{equipment_display}\n\n"
-        f"💰 每次寻找消耗 1{sakura_b}\n"
+        f"💰 每次寻找消耗 1{sakura_b}，批量寻找(10/30/50次)分别消耗对应数量\n"
         f"**今日剩余游戏次数: {config.hunt_daily_limit - today_count - 1}**\n"
         f"📊 总寻宝次数: {sql_get_total_hunt_actions(msg.from_user.id)}次\n\n"
         f"💡 提示: 非目标装备将自动丢弃\n"
@@ -271,23 +277,35 @@ async def start_hunt(_, msg):
     )
 
 
-@bot.on_callback_query(filters.regex(r'^hunt_bulk_action_(\d+)$'))
+@bot.on_callback_query(filters.regex(r'^hunt_bulk_action_(\d+)_(\d+)$'))
 async def hunt_bulk_action(_, call):
     """批量寻找装备"""
     hunt_id = int(call.matches[0].group(1))
+    quantity = int(call.matches[0].group(2))
+    
+    # 验证批量数量
+    if quantity not in [10, 30, 50]:
+        return await callAnswer(call, "❌ 无效的批量数量", show_alert=True)
     
     # 验证游戏会话
     hunt = sql_get_active_hunt(call.from_user.id)
     if not hunt or hunt.id != hunt_id:
-        return await callAnswer(call, "❌ 游戏会话无效", show_alert=True)
+        # 游戏会话无效时立即删除消息
+        await callAnswer(call, "❌ 游戏会话无效", show_alert=True)
+        try:
+            await deleteMessage(call.message)
+        except:
+            pass
+        return
     
-    # 检查用户金币（批量寻找消耗10金币）
+    # 计算所需金币 (每次1金币)
+    required_coins = quantity
     user = sql_get_emby(call.from_user.id)
-    if not user or user.iv < 10:
-        return await callAnswer(call, f"❌ {sakura_b}不足，批量寻找需要 10{sakura_b}", show_alert=True)
+    if not user or user.iv < required_coins:
+        return await callAnswer(call, f"❌ {sakura_b}不足，批量寻找{quantity}次需要 {required_coins}{sakura_b}", show_alert=True)
     
     # 扣除金币
-    if not sql_update_emby(Emby.tg == call.from_user.id, iv=user.iv - 10):
+    if not sql_update_emby(Emby.tg == call.from_user.id, iv=user.iv - required_coins):
         return await callAnswer(call, f"❌ 扣除{sakura_b}失败", show_alert=True)
     
     # 获取今日目标汽车装备ID (从缓存)
@@ -296,12 +314,12 @@ async def hunt_bulk_action(_, call):
     if daily_car:
         target_equipment_ids = [int(x) for x in daily_car.equipment_ids.split(',')]
     
-    # 批量寻找10次
+    # 批量寻找指定次数
     found_equipment = []
     target_found = 0
     non_target_found = 0
     
-    for i in range(10):
+    for i in range(quantity):
         equipment_id = sql_random_equipment_by_rarity()
         if equipment_id:
             equipment_def = sql_get_equipment_definition(equipment_id)
@@ -327,12 +345,12 @@ async def hunt_bulk_action(_, call):
                     'is_target': False
                 })
     
-    # 更新寻找统计 - 批量寻找记录10次寻找动作
-    sql_update_bulk_hunt_stats(hunt_id, datetime.datetime.now(), 10)
+    # 更新寻找统计 - 批量寻找记录实际次数
+    sql_update_bulk_hunt_stats(hunt_id, datetime.datetime.now(), quantity)
     
     # 构建结果消息
     result_text = f"💎 **批量寻找完成！**\n\n"
-    result_text += f"🔍 寻找次数: 10次\n"
+    result_text += f"🔍 寻找次数: {quantity}次\n"
     result_text += f"✅ 获得目标装备: {target_found}个\n"
     result_text += f"🗑️ 自动丢弃非目标装备: {non_target_found}个\n\n"
     
@@ -358,7 +376,7 @@ async def hunt_bulk_action(_, call):
     # 检查是否装备齐全，自动完成游戏
     if assembly_ready and daily_car and target_found > 0:
         # 调用游戏完成处理函数
-        await callAnswer(call, "🎉 批量寻找完成并已收集齐全！游戏完成！")
+        await callAnswer(call, f"🎉 批量寻找{quantity}次完成并已收集齐全！游戏完成！")
         completion_success = await handle_game_completion(call, hunt_id, daily_car, result_text + "\n\n")
         if completion_success:
             return  # 游戏完成，直接返回
@@ -367,12 +385,12 @@ async def hunt_bulk_action(_, call):
     result_text += f"\n🏎️ **当前状态:**\n"
     result_text += f"👤 **{call.from_user.first_name}** 正在寻宝...\n"
     result_text += f"🎯 目标汽车: {car_name}\n"
-    result_text += f"💰 当前{sakura_b}: {user.iv - 10}\n"
+    result_text += f"💰 当前{sakura_b}: {user.iv - required_coins}\n"
     result_text += f"📊 总寻宝次数: {sql_get_total_hunt_actions(call.from_user.id)}次\n\n"
     result_text += f"{equipment_display}\n\n"
     result_text += f"继续寻找装备吧！"
     
-    await callAnswer(call, "💎 批量寻找完成！")
+    await callAnswer(call, f"💎 批量寻找{quantity}次完成！")
     await editMessage(call, result_text, buttons=hunt_game_ikb(hunt_id, int(datetime.datetime.now().timestamp())))
 
 
@@ -384,7 +402,13 @@ async def hunt_action(_, call):
     # 验证游戏会话
     hunt = sql_get_active_hunt(call.from_user.id)
     if not hunt or hunt.id != hunt_id:
-        return await callAnswer(call, "❌ 游戏会话无效", show_alert=True)
+        # 游戏会话无效时立即删除消息
+        await callAnswer(call, "❌ 游戏会话无效", show_alert=True)
+        try:
+            await deleteMessage(call.message)
+        except:
+            pass
+        return
     
     # 检查1秒冷却时间
     current_time = datetime.datetime.now()
@@ -523,7 +547,13 @@ async def hunt_end(_, call):
     # 验证游戏会话
     hunt = sql_get_active_hunt(call.from_user.id)
     if not hunt or hunt.id != hunt_id:
-        return await callAnswer(call, "❌ 游戏会话无效", show_alert=True)
+        # 游戏会话无效时立即删除消息
+        await callAnswer(call, "❌ 游戏会话无效", show_alert=True)
+        try:
+            await deleteMessage(call.message)
+        except:
+            pass
+        return
     
     # 结束游戏
     if sql_end_hunt(hunt_id):
@@ -585,7 +615,13 @@ async def hunt_game_return(_, call):
     # 验证游戏会话
     hunt = sql_get_active_hunt(call.from_user.id)
     if not hunt or hunt.id != hunt_id:
-        return await callAnswer(call, "❌ 游戏会话无效", show_alert=True)
+        # 游戏会话无效时立即删除消息
+        await callAnswer(call, "❌ 游戏会话无效", show_alert=True)
+        try:
+            await deleteMessage(call.message)
+        except:
+            pass
+        return
     
     # 获取缓存的每日汽车
     daily_car = sql_get_cached_daily_car(hunt)
