@@ -263,6 +263,51 @@ def add_car_with_equipment(car_name: str, equipment_ids: str, description: str =
             return False
 
 
+def sql_check_and_fix_hunt_table():
+    """检查并修复hunt表结构"""
+    try:
+        from sqlalchemy import inspect, text
+        inspector = inspect(engine)
+        
+        # 检查hunt表是否存在
+        if 'hunt' not in inspector.get_table_names():
+            LOGGER.error("Hunt table does not exist")
+            return False
+            
+        # 检查必要的列
+        columns = inspector.get_columns('hunt')
+        column_names = [col['name'] for col in columns]
+        
+        missing_columns = []
+        if 'hunt_actions' not in column_names:
+            missing_columns.append('hunt_actions')
+        if 'daily_car_info' not in column_names:
+            missing_columns.append('daily_car_info')
+            
+        if missing_columns:
+            LOGGER.warning(f"Hunt table missing columns: {missing_columns}")
+            # 尝试添加缺失的列
+            with engine.connect() as conn:
+                for column in missing_columns:
+                    try:
+                        if column == 'hunt_actions':
+                            sql = text("ALTER TABLE hunt ADD COLUMN hunt_actions INT DEFAULT 0")
+                        elif column == 'daily_car_info':
+                            sql = text("ALTER TABLE hunt ADD COLUMN daily_car_info TEXT NULL")
+                        conn.execute(sql)
+                        conn.commit()
+                        LOGGER.info(f"Successfully added column: {column}")
+                    except Exception as e:
+                        LOGGER.error(f"Failed to add column {column}: {e}")
+                        return False
+            return True
+        
+        return True  # 所有列都存在
+    except Exception as e:
+        LOGGER.error(f"Error checking hunt table structure: {e}")
+        return False
+
+
 def sql_start_hunt(tg: int) -> int:
     """开始车库游戏"""
     with Session() as session:
@@ -316,8 +361,12 @@ def sql_start_hunt(tg: int) -> int:
             session.commit()
             
             return hunt.id
-        except:
-            return 0
+        except Exception as e:
+            LOGGER.error(f"Error starting hunt for user {tg}: {e}")
+            # 检查是否是数据库结构问题
+            if "Unknown column" in str(e) or "doesn't exist" in str(e):
+                return -3  # 数据库结构问题
+            return 0  # 其他未知错误
 
 
 def sql_get_equipment_definition(equipment_id: int):
