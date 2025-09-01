@@ -91,8 +91,8 @@ async def handle_game_completion(call, hunt_id: int, daily_car, equipment_found_
     
     await editMessage(call, message_text)
     
-    # 3分钟后删除消息
-    asyncio.create_task(delete_message_after_delay(call.message, 180))
+    # 5分钟后删除消息（超过5分钟无操作自动删除）
+    asyncio.create_task(delete_message_after_delay(call.message, 300))
     
     return True
 
@@ -159,7 +159,7 @@ async def start_hunt(_, msg):
         current_time = datetime.datetime.now()
         if (current_time - start_time).total_seconds() > 1800:  # 30分钟
             sql_end_hunt(active_hunt.id)
-            return await sendMessage(msg, "⏰ 您的上一场寻宝游戏已超时结束，请重新开始")
+            return await sendMessage(msg, "⏰ 您的上一场寻宝游戏已超时结束，请重新开始", timer=300)
         else:
             remaining_time = 1800 - int((current_time - start_time).total_seconds())
             remaining_minutes = remaining_time // 60
@@ -270,7 +270,7 @@ async def hunt_bulk_action(_, call):
     current_time = datetime.datetime.now()
     if (current_time - start_time).total_seconds() > 1800:  # 30分钟
         sql_end_hunt(hunt_id)
-        return await editMessage(call, "⏰ 寻宝游戏时间已结束！")
+        return await editMessage(call, "⏰ 寻宝游戏时间已结束！", timer=300)
     
     # 检查用户金币（批量寻找消耗10金币）
     user = sql_get_emby(call.from_user.id)
@@ -388,7 +388,7 @@ async def hunt_action(_, call):
     current_time = datetime.datetime.now()
     if (current_time - start_time).total_seconds() > 1800:  # 30分钟
         sql_end_hunt(hunt_id)
-        return await editMessage(call, "⏰ 寻宝游戏时间已结束！")
+        return await editMessage(call, "⏰ 寻宝游戏时间已结束！", timer=300)
     
     # 检查1秒冷却时间
     if hunt.last_hunt_time:
@@ -586,8 +586,8 @@ async def hunt_end(_, call):
         await callAnswer(call, "🏁 游戏结束")
         await editMessage(call, result_text)
         
-        # 3分钟后删除结束消息
-        asyncio.create_task(delete_message_after_delay(call.message, 180))  # 180秒 = 3分钟
+        # 5分钟后删除结束消息（游戏结束后自动删除）
+        asyncio.create_task(delete_message_after_delay(call.message, 300))  # 300秒 = 5分钟
         
     else:
         await callAnswer(call, "❌ 结束游戏失败", show_alert=True)
@@ -608,7 +608,7 @@ async def hunt_game_return(_, call):
     current_time = datetime.datetime.now()
     if (current_time - start_time).total_seconds() > 1800:  # 30分钟
         sql_end_hunt(hunt_id)
-        return await editMessage(call, "⏰ 车库游戏时间已结束！")
+        return await editMessage(call, "⏰ 车库游戏时间已结束！", timer=300)
     
     remaining_time = 1800 - int((current_time - start_time).total_seconds())
     remaining_minutes = remaining_time // 60
