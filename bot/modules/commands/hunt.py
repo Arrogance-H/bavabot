@@ -75,12 +75,14 @@ async def handle_game_completion(call, hunt_id: int, daily_car, equipment_found_
     if not hunt:
         return False
     
-    # 构建完成消息
+    # 构建简化的完成消息（不包含奖励信息）
     message_text = f"{equipment_found_text}🎉 **恭喜完成寻宝！**\n\n"
     message_text += f"🏎️ 目标汽车: **{daily_car.car_name}**\n"
     message_text += f"📝 {daily_car.description}\n"
+    message_text += f"\n✨ **装备已收集完成，游戏自动结束！**\n"
+    message_text += f"🎮 感谢参与寻宝游戏！"
     
-    # 处理奖励发放
+    # 处理奖励发放（用于独立通知消息）
     reward_given = False
     reward_description = ""
     claim_info = ""
@@ -91,31 +93,23 @@ async def handle_game_completion(call, hunt_id: int, daily_car, equipment_found_
             reward_result = sql_give_assembly_reward(call.from_user.id, daily_car.id)
             if reward_result.get("success", False):
                 reward_given = True
-                message_text += f"🎁 奖励: {reward_config.reward_value}{sakura_b} ✅已到账\n"
                 reward_description = f"{reward_config.reward_value}{sakura_b}"
                 claim_info = "✅已自动到账"
             else:
-                message_text += f"🎁 奖励: {reward_config.reward_value}{sakura_b} ❌发放失败\n"
                 reward_description = f"{reward_config.reward_value}{sakura_b}"
                 claim_info = "❌发放失败，请联系管理员"
         elif reward_config.reward_type == "code":
-            message_text += f"🎫 奖励: {reward_config.reward_value}个注册码\n📞 请联系 @MEBimmerSupportBot 领取\n"
             reward_description = f"{reward_config.reward_value}个注册码"
             claim_info = "📞 请联系 @MEBimmerSupportBot 领取"
         elif reward_config.reward_type == "white":
-            message_text += f"⚪ 奖励: {reward_config.reward_value}个白名单\n📞 请联系 @MEBimmerSupportBot 领取\n"
             reward_description = f"{reward_config.reward_value}个白名单"
             claim_info = "📞 请联系 @MEBimmerSupportBot 领取"
         else:
-            message_text += f"🎁 奖励: {reward_config.reward_description}\n"
             reward_description = reward_config.reward_description
             claim_info = "请查看游戏详情"
     else:
         reward_description = "无奖励配置"
         claim_info = "无需领取"
-    
-    message_text += f"\n✨ **装备已收集完成，游戏自动结束！**\n"
-    message_text += f"🎮 感谢参与寻宝游戏！"
     
     # 结束游戏
     sql_end_hunt(hunt_id)
