@@ -446,6 +446,18 @@ def sql_get_active_hunt(tg: int):
             return None
 
 
+def sql_get_hunt_by_id(hunt_id: int):
+    """根据hunt_id获取游戏会话（任何用户）"""
+    with Session() as session:
+        try:
+            hunt = session.query(Hunt).filter(
+                and_(Hunt.id == hunt_id, Hunt.is_active == True)
+            ).first()
+            return hunt
+        except:
+            return None
+
+
 def sql_get_cached_daily_car(hunt):
     """获取游戏会话中缓存的每日汽车信息"""
     if not hunt or not hunt.daily_car_info:
