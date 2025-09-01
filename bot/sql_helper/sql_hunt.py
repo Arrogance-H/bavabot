@@ -516,6 +516,17 @@ def sql_get_today_hunt_count(tg: int) -> int:
             return 0
 
 
+def sql_get_total_hunt_count(tg: int) -> int:
+    """获取用户总寻宝次数"""
+    with Session() as session:
+        try:
+            count = session.query(Hunt).filter(Hunt.tg == tg).count()
+            return count
+        except Exception as e:
+            LOGGER.error(f"获取用户总寻宝次数失败: {e}")
+            return 0
+
+
 def sql_get_daily_car(date: str = None):
     """获取每日汽车"""
     if not date:

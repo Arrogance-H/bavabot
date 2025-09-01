@@ -12,10 +12,9 @@ from bot.func_helper.fix_bottons import ikb
 from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby
 from bot.sql_helper.sql_hunt import (
     sql_start_hunt, sql_end_hunt, sql_get_active_hunt, sql_add_equipment,
-    sql_get_user_equipment, sql_get_today_hunt_count, sql_get_daily_car,
-    sql_check_car_assembly, sql_assemble_car, sql_get_equipment_definition,
-    sql_random_equipment_by_rarity, sql_count_user_equipment,
-    sql_get_reward_button, sql_update_hunt_stats
+    sql_get_user_equipment, sql_get_today_hunt_count, sql_get_total_hunt_count, sql_get_daily_car,
+    sql_get_equipment_definition, sql_random_equipment_by_rarity, sql_count_user_equipment,
+    sql_update_hunt_stats
 )
 
 
@@ -44,7 +43,7 @@ def hunt_game_ikb(hunt_id: int, last_hunt_time: int = 0):
     
     return ikb([
         [(hunt_btn_text, f"hunt_action_{hunt_id}"), (bulk_hunt_btn_text, f"hunt_bulk_action_{hunt_id}")],
-        [("🔧 组装汽车", f"hunt_assembly_{hunt_id}"), ("❌ 结束游戏", f"hunt_end_{hunt_id}")]
+        [("❌ 结束游戏", f"hunt_end_{hunt_id}")]
     ])
 
 
@@ -59,65 +58,47 @@ def get_equipment_color_emoji(category: str) -> str:
     return color_map.get(category, '⚪')
 
 
-async def process_assembly_success(call, hunt_id: int, car_id: int, assembly_result: dict, message_prefix: str = "✨ **组装成功！**") -> None:
-    """处理组装成功的通用逻辑"""
-    car_name = assembly_result["car_name"]
-    reward_info = assembly_result["reward"]
-    
-    # 构建奖励信息
-    reward_text = ""
-    if reward_info.get("success", False):
-        if reward_info.get("reward_type") == "coins":
-            reward_text = f"\n💰 奖励: +{reward_info['reward_value']}{sakura_b} (已自动添加)"
-        elif reward_info.get("reward_type") == "code":
-            reward_text = f"\n🎫 奖励: {reward_info['reward_value']}个注册码\n📞 请联系 @MEBimmerSupportBot 领取"
-        elif reward_info.get("reward_type") == "white":
-            reward_text = f"\n⚪ 奖励: {reward_info['reward_value']}个白名单\n📞 请联系 @MEBimmerSupportBot 领取"
-        else:
-            reward_text = f"\n🎁 奖励: {reward_info.get('message', '未知奖励')}"
-    elif reward_info.get("message"):
-        # 奖励处理失败，但组装成功
-        reward_text = f"\n⚠️ 奖励处理异常: {reward_info['message']}"
-    
-    # 构建按钮 - 只有M4(car_id=3)和M5(car_id=4)才显示奖励按钮
-    buttons = []
-    if car_id in [3, 4]:  # M4圣保罗黄和M5风暴灰
-        # 检查是否有自定义奖励按钮配置
-        reward_button = sql_get_reward_button(car_id)
-        if reward_button:
-            buttons.append([(reward_button.button_text, reward_button.button_url)])
-    
-    buttons.extend([
-        [("🎮 继续游戏", f"hunt_game_{hunt_id}")],
-        [("❌ 结束游戏", f"hunt_end_{hunt_id}")]
-    ])
-    
-    message_text = f"{message_prefix}\n\n"
-    message_text += f"🏎️ 恭喜您获得汽车: **{car_name}**\n"
-    message_text += f"📝 {assembly_result.get('description', '')}\n"
-    message_text += f"{reward_text}\n\n"
-    message_text += f"🎮 您可以继续游戏或结束当前游戏！"
-    
-    await editMessage(call, message_text, buttons=ikb(buttons))
-    
-    # 3分钟后删除消息的异步任务
-    asyncio.create_task(delete_message_after_delay(call.message, 180))
-
-
-async def handle_auto_assembly(call, hunt_id: int, daily_car, assembly_result_text_prefix: str = "") -> bool:
-    """处理自动组装逻辑，返回是否成功组装"""
+async def handle_game_completion(call, hunt_id: int, daily_car, equipment_found_text: str = "") -> bool:
+    """处理游戏完成逻辑 - 当收集齐全部目标装备时"""
     if not daily_car:
         return False
     
-    # 执行组装
-    assembly_result = sql_assemble_car(call.from_user.id, daily_car.id)
+    # 获取奖励信息
+    from bot.sql_helper.sql_hunt import sql_get_reward_config
+    reward_config = sql_get_reward_config(daily_car.id)
     
-    if assembly_result["success"]:
-        message_prefix = f"{assembly_result_text_prefix}🎉 **装备齐全，自动组装成功！**"
-        await process_assembly_success(call, hunt_id, daily_car.id, assembly_result, message_prefix)
-        return True
+    # 构建完成消息
+    message_text = f"{equipment_found_text}🎉 **恭喜完成寻宝！**\n\n"
+    message_text += f"🏎️ 目标汽车: **{daily_car.car_name}**\n"
+    message_text += f"📝 {daily_car.description}\n"
     
-    return False
+    # 添加奖励信息
+    if reward_config:
+        if reward_config.reward_type == "coins":
+            message_text += f"🎁 奖励: {reward_config.reward_value}{sakura_b}\n"
+        elif reward_config.reward_type == "code":
+            message_text += f"🎫 奖励: {reward_config.reward_value}个注册码\n📞 请联系 @MEBimmerSupportBot 领取\n"
+        elif reward_config.reward_type == "white":
+            message_text += f"⚪ 奖励: {reward_config.reward_value}个白名单\n📞 请联系 @MEBimmerSupportBot 领取\n"
+        else:
+            message_text += f"🎁 奖励: {reward_config.reward_description}\n"
+    
+    message_text += f"\n✨ **装备已收集完成，游戏自动结束！**\n"
+    message_text += f"🎮 感谢参与寻宝游戏！"
+    
+    # 结束游戏
+    sql_end_hunt(hunt_id)
+    
+    await editMessage(call, message_text)
+    
+    # 3分钟后删除消息
+    asyncio.create_task(delete_message_after_delay(call.message, 180))
+    
+    return True
+
+
+
+
 
 
 def get_user_target_equipment_display(tg: int, target_equipment_ids: list) -> str:
@@ -154,19 +135,6 @@ def get_user_target_equipment_display(tg: int, target_equipment_ids: list) -> st
     return display_text, all_equipped
 
 
-def hunt_assembly_ikb(hunt_id: int, car_id: int = None):
-    """组装界面按钮"""
-    buttons = []
-    if car_id:
-        assembly_button = ("✨ 组装", f"hunt_do_assembly_{hunt_id}_{car_id}")
-        buttons.append([assembly_button])
-        LOGGER.debug(f"添加组装按钮: hunt_id={hunt_id}, car_id={car_id}, callback={assembly_button[1]}")
-    else:
-        LOGGER.debug(f"未添加组装按钮: car_id为空")
-    
-    buttons.append([("🔙 返回车库", f"hunt_game_{hunt_id}")])
-    
-    return ikb(buttons)
 
 
 @bot.on_message(filters.command('hunt', prefixes) & user_in_group_on_filter)
@@ -180,6 +148,7 @@ async def start_hunt(_, msg):
     
     # 检查今日游戏次数
     today_count = sql_get_today_hunt_count(msg.from_user.id)
+    total_count = sql_get_total_hunt_count(msg.from_user.id)
     if today_count >= config.hunt_daily_limit:
         return await sendMessage(msg, "⏰ 您今日的寻宝游戏次数已用完，请明日再来！")
     
@@ -221,7 +190,8 @@ async def start_hunt(_, msg):
                 f"🎯 今日目标汽车: **{car_name}**\n"
                 f"⏰ 剩余时间: {remaining_minutes}分{remaining_seconds}秒\n"
                 f"💰 当前{sakura_b}: {user.iv}\n"
-                f"🔍 找到装备: {active_hunt.equipment_found}个\n\n"
+                f"🔍 找到装备: {active_hunt.equipment_found}个\n"
+                f"📊 总寻宝次数: {sql_get_total_hunt_count(msg.from_user.id)}次\n\n"
                 f"{equipment_display}\n\n"
                 f"继续您的寻宝之旅吧！",
                 buttons=hunt_game_ikb(active_hunt.id)
@@ -276,8 +246,10 @@ async def start_hunt(_, msg):
         f"🔧 需要装备:\n{equipment_display}\n\n"
         f"⏰ 游戏时间: 30分钟\n"
         f"💰 每次寻找消耗 1{sakura_b}\n"
-        f"**今日剩余游戏次数: {config.hunt_daily_limit - today_count - 1}**\n\n"
+        f"**今日剩余游戏次数: {config.hunt_daily_limit - today_count - 1}**\n"
+        f"📊 总寻宝次数: {total_count + 1}次\n\n"
         f"💡 提示: 非目标装备将自动丢弃\n"
+        f"🎉 收集齐全部装备后游戏将自动完成！\n"
         f"点击下方按钮开始寻找装备！",
         buttons=hunt_game_ikb(hunt_id)
     )
@@ -378,20 +350,22 @@ async def hunt_bulk_action(_, call):
         target_equipment_ids = [int(x) for x in daily_car.equipment_ids.split(',')]
         equipment_display, assembly_ready = get_user_target_equipment_display(call.from_user.id, target_equipment_ids)
     
-    # 检查是否装备齐全，自动组装
+    # 检查是否装备齐全，自动完成游戏
     if assembly_ready and daily_car and target_found > 0:
-        # 调用自动组装处理函数
-        auto_assembly_success = await handle_auto_assembly(call, hunt_id, daily_car, result_text + "\n\n")
-        if auto_assembly_success:
-            await callAnswer(call, "🎉 批量寻找完成并自动组装成功！")
-            return  # 自动组装成功，直接返回
+        # 调用游戏完成处理函数
+        await callAnswer(call, "🎉 批量寻找完成并已收集齐全！游戏完成！")
+        completion_success = await handle_game_completion(call, hunt_id, daily_car, result_text + "\n\n")
+        if completion_success:
+            return  # 游戏完成，直接返回
     
-    # 装备未齐全或自动组装失败，显示正常的游戏进行界面
+    # 装备未齐全或游戏完成失败，显示正常的游戏进行界面
     result_text += f"\n🏎️ **当前状态:**\n"
+    result_text += f"👤 **{call.from_user.first_name}** 正在寻宝...\n"
     result_text += f"🎯 目标汽车: {car_name}\n"
     result_text += f"⏰ 剩余时间: {remaining_minutes}分{remaining_seconds}秒\n"
     result_text += f"💰 当前{sakura_b}: {user.iv - 10}\n"
-    result_text += f"🔍 总计找到: {hunt.equipment_found}个\n\n"
+    result_text += f"🔍 总计找到: {hunt.equipment_found}个\n"
+    result_text += f"📊 总寻宝次数: {sql_get_total_hunt_count(call.from_user.id)}次\n\n"
     result_text += f"{equipment_display}\n\n"
     result_text += f"继续寻找装备吧！"
     
@@ -473,25 +447,31 @@ async def hunt_action(_, call):
                         target_equipment_ids = [int(x) for x in daily_car.equipment_ids.split(',')]
                         equipment_display, assembly_ready = get_user_target_equipment_display(call.from_user.id, target_equipment_ids)
                     
-                    # 检查是否装备齐全，自动组装
+                    # 检查是否装备齐全，自动完成游戏
                     if assembly_ready and daily_car:
-                        # 调用自动组装处理函数
-                        auto_assembly_success = await handle_auto_assembly(call, hunt_id, daily_car, 
-                                                                           f"✅ 最后获得: {color_emoji} {equipment_name}\n\n")
-                        if auto_assembly_success:
-                            return  # 自动组装成功，直接返回
+                        # 调用游戏完成处理函数
+                        await callAnswer(call, f"🎉 发现目标装备并已收集齐全！游戏完成！")
+                        completion_success = await handle_game_completion(call, hunt_id, daily_car, 
+                                                                         f"✅ 最后获得: {color_emoji} {equipment_name}\n\n")
+                        if completion_success:
+                            return  # 游戏完成，直接返回
                     
-                    # 装备未齐全或自动组装失败，显示正常的游戏进行界面
+                    # 获取用户昵称
+                    user_nickname = call.from_user.first_name
+                    
+                    # 装备未齐全或游戏完成失败，显示正常的游戏进行界面
                     # 刷新hunt对象获取最新统计
                     hunt = sql_get_active_hunt(call.from_user.id)
                     
                     await editMessage(
                         call,
                         f"🏎️ **寻宝游戏进行中**\n\n"
+                        f"👤 **{user_nickname}** 正在寻宝...\n\n"
                         f"🎯 今日目标汽车: **{car_name}**\n"
                         f"⏰ 剩余时间: {remaining_minutes}分{remaining_seconds}秒\n"
                         f"💰 当前{sakura_b}: {user.iv - 1}\n"
                         f"🔍 找到装备: {hunt.equipment_found}个\n"
+                        f"📊 总寻宝次数: {sql_get_total_hunt_count(call.from_user.id)}次\n"
                         f"✅ 刚获得: {color_emoji} {equipment_name} (目标装备)\n\n"
                         f"{equipment_display}\n\n"
                         f"继续寻找装备吧！",
@@ -521,13 +501,18 @@ async def hunt_action(_, call):
                 # 刷新hunt对象获取最新统计
                 hunt = sql_get_active_hunt(call.from_user.id)
                 
+                # 获取用户昵称
+                user_nickname = call.from_user.first_name
+                
                 await editMessage(
                     call,
                     f"🏎️ **寻宝游戏进行中**\n\n"
+                    f"👤 **{user_nickname}** 正在寻宝...\n\n"
                     f"🎯 今日目标汽车: **{car_name}**\n"
                     f"⏰ 剩余时间: {remaining_minutes}分{remaining_seconds}秒\n"
                     f"💰 当前{sakura_b}: {user.iv - 1}\n"
                     f"🔍 找到装备: {hunt.equipment_found}个\n"
+                    f"📊 总寻宝次数: {sql_get_total_hunt_count(call.from_user.id)}次\n"
                     f"🗑️ 刚丢弃: {color_emoji} {equipment_name} (非目标装备)\n\n"
                     f"{equipment_display}\n\n"
                     f"继续寻找装备吧！",
@@ -543,118 +528,6 @@ async def hunt_action(_, call):
         await callAnswer(call, "❌ 寻找失败，请重试", show_alert=True)
 
 
-@bot.on_callback_query(filters.regex(r'^hunt_assembly_(\d+)$'))
-async def hunt_assembly(_, call):
-    """汽车组装界面"""
-    hunt_id = int(call.matches[0].group(1))
-    
-    # 验证游戏会话
-    hunt = sql_get_active_hunt(call.from_user.id)
-    if not hunt or hunt.id != hunt_id:
-        return await callAnswer(call, "❌ 游戏会话无效", show_alert=True)
-    
-    # 获取今日汽车
-    daily_car = sql_get_daily_car()
-    if not daily_car:
-        return await callAnswer(call, "❌ 今日汽车配置错误", show_alert=True)
-    
-    # 检查是否可以组装
-    can_assemble = sql_check_car_assembly(call.from_user.id, daily_car.id)
-    
-    # 获取奖励信息
-    from bot.sql_helper.sql_hunt import sql_get_reward_config
-    reward_config = sql_get_reward_config(daily_car.id)
-    
-    # 获取用户装备统计
-    equipment_list = sql_get_user_equipment(call.from_user.id, today_only=True)
-    equipment_counts = {}
-    for equip in equipment_list:
-        equipment_counts[equip.equipment_id] = equipment_counts.get(equip.equipment_id, 0) + 1
-    
-    required_equipment = [int(x) for x in daily_car.equipment_ids.split(',')]
-    
-    assembly_text = f"🔧 **汽车组装**\n\n"
-    assembly_text += f"🏎️ 今日目标: **{daily_car.car_name}**\n"
-    assembly_text += f"📝 描述: {daily_car.description}\n"
-    
-    # 添加奖励信息
-    if reward_config:
-        if reward_config.reward_type == "coins":
-            assembly_text += f"🎁 完成奖励: {reward_config.reward_value}{sakura_b}\n"
-        else:
-            assembly_text += f"🎁 完成奖励: {reward_config.reward_description}\n"
-    
-    assembly_text += f"\n📋 **需要装备:**\n"
-    
-    for req_id in required_equipment:
-        have_count = equipment_counts.get(req_id, 0)
-        status = "✅" if have_count >= 1 else "❌"
-        # 获取装备定义以显示更好的名称和颜色
-        equipment_def = sql_get_equipment_definition(req_id)
-        if equipment_def:
-            equipment_name = equipment_def.equipment_name
-            color_emoji = get_equipment_color_emoji(equipment_def.category)
-            assembly_text += f"{status} {color_emoji} {equipment_name}: {have_count}/1\n"
-        else:
-            assembly_text += f"{status} ⚪ 装备 {req_id}: {have_count}/1\n"
-    
-    if can_assemble:
-        assembly_text += f"\n🎉 **可以组装！**"
-        LOGGER.info(f"用户 {call.from_user.id} 可以组装汽车 {daily_car.car_name} (ID: {daily_car.id})")
-    else:
-        assembly_text += f"\n❌ **装备不足，无法组装**"
-        LOGGER.debug(f"用户 {call.from_user.id} 装备不足，无法组装汽车 {daily_car.car_name}")
-    
-    await callAnswer(call, "🔧 汽车组装")
-    
-    # 确保按钮生成逻辑正确
-    button_car_id = daily_car.id if can_assemble else None
-    LOGGER.debug(f"用户 {call.from_user.id} 组装界面: can_assemble={can_assemble}, button_car_id={button_car_id}")
-    
-    await editMessage(
-        call, 
-        assembly_text, 
-        buttons=hunt_assembly_ikb(hunt_id, button_car_id)
-    )
-
-
-@bot.on_callback_query(filters.regex(r'^hunt_do_assembly_(\d+)_(\d+)$'))
-async def hunt_do_assembly(_, call):
-    """执行汽车组装"""
-    hunt_id = int(call.matches[0].group(1))
-    car_id = int(call.matches[0].group(2))
-    
-    # 验证游戏会话
-    hunt = sql_get_active_hunt(call.from_user.id)
-    if not hunt or hunt.id != hunt_id:
-        return await callAnswer(call, "❌ 游戏会话无效", show_alert=True)
-    
-    # 执行组装
-    assembly_result = sql_assemble_car(call.from_user.id, car_id)
-    
-    if assembly_result["success"]:
-        car_name = assembly_result["car_name"]
-        await callAnswer(call, f"🎉 成功组装 {car_name}！")
-        await process_assembly_success(call, hunt_id, car_id, assembly_result)
-        
-    else:
-        # 组装失败，提供详细错误信息
-        error_message = assembly_result.get("message", "未知错误")
-        LOGGER.warning(f"用户 {call.from_user.id} 汽车组装失败: {error_message}")
-        
-        await callAnswer(call, f"❌ 组装失败: {error_message}", show_alert=True)
-        
-        # 返回组装界面让用户重试
-        await editMessage(
-            call,
-            f"❌ **组装失败**\n\n"
-            f"错误信息: {error_message}\n\n"
-            f"请检查您的装备或重试组装。如果问题持续，请联系管理员。",
-            buttons=ikb([
-                [("🔄 重试组装", f"hunt_assembly_{hunt_id}")],
-                [("🔙 返回车库", f"hunt_game_{hunt_id}")]
-            ])
-        )
 
 
 @bot.on_callback_query(filters.regex(r'^hunt_end_(\d+)$'))
@@ -761,10 +634,12 @@ async def hunt_game_return(_, call):
     await editMessage(
         call,
         f"🏎️ **车库游戏进行中**\n\n"
+        f"👤 **{call.from_user.first_name}** 正在寻宝...\n\n"
         f"🎯 今日目标汽车: **{car_name}**\n"
         f"⏰ 剩余时间: {remaining_minutes}分{remaining_seconds}秒\n"
         f"💰 当前{sakura_b}: {current_coins}\n"
-        f"🔍 找到的装备: {hunt.equipment_found}个\n\n"
+        f"🔍 找到的装备: {hunt.equipment_found}个\n"
+        f"📊 总寻宝次数: {sql_get_total_hunt_count(call.from_user.id)}次\n\n"
         f"{equipment_display}\n\n"
         f"点击下方按钮继续寻找装备！",
         buttons=hunt_game_ikb(hunt_id)
