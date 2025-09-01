@@ -12,9 +12,9 @@ from bot.func_helper.fix_bottons import ikb
 from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby
 from bot.sql_helper.sql_hunt import (
     sql_start_hunt, sql_end_hunt, sql_get_active_hunt, sql_add_equipment,
-    sql_get_user_equipment, sql_get_today_hunt_count, sql_get_total_hunt_count, sql_get_daily_car,
+    sql_get_user_equipment, sql_get_today_hunt_count, sql_get_total_hunt_actions, sql_get_daily_car,
     sql_get_equipment_definition, sql_random_equipment_by_rarity, sql_count_user_equipment,
-    sql_update_hunt_stats
+    sql_update_hunt_stats, sql_get_cached_daily_car, sql_update_bulk_hunt_stats
 )
 
 
@@ -162,8 +162,8 @@ async def start_hunt(_, msg):
     # 检查是否已有活跃游戏
     active_hunt = sql_get_active_hunt(msg.from_user.id)
     if active_hunt:
-        # 获取今日汽车
-        daily_car = sql_get_daily_car()
+        # 获取缓存的每日汽车信息
+        daily_car = sql_get_cached_daily_car(active_hunt)
         car_name = daily_car.car_name if daily_car else "未知"
         
         # 获取目标装备数量
@@ -186,8 +186,7 @@ async def start_hunt(_, msg):
             f"👤 **{user_nickname}** 正在寻宝...\n\n"
             f"🎯 今日目标汽车: **{car_name}**\n"
             f"💰 当前{sakura_b}: {user.iv}\n"
-            f"🔍 找到装备: {active_hunt.equipment_found}个\n"
-            f"📊 总寻宝次数: {sql_get_total_hunt_count(msg.from_user.id)}次\n\n"
+            f"📊 总寻宝次数: {sql_get_total_hunt_actions(msg.from_user.id)}次\n\n"
             f"{equipment_display}\n\n"
             f"继续您的寻宝之旅吧！",
             buttons=hunt_game_ikb(active_hunt.id)
@@ -242,7 +241,7 @@ async def start_hunt(_, msg):
         f"🔧 需要装备:\n{equipment_display}\n\n"
         f"💰 每次寻找消耗 1{sakura_b}\n"
         f"**今日剩余游戏次数: {config.hunt_daily_limit - today_count - 1}**\n"
-        f"📊 总寻宝次数: {total_count + 1}次\n\n"
+        f"📊 总寻宝次数: {sql_get_total_hunt_actions(msg.from_user.id)}次\n\n"
         f"💡 提示: 非目标装备将自动丢弃\n"
         f"🎉 收集齐全部装备后游戏将自动完成！\n"
         f"点击下方按钮开始寻找装备！",
@@ -269,8 +268,8 @@ async def hunt_bulk_action(_, call):
     if not sql_update_emby(Emby.tg == call.from_user.id, iv=user.iv - 10):
         return await callAnswer(call, f"❌ 扣除{sakura_b}失败", show_alert=True)
     
-    # 获取今日目标汽车装备ID
-    daily_car = sql_get_daily_car()
+    # 获取今日目标汽车装备ID (从缓存)
+    daily_car = sql_get_cached_daily_car(hunt)
     target_equipment_ids = []
     if daily_car:
         target_equipment_ids = [int(x) for x in daily_car.equipment_ids.split(',')]
@@ -306,8 +305,8 @@ async def hunt_bulk_action(_, call):
                     'is_target': False
                 })
     
-    # 更新寻找统计
-    sql_update_hunt_stats(hunt_id, datetime.datetime.now())
+    # 更新寻找统计 - 批量寻找记录10次寻找动作
+    sql_update_bulk_hunt_stats(hunt_id, datetime.datetime.now(), 10)
     
     # 构建结果消息
     result_text = f"💎 **批量寻找完成！**\n\n"
@@ -347,8 +346,7 @@ async def hunt_bulk_action(_, call):
     result_text += f"👤 **{call.from_user.first_name}** 正在寻宝...\n"
     result_text += f"🎯 目标汽车: {car_name}\n"
     result_text += f"💰 当前{sakura_b}: {user.iv - 10}\n"
-    result_text += f"🔍 总计找到: {hunt.equipment_found}个\n"
-    result_text += f"📊 总寻宝次数: {sql_get_total_hunt_count(call.from_user.id)}次\n\n"
+    result_text += f"📊 总寻宝次数: {sql_get_total_hunt_actions(call.from_user.id)}次\n\n"
     result_text += f"{equipment_display}\n\n"
     result_text += f"继续寻找装备吧！"
     
@@ -395,7 +393,7 @@ async def hunt_action(_, call):
             color_emoji = get_equipment_color_emoji(equipment_category)
             
             # 检查是否为今日目标汽车装备
-            daily_car = sql_get_daily_car()
+            daily_car = sql_get_cached_daily_car(hunt)
             is_target_equipment = False
             if daily_car:
                 required_equipment_ids = [int(x) for x in daily_car.equipment_ids.split(',')]
@@ -442,8 +440,7 @@ async def hunt_action(_, call):
                         f"👤 **{user_nickname}** 正在寻宝...\n\n"
                         f"🎯 今日目标汽车: **{car_name}**\n"
                         f"💰 当前{sakura_b}: {user.iv - 1}\n"
-                        f"🔍 找到装备: {hunt.equipment_found}个\n"
-                        f"📊 总寻宝次数: {sql_get_total_hunt_count(call.from_user.id)}次\n"
+                        f"📊 总寻宝次数: {sql_get_total_hunt_actions(call.from_user.id)}次\n"
                         f"✅ 刚获得: {color_emoji} {equipment_name} (目标装备)\n\n"
                         f"{equipment_display}\n\n"
                         f"继续寻找装备吧！",
@@ -478,8 +475,7 @@ async def hunt_action(_, call):
                     f"👤 **{user_nickname}** 正在寻宝...\n\n"
                     f"🎯 今日目标汽车: **{car_name}**\n"
                     f"💰 当前{sakura_b}: {user.iv - 1}\n"
-                    f"🔍 找到装备: {hunt.equipment_found}个\n"
-                    f"📊 总寻宝次数: {sql_get_total_hunt_count(call.from_user.id)}次\n"
+                    f"📊 总寻宝次数: {sql_get_total_hunt_actions(call.from_user.id)}次\n"
                     f"🗑️ 刚丢弃: {color_emoji} {equipment_name} (非目标装备)\n\n"
                     f"{equipment_display}\n\n"
                     f"继续寻找装备吧！",
@@ -530,7 +526,6 @@ async def hunt_end(_, call):
         result_text = f"🏁 **车库游戏结束**\n\n"
         result_text += f"👤 **{user_nickname}** 已经结束寻宝\n\n"
         result_text += f"⏱️ 游戏时长: {duration_minutes}分{duration_seconds}秒\n"
-        result_text += f"🔍 找到装备: {hunt.equipment_found}个\n"
         result_text += f"💰 消耗{sakura_b}: {hunt.coins_spent}\n\n"
         result_text += f"🎒 **已获得目标装备:**\n"
         
@@ -570,8 +565,8 @@ async def hunt_game_return(_, call):
     if not hunt or hunt.id != hunt_id:
         return await callAnswer(call, "❌ 游戏会话无效", show_alert=True)
     
-    # 获取今日汽车
-    daily_car = sql_get_daily_car()
+    # 获取缓存的每日汽车
+    daily_car = sql_get_cached_daily_car(hunt)
     car_name = daily_car.car_name if daily_car else "未知"
     
     # 获取用户当前金币
@@ -593,8 +588,7 @@ async def hunt_game_return(_, call):
         f"👤 **{call.from_user.first_name}** 正在寻宝...\n\n"
         f"🎯 今日目标汽车: **{car_name}**\n"
         f"💰 当前{sakura_b}: {current_coins}\n"
-        f"🔍 找到的装备: {hunt.equipment_found}个\n"
-        f"📊 总寻宝次数: {sql_get_total_hunt_count(call.from_user.id)}次\n\n"
+        f"📊 总寻宝次数: {sql_get_total_hunt_actions(call.from_user.id)}次\n\n"
         f"{equipment_display}\n\n"
         f"点击下方按钮继续寻找装备！",
         buttons=hunt_game_ikb(hunt_id)
