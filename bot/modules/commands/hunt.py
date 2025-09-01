@@ -64,7 +64,7 @@ async def handle_game_completion(call, hunt_id: int, daily_car, equipment_found_
         return False
     
     # 获取奖励信息
-    from bot.sql_helper.sql_hunt import sql_get_reward_config
+    from bot.sql_helper.sql_hunt import sql_get_reward_config, sql_give_assembly_reward
     reward_config = sql_get_reward_config(daily_car.id)
     
     # 构建完成消息
@@ -72,10 +72,17 @@ async def handle_game_completion(call, hunt_id: int, daily_car, equipment_found_
     message_text += f"🏎️ 目标汽车: **{daily_car.car_name}**\n"
     message_text += f"📝 {daily_car.description}\n"
     
-    # 添加奖励信息
+    # 处理奖励发放
+    reward_given = False
     if reward_config:
         if reward_config.reward_type == "coins":
-            message_text += f"🎁 奖励: {reward_config.reward_value}{sakura_b}\n"
+            # 使用现有的奖励发放系统给用户添加金币
+            reward_result = sql_give_assembly_reward(call.from_user.id, daily_car.id)
+            if reward_result.get("success", False):
+                reward_given = True
+                message_text += f"🎁 奖励: {reward_config.reward_value}{sakura_b} ✅已到账\n"
+            else:
+                message_text += f"🎁 奖励: {reward_config.reward_value}{sakura_b} ❌发放失败\n"
         elif reward_config.reward_type == "code":
             message_text += f"🎫 奖励: {reward_config.reward_value}个注册码\n📞 请联系 @MEBimmerSupportBot 领取\n"
         elif reward_config.reward_type == "white":
