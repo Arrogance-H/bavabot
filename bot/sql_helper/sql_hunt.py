@@ -865,13 +865,13 @@ def sql_random_equipment_by_rarity():
             rand_value = random.random() * 100  # 0-100的随机数
             
             # 紫色装备个别概率判断 (M2 > M3 > M4 > M5) - 保持3.9%总概率
-            if rand_value < 0.1:  # 0.1% M5紫色装备 (风暴灰车漆, equipment_id=4)
+           if rand_value < 0.05:  # 0.05% M5紫色装备 (风暴灰车漆, equipment_id=4)
                 return 4  # 直接返回M5专属紫色装备ID
-            elif rand_value < 0.9:  # 0.8% M4紫色装备 (圣保罗黄车漆, equipment_id=3)
-                return 3  # 直接返回M4专属紫色装备ID
-            elif rand_value < 1.9:  # 1.0% M3紫色装备 (曼岛绿车漆, equipment_id=2)
-                return 2  # 直接返回M3专属紫色装备ID
-            elif rand_value < 3.9:  # 2.0% M2紫色装备 (赞德福特蓝车漆, equipment_id=1)
+            elif rand_value < 0.55:  # 0.5% M4紫色装备 (圣保罗黄车漆, equipment_id=3)
+               return 3  # 直接返回M4专属紫色装备ID
+            elif rand_value < 1.55:  # 1.0% M3紫色装备 (曼岛绿车漆, equipment_id=2)
+               return 2  # 直接返回M3专属紫色装备ID
+            elif rand_value < 3.9:  # 2.35% M2紫色装备 (赞德福特蓝车漆, equipment_id=1)
                 return 1  # 直接返回M2专属紫色装备ID
             elif rand_value < 8.9:  # 5.0% 概率获得金色装备 (3.9% + 5.0%)
                 category = 'gold'
