@@ -199,7 +199,19 @@ async def hunt_statistics(_, msg):
             stats_text += f"🔍 发现装备: {user_today_equipment}\n"
             stats_text += f"🏎️ 完成组装: {user_today_rewards}\n"
             
-            await sendMessage(msg, stats_text)
+            stats_msg = await sendMessage(msg, stats_text)
+            
+            # 3分钟后自动删除统计消息
+            if stats_msg:
+                import asyncio
+                async def delete_stats_message():
+                    try:
+                        await asyncio.sleep(180)  # 180秒 = 3分钟
+                        await deleteMessage(stats_msg)
+                    except Exception as e:
+                        LOGGER.error(f"删除统计消息失败: {e}")
+                
+                asyncio.create_task(delete_stats_message())
             
     except Exception as e:
         LOGGER.error(f"查看统计信息失败: {e}")
