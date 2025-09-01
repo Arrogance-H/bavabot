@@ -54,8 +54,11 @@ async def editMessage(message, text: str, buttons=None, timer=None, parse_mode: 
     :param buttons:
     :return:
     """
+    original_callback = None
     if isinstance(message, CallbackQuery):
+        original_callback = message
         message = message.message
+    
     try:
         edt = await message.edit(text=text, disable_web_page_preview=True, reply_markup=buttons, parse_mode=parse_mode)
         if timer is not None:
@@ -63,8 +66,21 @@ async def editMessage(message, text: str, buttons=None, timer=None, parse_mode: 
         return True
     except FloodWait as f:
         LOGGER.warning(str(f))
+        
+        # 如果有回调查询对象，向用户显示友好提示
+        if original_callback:
+            try:
+                wait_time = f.value
+                if wait_time > 60:
+                    wait_msg = f"⏰ 操作过于频繁，请等待 {wait_time//60}分{wait_time%60}秒后再试"
+                else:
+                    wait_msg = f"⏰ 操作过于频繁，请等待 {wait_time} 秒后再试"
+                await callAnswer(original_callback, wait_msg, show_alert=True)
+            except Exception as notify_error:
+                LOGGER.warning(f"发送FLOOD_WAIT用户提示失败: {notify_error}")
+        
         await sleep(f.value * 1.2)
-        return await editMessage(message, text, buttons, parse_mode=parse_mode)
+        return await editMessage(original_callback if original_callback else message, text, buttons, parse_mode=parse_mode)
     except BadRequest as e:
         if e.ID == 'BUTTON_URL_INVALID':
             # await editMessage(message, text='⚠️ 底部按钮设置失败。', buttons=back_start_ikb)
