@@ -641,7 +641,7 @@ async def hunt_end(_, call):
         else:
             result_text += "空空如也...\n"
         
-        result_text += f"\n💡 记住：装备仅当天有效哦！\n☺️ 参与寻宝游戏！"
+        result_text += f"\n💡 记住：装备仅当天有效哦！\n☺️ 感谢参与寻宝游戏！"
         
         await callAnswer(call, "🏁 游戏结束")
         await editMessage(call, result_text)
