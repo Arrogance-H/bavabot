@@ -206,9 +206,17 @@ async def start_hunt(_, msg):
                 # 成功了，继续正常流程
                 pass
             else:
-                return await sendMessage(msg, "❌ 数据库已修复，但游戏启动仍失败，请联系管理员")
+                return await sendMessage(msg, 
+                    "❌ 数据库已修复，但游戏启动仍失败\n\n"
+                    "🔧 请管理员运行数据库重构脚本：\n"
+                    "`python3 reconstruct_hunt_database.py --backup`\n\n"
+                    "或查看 HUNT_RECONSTRUCTION_README.md 获取详细说明")
         else:
-            return await sendMessage(msg, "❌ 数据库结构需要更新，请联系管理员运行数据库迁移")
+            return await sendMessage(msg, 
+                "❌ 数据库结构需要重构以兼容当前游戏代码\n\n"
+                "🔧 请管理员运行以下命令：\n"
+                "`python3 reconstruct_hunt_database.py --backup`\n\n"
+                "📖 详细说明请查看：HUNT_RECONSTRUCTION_README.md")
     elif hunt_id == 0:
         return await sendMessage(msg, "❌ 开始游戏失败，请稍后再试")
     
