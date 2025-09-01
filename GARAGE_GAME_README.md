@@ -167,31 +167,54 @@ bot/
 (pymysql.err.OperationalError) (1054, "Unknown column 'hunt.hunt_actions' in 'field list'")
 ```
 
-这意味着数据库表结构过时，需要运行迁移脚本：
+这意味着数据库表结构过时，需要运行迁移脚本。**请按以下方法解决：**
 
-### 方法一：使用Python迁移脚本 (推荐)
+### 方法一：一键迁移脚本 (最简单)
+```bash
+cd /path/to/bavabot
+./migrate.sh
+```
+
+### 方法二：Python迁移脚本 (推荐)
 ```bash
 cd /path/to/bavabot
 python3 migrate_hunt_table.py
 ```
 
-### 方法二：直接执行SQL
+### 方法三：独立迁移脚本 (如果依赖有问题)
+```bash
+# 使用配置文件
+python3 migrate_hunt_table_standalone.py --config
+
+# 或手动指定数据库参数
+python3 migrate_hunt_table_standalone.py --host localhost --user root --password yourpass --database bavabot
+```
+
+### 方法四：直接执行SQL
 ```bash
 mysql -u username -p database_name < migrate_hunt_table.sql
 ```
 
+### 迁移内容
 迁移脚本会安全地添加缺失的列：
 - `hunt_actions` (INT, DEFAULT 0) - 寻找装备的次数
 - `daily_car_info` (TEXT, NULL) - 缓存的每日汽车信息
 
+### 详细说明
+- 📖 **详细迁移指南**: 参见 `MIGRATION_README.md`
+- 🔧 **自动检测**: 脚本会检查列是否已存在，避免重复操作
+- 🛡️ **安全机制**: 使用事务确保数据一致性
+- 📋 **多种方案**: 提供多个备选方案确保迁移成功
+
 ### 迁移前后对比
 **迁移前的错误：**
 - 代码模型定义了新列但数据库表中不存在
-- SQLAlchemy查询会失败
+- SQLAlchemy查询会失败，导致车库游戏无法使用
 
 **迁移后：**
 - 数据库表结构与代码模型一致
-- 游戏功能正常运行
+- 车库游戏功能正常运行
+- 支持寻找装备次数统计和每日汽车信息缓存
 
 ---
 
