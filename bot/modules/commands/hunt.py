@@ -155,7 +155,6 @@ async def start_hunt(_, msg):
     
     # 检查今日游戏次数
     today_count = sql_get_today_hunt_count(msg.from_user.id)
-    total_count = sql_get_total_hunt_count(msg.from_user.id)
     if today_count >= config.hunt_daily_limit:
         return await sendMessage(msg, "⏰ 您今日的寻宝游戏次数已用完，请明日再来！")
     
