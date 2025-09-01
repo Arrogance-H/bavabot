@@ -10,6 +10,10 @@ Database migration script: Add missing columns to hunt table
 This script fixes the issue:
 - hunt table missing hunt_actions column (hunt action count)
 - hunt table missing daily_car_info column (cached daily car info)
+
+注意：如果遇到依赖问题，请使用独立版本：
+Note: If you encounter dependency issues, use the standalone version:
+python3 migrate_hunt_table_standalone.py --config
 """
 
 import sys
@@ -18,15 +22,49 @@ import os
 # 添加项目根目录到Python路径
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+def try_standalone_migration():
+    """尝试运行独立迁移脚本"""
+    standalone_script = os.path.join(os.path.dirname(__file__), 'migrate_hunt_table_standalone.py')
+    if os.path.exists(standalone_script):
+        print(f"Trying to run standalone migration script: {standalone_script}")
+        import subprocess
+        try:
+            result = subprocess.run([sys.executable, standalone_script, '--config'], 
+                                  capture_output=True, text=True)
+            print(result.stdout)
+            if result.stderr:
+                print("Errors:", result.stderr)
+            return result.returncode == 0
+        except Exception as e:
+            print(f"Failed to run standalone script: {e}")
+            return False
+    return False
+
 try:
     from bot.sql_helper import engine
     from sqlalchemy import text, inspect
     print("Successfully imported database engine")
 except ImportError as e:
     print(f"Failed to import database engine: {e}")
-    print("Please make sure you have installed the required dependencies:")
-    print("pip install PyMySQL SQLAlchemy")
-    sys.exit(1)
+    print("This usually happens when:")
+    print("1. Required dependencies are not installed")
+    print("2. Configuration files are missing")
+    print("3. Database connection parameters are not set")
+    print()
+    print("Attempting to use standalone migration script...")
+    
+    if try_standalone_migration():
+        print("Standalone migration completed successfully!")
+        sys.exit(0)
+    else:
+        print()
+        print("Standalone migration also failed. Manual steps:")
+        print("1. Install dependencies: pip install PyMySQL SQLAlchemy loguru pydantic")
+        print("2. Or run standalone migration with database parameters:")
+        print("   python3 migrate_hunt_table_standalone.py --host HOST --user USER --password PASS --database DB")
+        print("3. Or execute the SQL script manually:")
+        print("   mysql -u username -p database_name < migrate_hunt_table.sql")
+        sys.exit(1)
 
 
 def check_column_exists(table_name, column_name):
@@ -120,7 +158,14 @@ def main():
             print("✓ Database connection successful")
     except Exception as e:
         print(f"✗ Database connection failed: {e}")
+        print("\nThis might be because:")
+        print("1. Database server is not running")
+        print("2. Database configuration is incorrect")
+        print("3. Network connectivity issues")
         print("\nPlease check your database configuration in bot/__init__.py")
+        print("\nTrying standalone migration as fallback...")
+        if try_standalone_migration():
+            return True
         return False
     
     # 检查hunt表是否存在
@@ -129,6 +174,7 @@ def main():
         tables = inspector.get_table_names()
         if 'hunt' not in tables:
             print("✗ Hunt table does not exist. Please create it first.")
+            print("You can create it by running the application once, which will auto-create tables.")
             return False
         print("✓ Hunt table exists")
     except Exception as e:
@@ -137,23 +183,37 @@ def main():
     
     # 执行迁移
     success = True
-    success &= add_hunt_actions_column()
-    success &= add_daily_car_info_column()
+    try:
+        success &= add_hunt_actions_column()
+        success &= add_daily_car_info_column()
+    except Exception as e:
+        print(f"✗ Migration execution failed: {e}")
+        success = False
     
     if success:
         # 验证迁移
-        if verify_migration():
-            print("\n" + "=" * 50)
-            print("✓ Hunt table migration completed successfully!")
-            print("The application should now work without the column errors.")
-            return True
-        else:
-            print("\n" + "=" * 50)
-            print("✗ Migration completed but verification failed.")
+        try:
+            if verify_migration():
+                print("\n" + "=" * 50)
+                print("✓ Hunt table migration completed successfully!")
+                print("The application should now work without the column errors.")
+                print("You can now restart your bot application.")
+                return True
+            else:
+                print("\n" + "=" * 50)
+                print("✗ Migration completed but verification failed.")
+                print("Please check the database manually or contact support.")
+                return False
+        except Exception as e:
+            print(f"\n✗ Migration verification failed: {e}")
             return False
     else:
         print("\n" + "=" * 50)
         print("✗ Migration failed.")
+        print("\nTrying standalone migration as fallback...")
+        if try_standalone_migration():
+            return True
+        print("Please check MIGRATION_README.md for manual migration steps.")
         return False
 
 
