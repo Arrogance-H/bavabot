@@ -22,6 +22,8 @@ class Hunt(Base):
     equipment_found = Column(Integer, default=0)  # 找到的装备数量
     coins_spent = Column(Integer, default=0)  # 消耗的金币数量
     last_hunt_time = Column(DateTime, nullable=True)  # 上次寻找时间
+    hunt_actions = Column(Integer, default=0)  # 寻找装备的次数
+    daily_car_info = Column(Text, nullable=True)  # 缓存的每日汽车信息
 
 
 class Equipment(Base):
@@ -297,12 +299,25 @@ def sql_start_hunt(tg: int) -> int:
                 else:
                     return -2  # 已有进行中的游戏
             
+            # 获取并缓存今日汽车信息
+            daily_car = sql_get_daily_car()
+            daily_car_info = None
+            if daily_car:
+                import json
+                daily_car_info = json.dumps({
+                    'id': daily_car.id,
+                    'car_name': daily_car.car_name,
+                    'equipment_ids': daily_car.equipment_ids,
+                    'description': daily_car.description
+                })
+            
             # 创建新游戏会话
             hunt = Hunt(
                 tg=tg,
                 start_time=datetime.datetime.now(),
                 game_date=today,
-                is_active=True
+                is_active=True,
+                daily_car_info=daily_car_info
             )
             session.add(hunt)
             session.commit()
@@ -431,11 +446,36 @@ def sql_get_active_hunt(tg: int):
                 _ = hunt.equipment_found
                 _ = hunt.coins_spent
                 _ = hunt.last_hunt_time
+                _ = hunt.hunt_actions
+                _ = hunt.daily_car_info
                 session.expunge(hunt)
             return hunt
         except Exception as e:
             LOGGER.error(f"获取活跃车库会话失败: {e}")
             return None
+
+
+def sql_get_cached_daily_car(hunt):
+    """获取游戏会话中缓存的每日汽车信息"""
+    if not hunt or not hunt.daily_car_info:
+        return None
+    
+    try:
+        import json
+        car_data = json.loads(hunt.daily_car_info)
+        
+        # 创建一个简单的对象来模拟Car对象
+        class CachedCar:
+            def __init__(self, data):
+                self.id = data['id']
+                self.car_name = data['car_name']
+                self.equipment_ids = data['equipment_ids']
+                self.description = data['description']
+        
+        return CachedCar(car_data)
+    except Exception as e:
+        LOGGER.error(f"解析缓存的每日汽车信息失败: {e}")
+        return None
 
 
 def sql_add_equipment(tg: int, hunt_session_id: int, equipment_id: int) -> bool:
@@ -524,6 +564,18 @@ def sql_get_total_hunt_count(tg: int) -> int:
             return count
         except Exception as e:
             LOGGER.error(f"获取用户总寻宝次数失败: {e}")
+            return 0
+
+
+def sql_get_total_hunt_actions(tg: int) -> int:
+    """获取用户总寻找装备次数(实际操作次数)"""
+    with Session() as session:
+        try:
+            # 汇总所有hunt会话的hunt_actions
+            result = session.query(func.sum(Hunt.hunt_actions)).filter(Hunt.tg == tg).scalar()
+            return result if result else 0
+        except Exception as e:
+            LOGGER.error(f"获取用户总寻找装备次数失败: {e}")
             return 0
 
 
@@ -774,12 +826,30 @@ def sql_update_hunt_stats(hunt_id: int, last_hunt_time: datetime.datetime) -> bo
             if hunt:
                 hunt.last_hunt_time = last_hunt_time
                 hunt.equipment_found = (hunt.equipment_found or 0) + 1
+                hunt.hunt_actions = (hunt.hunt_actions or 0) + 1  # 增加寻找次数
                 session.commit()
                 return True
             return False
         except Exception as e:
             session.rollback()
             LOGGER.error(f"更新车库游戏统计失败: {e}")
+            return False
+
+
+def sql_update_bulk_hunt_stats(hunt_id: int, last_hunt_time: datetime.datetime, action_count: int = 10) -> bool:
+    """更新批量车库游戏统计信息"""
+    with Session() as session:
+        try:
+            hunt = session.query(Hunt).filter(Hunt.id == hunt_id).first()
+            if hunt:
+                hunt.last_hunt_time = last_hunt_time
+                hunt.hunt_actions = (hunt.hunt_actions or 0) + action_count  # 增加批量寻找次数
+                session.commit()
+                return True
+            return False
+        except Exception as e:
+            session.rollback()
+            LOGGER.error(f"更新批量车库游戏统计失败: {e}")
             return False
 
 
