@@ -37,18 +37,15 @@ def hunt_game_ikb(hunt_id: int, last_hunt_time: int = 0):
     if can_hunt:
         hunt_btn_text = "🔍 寻找装备"
         bulk_10_text = "💎 批量10次"
-        bulk_30_text = "💎 批量30次"
         bulk_50_text = "💎 批量50次"
     else:
         hunt_btn_text = f"⏰ 寻找装备"
         bulk_10_text = f"⏰ 批量10次"
-        bulk_30_text = f"⏰ 批量30次"
         bulk_50_text = f"⏰ 批量50次"
     
     return ikb([
         [(hunt_btn_text, f"hunt_action_{hunt_id}")],
-        [(bulk_10_text, f"hunt_bulk_action_{hunt_id}_10"), (bulk_30_text, f"hunt_bulk_action_{hunt_id}_30")],
-        [(bulk_50_text, f"hunt_bulk_action_{hunt_id}_50")],
+        [(bulk_10_text, f"hunt_bulk_action_{hunt_id}_10"), (bulk_50_text, f"hunt_bulk_action_{hunt_id}_50")],
         [("❌ 结束游戏", f"hunt_end_{hunt_id}")]
     ])
 
@@ -73,36 +70,78 @@ async def handle_game_completion(call, hunt_id: int, daily_car, equipment_found_
     from bot.sql_helper.sql_hunt import sql_get_reward_config, sql_give_assembly_reward
     reward_config = sql_get_reward_config(daily_car.id)
     
-    # 构建完成消息
+    # 获取hunt对象以获取完整的统计信息
+    hunt = sql_get_active_hunt(call.from_user.id)
+    if not hunt:
+        return False
+    
+    # 构建简化的完成消息（不包含奖励信息）
     message_text = f"{equipment_found_text}🎉 **恭喜完成寻宝！**\n\n"
     message_text += f"🏎️ 目标汽车: **{daily_car.car_name}**\n"
     message_text += f"📝 {daily_car.description}\n"
+    message_text += f"\n✨ **装备已收集完成，游戏自动结束！**\n"
+    message_text += f"🎮 感谢参与寻宝游戏！"
     
-    # 处理奖励发放
+    # 处理奖励发放（用于独立通知消息）
     reward_given = False
+    reward_description = ""
+    claim_info = ""
+    
     if reward_config:
         if reward_config.reward_type == "coins":
             # 使用现有的奖励发放系统给用户添加金币
             reward_result = sql_give_assembly_reward(call.from_user.id, daily_car.id)
             if reward_result.get("success", False):
                 reward_given = True
-                message_text += f"🎁 奖励: {reward_config.reward_value}{sakura_b} ✅已到账\n"
+                reward_description = f"{reward_config.reward_value}{sakura_b}"
+                claim_info = "✅已自动到账"
             else:
-                message_text += f"🎁 奖励: {reward_config.reward_value}{sakura_b} ❌发放失败\n"
+                reward_description = f"{reward_config.reward_value}{sakura_b}"
+                claim_info = "❌发放失败，请联系管理员"
         elif reward_config.reward_type == "code":
-            message_text += f"🎫 奖励: {reward_config.reward_value}个注册码\n📞 请联系 @MEBimmerSupportBot 领取\n"
+            reward_description = f"{reward_config.reward_value}个注册码"
+            claim_info = "📞 请联系 @MEBimmerSupportBot 领取"
         elif reward_config.reward_type == "white":
-            message_text += f"⚪ 奖励: {reward_config.reward_value}个白名单\n📞 请联系 @MEBimmerSupportBot 领取\n"
+            reward_description = f"{reward_config.reward_value}个白名单"
+            claim_info = "📞 请联系 @MEBimmerSupportBot 领取"
         else:
-            message_text += f"🎁 奖励: {reward_config.reward_description}\n"
-    
-    message_text += f"\n✨ **装备已收集完成，游戏自动结束！**\n"
-    message_text += f"🎮 感谢参与寻宝游戏！"
+            reward_description = reward_config.reward_description
+            claim_info = "请查看游戏详情"
+    else:
+        reward_description = "无奖励配置"
+        claim_info = "无需领取"
     
     # 结束游戏
     sql_end_hunt(hunt_id)
     
+    # 编辑当前消息显示简化的完成信息
     await editMessage(call, message_text)
+    
+    # 发送独立的完成通知消息
+    completion_time = datetime.datetime.now()
+    user_nickname = call.from_user.first_name
+    if call.from_user.last_name:
+        user_nickname += f" {call.from_user.last_name}"
+    
+    # 构建详细的完成通知消息
+    notification_text = f"🎉 **寻宝游戏完成通知** 🎉\n\n"
+    notification_text += f"👤 **用户信息:**\n"
+    notification_text += f"   昵称: {user_nickname}\n"
+    if call.from_user.username:
+        notification_text += f"   用户名: @{call.from_user.username}\n"
+    notification_text += f"   TG ID: `{call.from_user.id}`\n\n"
+    notification_text += f"⏰ **完成时间:** {completion_time.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+    notification_text += f"🏎️ **目标汽车:** {daily_car.car_name}\n\n"
+    notification_text += f"💰 **消耗JOY币:** {hunt.coins_spent}\n\n"
+    notification_text += f"🎁 **获得奖励:** {reward_description}\n\n"
+    notification_text += f"📋 **领奖信息:** {claim_info}\n\n"
+    notification_text += f"🎮 恭喜完成今日寻宝挑战！"
+    
+    # 发送独立的通知消息
+    try:
+        await sendMessage(call, notification_text, send=False)
+    except Exception as e:
+        LOGGER.error(f"发送完成通知消息失败: {e}")
     
     # 5分钟后删除消息（超过5分钟无操作自动删除）
     asyncio.create_task(delete_message_after_delay(call.message, 300))
@@ -267,7 +306,7 @@ async def start_hunt(_, msg):
         f"🎯 今日目标汽车: **{car_name}**\n"
         f"{reward_text}\n"
         f"🔧 需要装备:\n{equipment_display}\n\n"
-        f"💰 每次寻找消耗 1{sakura_b}，批量寻找(10/30/50次)分别消耗对应数量\n"
+        f"💰 每次寻找消耗 1{sakura_b}，批量寻找(10/50次)分别消耗对应数量\n"
         f"**今日剩余游戏次数: {config.hunt_daily_limit - today_count - 1}**\n"
         f"📊 总寻宝次数: {sql_get_total_hunt_actions(msg.from_user.id)}次\n\n"
         f"💡 提示: 非目标装备将自动丢弃\n"
@@ -284,7 +323,7 @@ async def hunt_bulk_action(_, call):
     quantity = int(call.matches[0].group(2))
     
     # 验证批量数量
-    if quantity not in [10, 30, 50]:
+    if quantity not in [10, 50]:
         return await callAnswer(call, "❌ 无效的批量数量", show_alert=True)
     
     # 验证游戏会话
