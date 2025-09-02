@@ -343,11 +343,16 @@ async def start_hunt(_, msg):
     # 获取用户昵称
     user_nickname = msg.from_user.first_name
     
+    # 获取用户当前金币
+    user = sql_get_emby(msg.from_user.id)
+    current_coins = user.iv if user else 0
+    
     await sendMessage(
         msg,
         f"🏎️ **寻宝游戏开始！**\n\n"
         f"👤 **{user_nickname}** 正在寻宝...\n\n"
         f"🎯 今日目标汽车: **{car_name}**\n"
+        f"💰 当前{sakura_b}: {current_coins}\n"
         f"{reward_text}\n"
         f"🔧 需要装备:\n{equipment_display}\n"
         f"💰 每次寻找消耗 1{sakura_b}\n"
