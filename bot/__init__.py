@@ -59,6 +59,7 @@ kk_gift_days = config.kk_gift_days
 fuxx_pitao = config.fuxx_pitao
 activity_check_days = config.activity_check_days
 red_envelope = config.red_envelope
+lottery = config.lottery
 hunt_daily_limit = config.hunt_daily_limit
 
 moviepilot = config.moviepilot
@@ -78,7 +79,10 @@ user_p = [
     BotCommand("srank", "[用户/禁言] 查看计分"),
     # 车库游戏用户命令 (Hunt Game User Commands)
     BotCommand("hunt", "[用户] 开始寻宝游戏"),
-    BotCommand("hunt_stats", "[用户] 查看寻宝游戏统计信息")]
+    BotCommand("hunt_stats", "[用户] 查看寻宝游戏统计信息"),
+    # 抽奖系统用户命令 (Lottery System User Commands)
+    BotCommand("lottery", "[用户] 查看抽奖列表"),
+    BotCommand("my_lottery", "[用户] 查看我的抽奖状态")]
 
 # 取消 BotCommand("exchange", "[私聊] 使用注册码")
 admin_p = user_p + [
@@ -119,6 +123,12 @@ admin_p = user_p + [
     BotCommand("hunt_config_reward", "配置寻宝游戏奖励 [管理]"),
     BotCommand("hunt_list_rewards", "查看寻宝游戏奖励配置 [管理]"),
     BotCommand("hunt_config_button", "配置寻宝游戏领奖配置 [管理]"),
+    # 抽奖系统管理员命令 (Lottery System Admin Commands)
+    BotCommand("lottery_create", "创建抽奖 [管理]"),
+    BotCommand("lottery_add_prize", "添加抽奖奖品 [管理]"),
+    BotCommand("lottery_manage", "管理抽奖 [管理]"),
+    BotCommand("lottery_draw", "手动开奖 [管理]"),
+    BotCommand("lottery_list_all", "查看所有抽奖 [管理]"),
 ]
 
 owner_p = admin_p + [

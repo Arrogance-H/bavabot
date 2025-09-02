@@ -23,3 +23,19 @@ from .hunt_admin import (
     list_hunt_rewards,       # 查看奖励配置 (/hunt_list_rewards)
     hunt_statistics          # 游戏统计信息 (/hunt_stats)
 )
+
+# 抽奖系统用户命令 (Lottery System User Commands)
+from .lottery import (
+    lottery_list,            # 查看抽奖列表 (/lottery)
+    my_lottery_status        # 查看我的抽奖状态 (/my_lottery)
+)
+
+# 抽奖系统管理员命令 (Lottery System Admin Commands)
+from .lottery_admin import (
+    create_lottery_command,  # 创建抽奖 (/lottery_create)
+    add_lottery_prize_command,  # 添加奖品 (/lottery_add_prize)
+    manage_lottery_command,  # 管理抽奖 (/lottery_manage)
+    manual_draw_lottery,     # 手动开奖 (/lottery_draw)
+    list_all_lotteries,      # 查看所有抽奖 (/lottery_list_all)
+    check_auto_draw          # 自动检查开奖任务
+)
