@@ -130,15 +130,15 @@ async def handle_game_completion(call, hunt_id: int, daily_car, equipment_found_
             else:
                 reward_description = f"{reward_config.reward_value}{sakura_b}"
                 claim_info = "❌发放失败，请联系管理员"
-        elif reward_config.reward_type == "code":
-            reward_description = f"{reward_config.reward_value}个注册码"
-            claim_info = "📞 请联系 @MEBimmerSupportBot 领取"
-        elif reward_config.reward_type == "white":
-            reward_description = f"{reward_config.reward_value}个白名单"
-            claim_info = "📞 请联系 @MEBimmerSupportBot 领取"
         else:
+            # 使用与start_hunt一致的逻辑，显示reward_description
             reward_description = reward_config.reward_description
-            claim_info = "请查看游戏详情"
+            if reward_config.reward_type == "code":
+                claim_info = "📞 请联系 @MEBimmerSupportBot 领取"
+            elif reward_config.reward_type == "white":
+                claim_info = "📞 请联系 @MEBimmerSupportBot 领取"
+            else:
+                claim_info = "请查看游戏详情"
     else:
         reward_description = "无奖励配置"
         claim_info = "无需领取"
