@@ -112,11 +112,7 @@ class RewardButton(Base):
     is_active = Column(Boolean, default=True)  # 是否激活
 
 
-# 为了向后兼容，保留旧表结构但标记为废弃
-Fragment = Equipment  # 别名，向后兼容
-Treasure = Car  # 别名，向后兼容  
-FragmentDefinition = EquipmentDefinition  # 别名，向后兼容
-DailyTreasure = DailyCar  # 别名，向后兼容
+
 
 
 # 创建表
@@ -706,13 +702,6 @@ def sql_assemble_car(tg: int, car_id: int) -> dict:
             return {"success": False, "message": "组装失败"}
 
 
-# 向后兼容的组装函数
-def sql_assemble_car_legacy(tg: int, car_id: int) -> bool:
-    """向后兼容的组装汽车函数"""
-    result = sql_assemble_car(tg, car_id)
-    return result["success"]
-
-
 def sql_cleanup_expired_equipment():
     """清理过期装备"""
     with Session() as session:
@@ -1151,40 +1140,3 @@ def sql_get_probability_stats():
 
 # 初始化汽车配置
 init_cars_and_equipment()
-
-# 为向后兼容保留旧函数名
-def init_treasures():
-    """向后兼容的初始化函数"""
-    return init_cars_and_equipment()
-
-def sql_get_fragment_definition(fragment_id: int):
-    """向后兼容的获取碎片定义函数"""
-    return sql_get_equipment_definition(fragment_id)
-
-def sql_get_all_fragment_definitions():
-    """向后兼容的获取所有碎片定义函数"""
-    return sql_get_all_equipment_definitions()
-
-def sql_add_fragment(tg: int, hunt_session_id: int, fragment_id: int) -> bool:
-    """向后兼容的添加碎片函数"""
-    return sql_add_equipment(tg, hunt_session_id, fragment_id)
-
-def sql_get_user_fragments(tg: int, today_only: bool = True):
-    """向后兼容的获取用户碎片函数"""
-    return sql_get_user_equipment(tg, today_only)
-
-def sql_get_daily_treasure(date: str = None):
-    """向后兼容的获取每日宝物函数"""
-    return sql_get_daily_car(date)
-
-def sql_check_treasure_synthesis(tg: int, treasure_id: int) -> bool:
-    """向后兼容的检查宝物合成函数"""
-    return sql_check_car_assembly(tg, treasure_id)
-
-def sql_synthesize_treasure(tg: int, treasure_id: int) -> bool:
-    """向后兼容的合成宝物函数"""
-    return sql_assemble_car_legacy(tg, treasure_id)
-
-def sql_cleanup_expired_fragments():
-    """向后兼容的清理过期碎片函数"""
-    return sql_cleanup_expired_equipment()
