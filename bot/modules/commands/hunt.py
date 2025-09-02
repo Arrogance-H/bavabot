@@ -431,10 +431,20 @@ async def hunt_bulk_action(_, call):
     
     if found_equipment:
         result_text += "📦 **发现的装备:**\n"
+        # 按装备名称和状态分组计数
+        equipment_summary = {}
         for item in found_equipment:
-            color_emoji = get_equipment_color_emoji(item['category'])
-            status = "🎯" if item['is_target'] else "🗑️"
-            result_text += f"{status} {color_emoji} {item['name']}\n"
+            key = (item['name'], item['category'], item['is_target'])
+            equipment_summary[key] = equipment_summary.get(key, 0) + 1
+        
+        # 显示分组后的装备
+        for (name, category, is_target), count in equipment_summary.items():
+            color_emoji = get_equipment_color_emoji(category)
+            status = "🎯" if is_target else "🗑️"
+            if count > 1:
+                result_text += f"{status} {color_emoji} {name}*{count}\n"
+            else:
+                result_text += f"{status} {color_emoji} {name}\n"
     
     # 获取最新状态
     car_name = daily_car.car_name if daily_car else "未知"
@@ -652,9 +662,15 @@ async def hunt_end(_, call):
                 if equipment_def:
                     equipment_name = equipment_def.equipment_name
                     color_emoji = get_equipment_color_emoji(equipment_def.category)
-                    result_text += f"{color_emoji} {equipment_name}: {count}个\n"
+                    if count > 1:
+                        result_text += f"{color_emoji} {equipment_name}*{count}\n"
+                    else:
+                        result_text += f"{color_emoji} {equipment_name}\n"
                 else:
-                    result_text += f"⚪ 装备 {equipment_id}: {count}个\n"
+                    if count > 1:
+                        result_text += f"⚪ 装备 {equipment_id}*{count}\n"
+                    else:
+                        result_text += f"⚪ 装备 {equipment_id}\n"
         else:
             result_text += "空空如也...\n"
         
