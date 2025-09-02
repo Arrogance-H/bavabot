@@ -67,12 +67,12 @@ def hunt_game_ikb(hunt_id: int, last_hunt_time: int = 0):
     
     if can_hunt:
         hunt_btn_text = "🔍 开始寻宝"
-        bulk_10_text = "🔍 寻找10次"
-        bulk_50_text = "🔍 寻找50次"
+        bulk_10_text = "🔍 寻宝10次"
+        bulk_50_text = "🔍 寻宝50次"
     else:
-        hunt_btn_text = f"⏰ 寻找寻宝"
-        bulk_10_text = f"⏰ 寻找10次"
-        bulk_50_text = f"⏰ 寻找50次"
+        hunt_btn_text = f"⏰ 寻宝"
+        bulk_10_text = f"⏰ 寻宝10次"
+        bulk_50_text = f"⏰ 寻宝50次"
     
     return ikb([
         [(hunt_btn_text, f"hunt_action_{hunt_id}")],
