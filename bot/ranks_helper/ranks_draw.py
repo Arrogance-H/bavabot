@@ -18,11 +18,41 @@ import numpy as np
 
 
 class RanksDraw:
+    # 红包封面背景图片路径 - Red envelope cover background image path
+    # 红包封面的背景图片存储在这个目录中 - Background images for red envelope covers are stored in this directory
     red_bg_path = os.path.join('bot', 'ranks_helper', 'red', 'bg')
+    
+    # 红包背景图片文件列表 - List of red envelope background image files
+    # 从red_bg_path目录中获取所有可用的背景图片文件 - Get all available background image files from red_bg_path directory
     red_bg_list = os.listdir(red_bg_path)
+    
+    # 红包用户头像遮罩 - Red envelope user avatar mask
+    # 用于给用户头像添加圆角边框效果 - Used to add rounded border effect to user avatars
     red_mask = Image.open(os.path.join('bot', 'ranks_helper', 'red', 'red_mask.png')).convert('RGBA')
+    
+    # 字体文件路径 - Font file paths
     zimu_font = os.path.join('bot', 'ranks_helper', "resource", 'font', "Provicali.otf")
     bold_font = os.path.join('bot', 'ranks_helper', "resource", 'font', "PingFang Bold.ttf")
+    
+    @classmethod
+    def get_available_red_backgrounds(cls):
+        """
+        获取可用的红包背景图片列表 - Get list of available red envelope background images
+        
+        Returns:
+            list: 可用背景图片文件名列表 - List of available background image filenames
+        """
+        return cls.red_bg_list.copy()
+    
+    @classmethod 
+    def get_red_background_path(cls):
+        """
+        获取红包背景图片目录路径 - Get red envelope background images directory path
+        
+        Returns:
+            str: 背景图片目录的完整路径 - Full path to background images directory
+        """
+        return cls.red_bg_path
 
     def __init__(self, embyname=None, weekly=False, backdrop=False):
         # 绘图文件路径初始化
@@ -251,13 +281,49 @@ class RanksDraw:
 
     @staticmethod
     async def hb_test_draw(money: int, members: int, user_pic: bytes = None, first_name: str = None):
+        """
+        生成红包封面图片 - Generate red envelope cover image
+        
+        红包封面的来源说明 - Source explanation for red envelope covers:
+        1. 背景图片来源 - Background image source:
+           - 路径: bot/ranks_helper/red/bg/ - Path: bot/ranks_helper/red/bg/
+           - 包含多个预设的红包背景图片 (bg01.JPG, bg02.JPG, rbg01.png 等)
+           - Contains multiple preset red envelope background images (bg01.JPG, bg02.JPG, rbg01.png etc.)
+           - 系统随机选择其中一个作为红包封面背景 - System randomly selects one as red envelope cover background
+           
+        2. 用户头像处理 - User avatar processing:
+           - 如果提供用户头像，会下载并处理用户的Telegram头像 - If user avatar provided, downloads and processes user's Telegram avatar
+           - 应用圆角遮罩效果 (red_mask.png) - Applies rounded corner mask effect (red_mask.png)
+           - 调整大小为300x300像素 - Resizes to 300x300 pixels
+           
+        3. 文字内容 - Text content:
+           - 红包发送者姓名 - Red envelope sender name
+           - 红包金额和份数信息 - Red envelope amount and quantity info
+           
+        Args:
+            money (int): 红包金额 - Red envelope amount
+            members (int): 红包份数 - Number of red envelope portions
+            user_pic (bytes, optional): 用户头像数据 - User avatar data
+            first_name (str, optional): 用户姓名 - User name
+            
+        Returns:
+            BytesIO: 生成的红包封面图片数据 - Generated red envelope cover image data
+        """
+        # 随机选择红包背景图片 - Randomly select red envelope background image
+        # 从 bot/ranks_helper/red/bg/ 目录中随机选择一个背景图片
+        # Randomly selects a background image from bot/ranks_helper/red/bg/ directory
         red_bg = os.path.join(RanksDraw.red_bg_path, random.choice(RanksDraw.red_bg_list))
+        
         if not user_pic:
+            # 无用户头像情况：只使用背景图片和文字 - No user avatar: only use background image and text
             cover = Image.open(red_bg)
             cover = await draw_cover_text(cover, first_name, money, members)
             img_bytes = BytesIO()
             cover.save(img_bytes, format='png')
             return img_bytes
+            
+        # 有用户头像情况：背景图片 + 处理后的用户头像 + 文字
+        # With user avatar: background image + processed user avatar + text
         cover = Image.open(red_bg)
         # 获取 cover 的背景颜色
         bg_color = cover.getpixel((0, 0))
@@ -290,9 +356,27 @@ async def convert_bgcc(_pic, bg_color):
 
 
 async def draw_cover_text(cover, first_name, money, members):
+    """
+    在红包封面上绘制文字信息 - Draw text information on red envelope cover
+    
+    在背景图片上添加以下文字内容:
+    - 用户姓名 + "红包" 文字 (居中显示，位置: width/2, 550)
+    - 金额/份数信息 (居中显示，位置: width/2, height-100)
+    
+    Args:
+        cover: PIL Image对象，红包背景图片
+        first_name: 红包发送者姓名
+        money: 红包金额
+        members: 红包份数
+        
+    Returns:
+        PIL Image: 添加了文字的红包封面图片
+    """
     draw = ImageDraw.Draw(cover)
+    # 绘制用户姓名和"红包"文字 - Draw user name and "红包" text
     draw.text((cover.width // 2, 550), f'{first_name}红包',
               font=ImageFont.truetype(RanksDraw.bold_font, 50), anchor='mm', fill=(249, 219, 160))
+    # 绘制金额和份数信息 - Draw amount and quantity information  
     draw.text((cover.width // 2, cover.height - 100), f'{money} / {members}',
               font=ImageFont.truetype(RanksDraw.zimu_font, 60), anchor='mm', fill=(249, 219, 160))
     return cover

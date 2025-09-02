@@ -3,6 +3,15 @@ red_envelope -
 
 Author:susu
 Date:2023/01/02
+
+红包封面生成说明 - Red Envelope Cover Generation Notes:
+红包封面是动态生成的，主要组成包括:
+1. 随机选择的背景图片 (来源: bot/ranks_helper/red/bg/)
+2. 用户Telegram头像 (如果提供)
+3. 动态文字内容 (用户名、金额等)
+
+详细说明请参考: RED_ENVELOPE_COVER_GUIDE.md
+For detailed information, see: RED_ENVELOPE_COVER_GUIDE.md
 """
 
 import cn2an
@@ -145,7 +154,12 @@ async def send_red_envelope(_, msg):
             private_text=private_text,
         )
 
+        # 获取用户头像用于红包封面生成 - Get user avatar for red envelope cover generation
         user_pic = await get_user_photo(msg.reply_to_message.from_user)
+        
+        # 生成专享红包封面 - Generate private red envelope cover
+        # 封面来源: 随机背景图片 + 接收者头像 + 文字内容
+        # Cover source: random background image + receiver avatar + text content
         cover = await RanksDraw.hb_test_draw(
             money, 1, user_pic, f"{msg.reply_to_message.from_user.first_name} 专享"
         )
@@ -192,7 +206,12 @@ async def send_red_envelope(_, msg):
         flag=flag,
     )
 
+    # 获取发送者头像用于红包封面生成 - Get sender avatar for red envelope cover generation  
     user_pic = await get_user_photo(msg.from_user if not msg.sender_chat else msg.chat)
+    
+    # 生成普通红包封面 - Generate regular red envelope cover
+    # 封面来源: 随机背景图片 + 发送者头像 + 文字内容
+    # Cover source: random background image + sender avatar + text content
     cover = await RanksDraw.hb_test_draw(money, members, user_pic, first_name)
 
     await asyncio.gather(sendPhoto(msg, photo=cover, buttons=ikb), reply.delete())
@@ -339,12 +358,26 @@ async def verify_red_envelope_sender(msg, money, is_private=False):
 
 
 async def get_user_photo(user):
-    """获取用户头像"""
+    """
+    获取用户头像 - Get user avatar
+    
+    红包封面中用户头像的获取过程:
+    1. 检查用户是否设置了Telegram头像
+    2. 如果有头像，使用bot.download_media下载大尺寸头像文件
+    3. 下载到内存中(in_memory=True)，返回字节数据
+    4. 这个字节数据会传递给RanksDraw.hb_test_draw()用于生成红包封面
+    
+    Args:
+        user: Telegram用户对象
+        
+    Returns:
+        bytes: 用户头像的字节数据，如果用户没有头像则返回None
+    """
     if not user.photo:
         return None
     return await bot.download_media(
-        user.photo.big_file_id,
-        in_memory=True,
+        user.photo.big_file_id,  # 使用大尺寸头像以保证图片质量
+        in_memory=True,  # 下载到内存而不是保存为文件
     )
 
 
