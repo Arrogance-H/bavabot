@@ -120,25 +120,30 @@ async def handle_game_completion(call, hunt_id: int, daily_car, equipment_found_
     claim_info = ""
     
     if reward_config:
-        if reward_config.reward_type == "coins":
-            # 使用现有的奖励发放系统给用户添加金币
-            reward_result = sql_give_assembly_reward(call.from_user.id, daily_car.id)
-            if reward_result.get("success", False):
-                reward_given = True
+        # 使用现有的奖励发放系统给用户发放奖励（所有类型）
+        reward_result = sql_give_assembly_reward(call.from_user.id, daily_car.id)
+        if reward_result.get("success", False):
+            reward_given = True
+            if reward_config.reward_type == "coins":
                 reward_description = f"{reward_config.reward_value}{sakura_b}"
                 claim_info = "✅已自动到账"
-            else:
-                reward_description = f"{reward_config.reward_value}{sakura_b}"
-                claim_info = "❌发放失败，请联系管理员"
-        else:
-            # 使用与start_hunt一致的逻辑，显示reward_description
-            reward_description = reward_config.reward_description
-            if reward_config.reward_type == "code":
+            elif reward_config.reward_type == "code":
+                reward_description = reward_config.reward_description
                 claim_info = "📞 请联系 @MEBimmerSupportBot 领取"
             elif reward_config.reward_type == "white":
+                reward_description = reward_config.reward_description
                 claim_info = "📞 请联系 @MEBimmerSupportBot 领取"
             else:
+                reward_description = reward_config.reward_description
                 claim_info = "请查看游戏详情"
+        else:
+            # 发放失败的情况
+            if reward_config.reward_type == "coins":
+                reward_description = f"{reward_config.reward_value}{sakura_b}"
+                claim_info = "❌发放失败，请联系管理员"
+            else:
+                reward_description = reward_config.reward_description
+                claim_info = "❌奖励发放失败，请联系管理员"
     else:
         reward_description = "无奖励配置"
         claim_info = "无需领取"

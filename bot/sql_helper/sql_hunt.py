@@ -3,7 +3,7 @@
 """
 import datetime
 from bot.sql_helper import Base, Session, engine
-from sqlalchemy import Column, BigInteger, String, DateTime, Integer, Boolean, Text, and_
+from sqlalchemy import Column, BigInteger, String, DateTime, Integer, Boolean, Text, and_, or_
 from sqlalchemy import func
 from bot import LOGGER, config
 
@@ -804,11 +804,14 @@ def sql_cleanup_idle_hunts():
             idle_threshold = current_time - datetime.timedelta(minutes=5)  # 5分钟前
             
             # 查找超过5分钟无活动的活跃游戏
+            # 包括：1) last_hunt_time为空且start_time超过阈值的游戏 2) last_hunt_time不为空且超过阈值的游戏
             idle_hunts = session.query(Hunt).filter(
                 and_(
-                    Hunt.is_active == True, 
-                    Hunt.last_hunt_time < idle_threshold,
-                    Hunt.last_hunt_time.isnot(None)
+                    Hunt.is_active == True,
+                    or_(
+                        and_(Hunt.last_hunt_time.is_(None), Hunt.start_time < idle_threshold),
+                        and_(Hunt.last_hunt_time.isnot(None), Hunt.last_hunt_time < idle_threshold)
+                    )
                 )
             ).all()
             
