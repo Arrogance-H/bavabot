@@ -352,10 +352,10 @@ async def start_hunt(_, msg):
         f"🏎️ **寻宝游戏开始！**\n\n"
         f"👤 **{user_nickname}** 正在寻宝...\n\n"
         f"🎯 今日目标汽车: **{car_name}**\n"
-        f"💰 当前{sakura_b}: {current_coins}\n"
         f"{reward_text}\n"
         f"🔧 需要装备:\n{equipment_display}\n"
         f"💰 每次寻找消耗 1{sakura_b}\n"
+        f"💰 当前{sakura_b}: {current_coins}{sakura_b}\n"
         f"🕹️ 今日剩余游戏次数: {config.hunt_daily_limit - today_count - 1}\n"
         f"📊 总寻宝次数: {sql_get_total_hunt_actions(msg.from_user.id)}次\n\n"
         f"👇 点击下方按钮开始寻找装备！",
