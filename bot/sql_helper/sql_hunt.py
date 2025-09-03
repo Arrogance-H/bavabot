@@ -24,6 +24,8 @@ class Hunt(Base):
     last_hunt_time = Column(DateTime, nullable=True)  # 上次寻找时间
     hunt_actions = Column(Integer, default=0)  # 寻找装备的次数
     daily_car_info = Column(Text, nullable=True)  # 缓存的每日汽车信息
+    message_id = Column(Integer, nullable=True)  # 关联的消息ID（用于会话失效时删除消息）
+    chat_id = Column(BigInteger, nullable=True)  # 消息所在的聊天ID
 
 
 class Equipment(Base):
@@ -304,7 +306,7 @@ def sql_check_and_fix_hunt_table():
         return False
 
 
-def sql_start_hunt(tg: int) -> int:
+def sql_start_hunt(tg: int, message_id: int = None, chat_id: int = None) -> int:
     """开始车库游戏"""
     with Session() as session:
         try:
@@ -351,7 +353,9 @@ def sql_start_hunt(tg: int) -> int:
                 start_time=datetime.datetime.now(),
                 game_date=today,
                 is_active=True,
-                daily_car_info=daily_car_info
+                daily_car_info=daily_car_info,
+                message_id=message_id,
+                chat_id=chat_id
             )
             session.add(hunt)
             session.commit()
@@ -363,6 +367,22 @@ def sql_start_hunt(tg: int) -> int:
             if "Unknown column" in str(e) or "doesn't exist" in str(e):
                 return -3  # 数据库结构问题
             return 0  # 其他未知错误
+
+
+def sql_update_hunt_message_info(hunt_id: int, message_id: int, chat_id: int) -> bool:
+    """更新车库游戏会话的消息信息"""
+    with Session() as session:
+        try:
+            hunt = session.query(Hunt).filter(Hunt.id == hunt_id).first()
+            if hunt:
+                hunt.message_id = message_id
+                hunt.chat_id = chat_id
+                session.commit()
+                return True
+            return False
+        except Exception as e:
+            LOGGER.error(f"Error updating hunt message info: {e}")
+            return False
 
 
 def sql_get_equipment_definition(equipment_id: int):
@@ -746,7 +766,7 @@ def sql_clear_user_equipment(tg: int, today_only: bool = True) -> bool:
 
 
 def sql_cleanup_timed_out_hunts():
-    """清理超时的车库游戏"""
+    """清理超时的车库游戏并返回需要删除的消息信息"""
     with Session() as session:
         try:
             current_time = datetime.datetime.now()
@@ -757,14 +777,25 @@ def sql_cleanup_timed_out_hunts():
                 and_(Hunt.is_active == True, Hunt.start_time < timeout_threshold)
             ).all()
             
+            # 收集需要删除的消息信息
+            messages_to_delete = []
             for hunt in timed_out_hunts:
+                if hunt.message_id and hunt.chat_id:
+                    messages_to_delete.append({
+                        'chat_id': hunt.chat_id,
+                        'message_id': hunt.message_id,
+                        'hunt_id': hunt.id
+                    })
                 hunt.end_time = current_time
                 hunt.is_active = False
             
             if timed_out_hunts:
                 session.commit()
-        except:
-            pass
+                
+            return messages_to_delete
+        except Exception as e:
+            LOGGER.error(f"清理超时游戏失败: {e}")
+            return []
 
 
 def sql_update_hunt_stats(hunt_id: int, last_hunt_time: datetime.datetime) -> bool:
@@ -800,7 +831,7 @@ def sql_update_bulk_hunt_stats(hunt_id: int, last_hunt_time: datetime.datetime, 
 
 
 def sql_cleanup_idle_hunts():
-    """清理超过5分钟无活动的游戏会话"""
+    """清理超过5分钟无活动的游戏会话并返回需要删除的消息信息"""
     with Session() as session:
         try:
             current_time = datetime.datetime.now()
@@ -818,14 +849,25 @@ def sql_cleanup_idle_hunts():
                 )
             ).all()
             
+            # 收集需要删除的消息信息
+            messages_to_delete = []
             for hunt in idle_hunts:
+                if hunt.message_id and hunt.chat_id:
+                    messages_to_delete.append({
+                        'chat_id': hunt.chat_id,
+                        'message_id': hunt.message_id,
+                        'hunt_id': hunt.id
+                    })
                 hunt.end_time = current_time
                 hunt.is_active = False
             
             if idle_hunts:
                 session.commit()
-        except:
-            pass
+                
+            return messages_to_delete
+        except Exception as e:
+            LOGGER.error(f"清理闲置游戏失败: {e}")
+            return []
 
 
 def sql_get_reward_button(car_id: int):
@@ -978,17 +1020,20 @@ def sql_give_assembly_reward(tg: int, car_id: int) -> dict:
             today = datetime.datetime.now().strftime("%Y-%m-%d")
             current_time = datetime.datetime.now()
             
-            # 检查是否已经获得过奖励
-            existing_reward = session.query(AssemblyReward).filter(
-                and_(
-                    AssemblyReward.tg == tg,
-                    AssemblyReward.car_id == car_id,
-                    AssemblyReward.obtained_date == today
-                )
-            ).first()
+            # 对于白名单奖励，检查是否曾经获得过（终身限制）
+            if reward_config.reward_type == "white":
+                existing_reward = session.query(AssemblyReward).filter(
+                    and_(
+                        AssemblyReward.tg == tg,
+                        AssemblyReward.car_id == car_id,
+                        AssemblyReward.reward_type == "white"
+                    )
+                ).first()
+                
+                if existing_reward:
+                    return {"success": False, "message": "该奖励每人仅能获得一次"}
             
-            if existing_reward:
-                return {"success": False, "message": "今日已获得此汽车的奖励"}
+            # 对于 coins, title, badge, code 奖励，不限制重复获得
             
             # 处理不同类型的奖励
             if reward_config.reward_type == "coins":
@@ -1068,6 +1113,52 @@ def sql_give_assembly_reward(tg: int, car_id: int) -> dict:
                     "reward_value": reward_config.reward_value,
                     "description": reward_config.reward_description,
                     "message": f"恭喜获得{reward_config.reward_value}个白名单！请联系 @MEBimmerSupportBot 领取"
+                }
+            
+            # 称号奖励
+            elif reward_config.reward_type == "title":
+                reward_record = AssemblyReward(
+                    tg=tg,
+                    car_id=car_id,
+                    car_name=car.car_name,
+                    reward_type=reward_config.reward_type,
+                    reward_value=reward_config.reward_value,
+                    reward_description=reward_config.reward_description,
+                    obtained_date=today,
+                    obtained_time=current_time
+                )
+                session.add(reward_record)
+                session.commit()
+                
+                return {
+                    "success": True,
+                    "reward_type": "title",
+                    "reward_value": reward_config.reward_value,
+                    "description": reward_config.reward_description,
+                    "message": f"恭喜获得称号：{reward_config.reward_value}！"
+                }
+            
+            # 徽章奖励
+            elif reward_config.reward_type == "badge":
+                reward_record = AssemblyReward(
+                    tg=tg,
+                    car_id=car_id,
+                    car_name=car.car_name,
+                    reward_type=reward_config.reward_type,
+                    reward_value=reward_config.reward_value,
+                    reward_description=reward_config.reward_description,
+                    obtained_date=today,
+                    obtained_time=current_time
+                )
+                session.add(reward_record)
+                session.commit()
+                
+                return {
+                    "success": True,
+                    "reward_type": "badge",
+                    "reward_value": reward_config.reward_value,
+                    "description": reward_config.reward_description,
+                    "message": f"恭喜获得徽章：{reward_config.reward_value}！"
                 }
             
             return {"success": False, "message": "未知的奖励类型"}

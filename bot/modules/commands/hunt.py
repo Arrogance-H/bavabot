@@ -15,7 +15,7 @@ from bot.sql_helper.sql_hunt import (
     sql_get_user_equipment, sql_get_today_hunt_count, sql_get_total_hunt_actions, sql_get_today_hunt_actions, sql_get_daily_car,
     sql_get_equipment_definition, sql_random_equipment_by_rarity, sql_count_user_equipment,
     sql_update_hunt_stats, sql_get_cached_daily_car, sql_update_bulk_hunt_stats, sql_check_and_fix_hunt_table,
-    sql_clear_user_equipment
+    sql_clear_user_equipment, sql_update_hunt_message_info
 )
 
 
@@ -77,7 +77,7 @@ def hunt_game_ikb(hunt_id: int, last_hunt_time: int = 0):
     return ikb([
         [(hunt_btn_text, f"hunt_action_{hunt_id}")],
         [(bulk_10_text, f"hunt_bulk_action_{hunt_id}_10"), (bulk_50_text, f"hunt_bulk_action_{hunt_id}_50")],
-        [("❌ 结束游戏", f"hunt_end_{hunt_id}")]
+        [("❌ 结束游戏", f"hunt_end_{hunt_id}"), ("🏠 返回主页", "back_start")]
     ])
 
 
@@ -133,17 +133,30 @@ async def handle_game_completion(call, hunt_id: int, daily_car, equipment_found_
             elif reward_config.reward_type == "white":
                 reward_description = reward_config.reward_description
                 claim_info = "📞 请联系 @MEBimmerSupportBot 领取"
+            elif reward_config.reward_type == "title":
+                reward_description = reward_config.reward_description
+                claim_info = "✅称号已获得"
+            elif reward_config.reward_type == "badge":
+                reward_description = reward_config.reward_description
+                claim_info = "✅徽章已获得"
             else:
                 reward_description = reward_config.reward_description
                 claim_info = "请查看游戏详情"
         else:
-            # 发放失败的情况
-            if reward_config.reward_type == "coins":
-                reward_description = f"{reward_config.reward_value}{sakura_b}"
-                claim_info = "❌发放失败，请联系管理员"
-            else:
+            # 检查失败原因
+            error_message = reward_result.get("message", "")
+            if "该奖励每人仅能获得一次" in error_message:
+                # 仅白名单类型奖励显示终身限制提示
                 reward_description = reward_config.reward_description
-                claim_info = "❌奖励发放失败，请联系管理员"
+                claim_info = "✅已获得过（每人仅限一次）"
+            else:
+                # 其他发放失败的情况
+                if reward_config.reward_type == "coins":
+                    reward_description = f"{reward_config.reward_value}{sakura_b}"
+                    claim_info = "❌发放失败，请联系管理员"
+                else:
+                    reward_description = reward_config.reward_description
+                    claim_info = "❌奖励发放失败，请联系管理员"
     else:
         reward_description = "无奖励配置"
         claim_info = "无需领取"
@@ -268,7 +281,8 @@ async def start_hunt(_, msg):
         # 获取用户昵称
         user_nickname = msg.from_user.first_name
         
-        return await sendMessage(
+        # 发送游戏界面消息并更新hunt会话消息信息
+        hunt_message = await sendMessage(
             msg,
             f"🏎️ **寻宝游戏进行中**\n\n"
             f"👤 **{user_nickname}** 正在寻宝...\n\n"
@@ -279,6 +293,12 @@ async def start_hunt(_, msg):
             f"💪 继续您的寻宝之旅吧！",
             buttons=hunt_game_ikb(active_hunt.id)
         )
+        
+        # 更新现有hunt会话的消息信息
+        if hunt_message and hasattr(hunt_message, 'id'):
+            sql_update_hunt_message_info(active_hunt.id, hunt_message.id, hunt_message.chat.id)
+        
+        return
     
     # 开始新游戏
     hunt_id = sql_start_hunt(msg.from_user.id)
@@ -347,7 +367,8 @@ async def start_hunt(_, msg):
     user = sql_get_emby(msg.from_user.id)
     current_coins = user.iv if user else 0
     
-    await sendMessage(
+    # 发送游戏界面消息
+    hunt_message = await sendMessage(
         msg,
         f"🏎️ **寻宝游戏开始！**\n\n"
         f"👤 **{user_nickname}** 正在寻宝...\n\n"
@@ -361,6 +382,10 @@ async def start_hunt(_, msg):
         f"👇 点击下方按钮开始寻找装备！",
         buttons=hunt_game_ikb(hunt_id)
     )
+    
+    # 更新hunt会话的消息信息，以便会话过期时能自动删除消息
+    if hunt_message and hasattr(hunt_message, 'id'):
+        sql_update_hunt_message_info(hunt_id, hunt_message.id, hunt_message.chat.id)
 
 
 @bot.on_callback_query(filters.regex(r'^hunt_bulk_action_(\d+)_(\d+)$'))

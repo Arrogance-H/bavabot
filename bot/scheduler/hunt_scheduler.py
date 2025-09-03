@@ -3,10 +3,10 @@
 """
 import asyncio
 from datetime import datetime, timedelta
-from bot import LOGGER, schedall
+from bot import LOGGER, schedall, bot
 from bot.sql_helper.sql_hunt import sql_cleanup_expired_equipment, sql_cleanup_timed_out_hunts, sql_cleanup_idle_hunts
 from bot.sql_helper.sql_emby import get_all_emby
-from bot.sql_helper.sql_emby import get_all_emby
+from bot.func_helper.msg_utils import deleteMessage
 
 
 async def cleanup_hunt_equipment():
@@ -19,19 +19,61 @@ async def cleanup_hunt_equipment():
 
 
 async def cleanup_expired_hunts():
-    """清理超时的车库游戏"""
+    """清理超时的车库游戏并删除相关消息"""
     try:
-        sql_cleanup_timed_out_hunts()
-        LOGGER.info("【车库清理】超时游戏清理完成")
+        messages_to_delete = sql_cleanup_timed_out_hunts()
+        
+        # 删除相关的游戏界面消息
+        deleted_count = 0
+        for msg_info in messages_to_delete:
+            try:
+                # 创建一个模拟的消息对象用于删除
+                class MockMessage:
+                    def __init__(self, chat_id, message_id):
+                        self.chat = type('obj', (object,), {'id': chat_id})()
+                        self.id = message_id
+                
+                mock_msg = MockMessage(msg_info['chat_id'], msg_info['message_id'])
+                await deleteMessage(mock_msg)
+                deleted_count += 1
+                LOGGER.info(f"【车库清理】已删除超时游戏会话 {msg_info['hunt_id']} 的消息")
+            except Exception as e:
+                LOGGER.warning(f"【车库清理】删除消息失败 (hunt_id: {msg_info['hunt_id']}): {e}")
+        
+        if messages_to_delete:
+            LOGGER.info(f"【车库清理】超时游戏清理完成，删除了 {deleted_count}/{len(messages_to_delete)} 条消息")
+        else:
+            LOGGER.info("【车库清理】超时游戏清理完成")
     except Exception as e:
         LOGGER.error(f"【车库清理】清理超时游戏失败: {e}")
 
 
 async def cleanup_idle_hunts():
-    """清理闲置的车库游戏"""
+    """清理闲置的车库游戏并删除相关消息"""
     try:
-        sql_cleanup_idle_hunts()
-        LOGGER.info("【车库清理】闲置游戏清理完成")
+        messages_to_delete = sql_cleanup_idle_hunts()
+        
+        # 删除相关的游戏界面消息
+        deleted_count = 0
+        for msg_info in messages_to_delete:
+            try:
+                # 创建一个模拟的消息对象用于删除
+                class MockMessage:
+                    def __init__(self, chat_id, message_id):
+                        self.chat = type('obj', (object,), {'id': chat_id})()
+                        self.id = message_id
+                
+                mock_msg = MockMessage(msg_info['chat_id'], msg_info['message_id'])
+                await deleteMessage(mock_msg)
+                deleted_count += 1
+                LOGGER.info(f"【车库清理】已删除闲置游戏会话 {msg_info['hunt_id']} 的消息")
+            except Exception as e:
+                LOGGER.warning(f"【车库清理】删除消息失败 (hunt_id: {msg_info['hunt_id']}): {e}")
+        
+        if messages_to_delete:
+            LOGGER.info(f"【车库清理】闲置游戏清理完成，删除了 {deleted_count}/{len(messages_to_delete)} 条消息")
+        else:
+            LOGGER.info("【车库清理】闲置游戏清理完成")
     except Exception as e:
         LOGGER.error(f"【车库清理】清理闲置游戏失败: {e}")
 
