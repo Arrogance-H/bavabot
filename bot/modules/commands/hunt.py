@@ -313,9 +313,8 @@ async def start_hunt(_, msg):
             # 修复成功，重试开始游戏
             hunt_id = sql_start_hunt(msg.from_user.id)
             if hunt_id > 0:
-                # 成功了，向用户报告修复成功
-                await sendMessage(msg, "✅ 数据库结构已自动修复！正在启动游戏...", delete_delay=3)
-                # 继续正常流程（不return）
+                # 成功了，继续正常游戏流程，不显示修复消息给用户
+                pass  # 继续正常流程
             else:
                 return await sendMessage(msg, 
                     "❌ 数据库已自动修复，但游戏启动仍失败\n\n"
@@ -378,7 +377,7 @@ async def start_hunt(_, msg):
         f"{reward_text}\n"
         f"🔧 需要装备:\n{equipment_display}\n"
         f"💰 每次寻找消耗 1{sakura_b}\n"
-        f"💰 当前{sakura_b}: {current_coins}{sakura_b}\n"
+        f"💰 当前{sakura_b}: {current_coins}\n"
         f"🕹️ 今日剩余游戏次数: {config.hunt_daily_limit - today_count - 1}\n"
         f"📊 今日寻宝次数: {sql_get_today_hunt_actions(msg.from_user.id)}次\n\n"
         f"👇 点击下方按钮开始寻找装备！",
@@ -409,7 +408,7 @@ async def hunt_bulk_action(_, call):
     required_coins = quantity
     user = sql_get_emby(call.from_user.id)
     if not user or user.iv < required_coins:
-        return await callAnswer(call, f"❌ {sakura_b}不足，批量寻找{quantity}次需要 {required_coins}{sakura_b}", show_alert=True)
+        return await callAnswer(call, f"❌ {sakura_b}不足，批量寻找{quantity}次需要 {required_coins} {sakura_b}", show_alert=True)
     
     # 扣除金币
     if not sql_update_emby(Emby.tg == call.from_user.id, iv=user.iv - required_coins):
@@ -532,7 +531,7 @@ async def hunt_action(_, call):
     # 检查用户金币
     user = sql_get_emby(call.from_user.id)
     if not user or user.iv < 1:
-        return await callAnswer(call, f"❌ {sakura_b}不足，需要 1{sakura_b}", show_alert=True)
+        return await callAnswer(call, f"❌ {sakura_b}不足，需要 1 {sakura_b}", show_alert=True)
     
     # 扣除金币
     if not sql_update_emby(Emby.tg == call.from_user.id, iv=user.iv - 1):
