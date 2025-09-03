@@ -15,7 +15,7 @@ from bot.sql_helper.sql_hunt import (
     sql_get_user_equipment, sql_get_today_hunt_count, sql_get_total_hunt_actions, sql_get_today_hunt_actions, sql_get_daily_car,
     sql_get_equipment_definition, sql_random_equipment_by_rarity, sql_count_user_equipment,
     sql_update_hunt_stats, sql_get_cached_daily_car, sql_update_bulk_hunt_stats, sql_check_and_fix_hunt_table,
-    sql_clear_user_equipment
+    sql_clear_user_equipment, sql_update_hunt_message_info
 )
 
 
@@ -281,7 +281,8 @@ async def start_hunt(_, msg):
         # 获取用户昵称
         user_nickname = msg.from_user.first_name
         
-        return await sendMessage(
+        # 发送游戏界面消息并更新hunt会话消息信息
+        hunt_message = await sendMessage(
             msg,
             f"🏎️ **寻宝游戏进行中**\n\n"
             f"👤 **{user_nickname}** 正在寻宝...\n\n"
@@ -292,6 +293,12 @@ async def start_hunt(_, msg):
             f"💪 继续您的寻宝之旅吧！",
             buttons=hunt_game_ikb(active_hunt.id)
         )
+        
+        # 更新现有hunt会话的消息信息
+        if hunt_message and hasattr(hunt_message, 'id'):
+            sql_update_hunt_message_info(active_hunt.id, hunt_message.id, hunt_message.chat.id)
+        
+        return
     
     # 开始新游戏
     hunt_id = sql_start_hunt(msg.from_user.id)
@@ -360,7 +367,8 @@ async def start_hunt(_, msg):
     user = sql_get_emby(msg.from_user.id)
     current_coins = user.iv if user else 0
     
-    await sendMessage(
+    # 发送游戏界面消息
+    hunt_message = await sendMessage(
         msg,
         f"🏎️ **寻宝游戏开始！**\n\n"
         f"👤 **{user_nickname}** 正在寻宝...\n\n"
@@ -374,6 +382,10 @@ async def start_hunt(_, msg):
         f"👇 点击下方按钮开始寻找装备！",
         buttons=hunt_game_ikb(hunt_id)
     )
+    
+    # 更新hunt会话的消息信息，以便会话过期时能自动删除消息
+    if hunt_message and hasattr(hunt_message, 'id'):
+        sql_update_hunt_message_info(hunt_id, hunt_message.id, hunt_message.chat.id)
 
 
 @bot.on_callback_query(filters.regex(r'^hunt_bulk_action_(\d+)_(\d+)$'))
