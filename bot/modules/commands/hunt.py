@@ -307,25 +307,27 @@ async def start_hunt(_, msg):
     elif hunt_id == -2:
         return await sendMessage(msg, "❌ 您已有进行中的游戏，请先结束当前游戏")
     elif hunt_id == -3:
-        # 数据库结构问题，尝试修复
+        # 数据库结构问题，尝试自动修复
+        LOGGER.info("🔧 Attempting automatic database structure fix...")
         if sql_check_and_fix_hunt_table():
             # 修复成功，重试开始游戏
             hunt_id = sql_start_hunt(msg.from_user.id)
             if hunt_id > 0:
-                # 成功了，继续正常流程
-                pass
+                # 成功了，向用户报告修复成功
+                await sendMessage(msg, "✅ 数据库结构已自动修复！正在启动游戏...", delete_delay=3)
+                # 继续正常流程（不return）
             else:
                 return await sendMessage(msg, 
-                    "❌ 数据库已修复，但游戏启动仍失败\n\n"
-                    "🔧 请管理员运行数据库重构脚本：\n"
-                    "`python3 reconstruct_hunt_database.py --backup`\n\n"
-                    "或查看 HUNT_RECONSTRUCTION_README.md 获取详细说明")
+                    "❌ 数据库已自动修复，但游戏启动仍失败\n\n"
+                    "🔧 请运行修复工具：\n"
+                    "`python3 fix_hunt_database.py`\n\n"
+                    "💡 或联系管理员检查数据库配置")
         else:
             return await sendMessage(msg, 
-                "❌ 数据库结构需要重构以兼容当前游戏代码\n\n"
-                "🔧 请管理员运行以下命令：\n"
-                "`python3 reconstruct_hunt_database.py --backup`\n\n"
-                "📖 详细说明请查看：HUNT_RECONSTRUCTION_README.md")
+                "❌ 数据库结构需要修复，自动修复失败\n\n"
+                "🔧 请在Docker容器中运行：\n"
+                "`python3 fix_hunt_database.py`\n\n"
+                "💡 选择'自动修复数据库结构'选项")
     elif hunt_id == 0:
         return await sendMessage(msg, "❌ 开始游戏失败，请稍后再试")
     
