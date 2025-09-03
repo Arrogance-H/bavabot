@@ -19,6 +19,38 @@ from bot.sql_helper.sql_hunt import (
 )
 
 
+async def can_auto_delete_message(message) -> bool:
+    """检查消息是否可以自动删除"""
+    try:
+        # 检查消息对象是否有效
+        if not message or not hasattr(message, 'chat'):
+            return False
+        
+        # 检查是否是私聊（私聊中机器人总是可以删除自己的消息）
+        if message.chat.type == 'private':
+            return True
+            
+        # 检查群聊中的删除权限
+        if message.chat.type in ['group', 'supergroup']:
+            try:
+                # 获取机器人在群组中的权限
+                bot_member = await bot.get_chat_member(message.chat.id, bot.me.id)
+                # 检查是否有删除消息权限
+                if hasattr(bot_member, 'can_delete_messages') and bot_member.can_delete_messages:
+                    return True
+                # 检查是否是管理员（管理员通常有删除权限）
+                if hasattr(bot_member, 'status') and bot_member.status in ['administrator', 'creator']:
+                    return True
+            except Exception as e:
+                LOGGER.warning(f"检查删除权限失败: {e}")
+                return False
+        
+        return False
+    except Exception as e:
+        LOGGER.error(f"检查消息删除能力失败: {e}")
+        return False
+
+
 async def delete_message_after_delay(message, delay_seconds: int):
     """在指定延迟后删除消息"""
     try:
@@ -357,7 +389,11 @@ async def start_hunt(_, msg):
     # 检查白名单用户是否参加白名单奖励游戏
     if user.lv == 'a' and reward_config and reward_config.reward_type == 'white':
         msg_obj = await sendMessage(msg, "❌ 您已是白名单用户")
-        asyncio.create_task(delete_message_after_delay(msg_obj, 30))
+        # 检查当前提示是否可以自动删除
+        if await can_auto_delete_message(msg_obj):
+            asyncio.create_task(delete_message_after_delay(msg_obj, 30))
+        else:
+            LOGGER.warning(f"无法自动删除白名单用户提示消息 (chat_id: {msg.chat.id}, user_id: {msg.from_user.id})")
         return
         
     
