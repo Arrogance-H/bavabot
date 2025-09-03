@@ -560,6 +560,20 @@ def sql_get_total_hunt_actions(tg: int) -> int:
             return 0
 
 
+def sql_get_today_hunt_actions(tg: int) -> int:
+    """获取用户今日寻找装备次数(实际操作次数)"""
+    with Session() as session:
+        try:
+            today = datetime.datetime.now().strftime("%Y-%m-%d")
+            # 汇总今日hunt会话的hunt_actions
+            result = session.query(func.sum(Hunt.hunt_actions)).filter(
+                and_(Hunt.tg == tg, Hunt.game_date == today)
+            ).scalar()
+            return result if result else 0
+        except:
+            return 0
+
+
 def sql_get_daily_car(date: str = None):
     """获取每日汽车"""
     if not date:

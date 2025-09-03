@@ -173,16 +173,12 @@ async def hunt_statistics(_, msg):
             
             # 今日游戏统计
             today_hunts = session.query(Hunt).filter(Hunt.game_date == today).count()
-            today_equipment = session.query(Equipment).filter(Equipment.obtained_date == today).count()
+            today_participants = session.query(func.count(func.distinct(Hunt.tg))).filter(Hunt.game_date == today).scalar()
             today_reward_users = session.query(func.count(func.distinct(AssemblyReward.tg))).filter(AssemblyReward.obtained_date == today).scalar()
             
             # 用户个人统计
             user_today_hunts = session.query(Hunt).filter(
                 Hunt.tg == msg.from_user.id, Hunt.game_date == today
-            ).count()
-            
-            user_today_equipment = session.query(Equipment).filter(
-                Equipment.tg == msg.from_user.id, Equipment.obtained_date == today
             ).count()
             
             user_today_rewards = session.query(AssemblyReward).filter(
@@ -194,12 +190,11 @@ async def hunt_statistics(_, msg):
             stats_text = f"📊 **寻宝游戏统计**\n\n"
             stats_text += f"📅 **今日全服数据:**\n"
             stats_text += f"🎮 游戏场次: {today_hunts}\n"
-            stats_text += f"🔍 发现装备: {today_equipment}\n"
+            stats_text += f"👥 参与人数: {today_participants}\n"
             stats_text += f"🏆 获奖用户: {today_reward_users}\n\n"
             
             stats_text += f"👤 **您的今日数据:**\n"
             stats_text += f"🎮 游戏场次: {user_today_hunts}/{config.hunt_daily_limit}\n"
-            stats_text += f"🔍 发现装备: {user_today_equipment}\n"
             stats_text += f"🏆 是否获奖: {'是' if user_has_rewards else '否'}\n"
             
             stats_msg = await sendMessage(msg, stats_text)
