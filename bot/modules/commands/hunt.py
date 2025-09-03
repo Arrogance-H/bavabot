@@ -133,13 +133,23 @@ async def handle_game_completion(call, hunt_id: int, daily_car, equipment_found_
             elif reward_config.reward_type == "white":
                 reward_description = reward_config.reward_description
                 claim_info = "📞 请联系 @MEBimmerSupportBot 领取"
+            elif reward_config.reward_type == "title":
+                reward_description = reward_config.reward_description
+                claim_info = "✅称号已获得"
+            elif reward_config.reward_type == "badge":
+                reward_description = reward_config.reward_description
+                claim_info = "✅徽章已获得"
             else:
                 reward_description = reward_config.reward_description
                 claim_info = "请查看游戏详情"
         else:
             # 检查是否是重复奖励的情况
             error_message = reward_result.get("message", "")
-            if "今日已获得此汽车的奖励" in error_message:
+            if "该奖励每人仅能获得一次" in error_message:
+                # 白名单类型奖励，显示终身限制提示
+                reward_description = reward_config.reward_description
+                claim_info = "✅已获得过（每人仅限一次）"
+            elif "今日已获得此汽车的奖励" in error_message:
                 # 用户今日已获得此奖励，显示提示信息
                 if reward_config.reward_type == "coins":
                     reward_description = f"{reward_config.reward_value}{sakura_b}"

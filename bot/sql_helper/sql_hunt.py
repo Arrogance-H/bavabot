@@ -978,17 +978,20 @@ def sql_give_assembly_reward(tg: int, car_id: int) -> dict:
             today = datetime.datetime.now().strftime("%Y-%m-%d")
             current_time = datetime.datetime.now()
             
-            # 检查是否已经获得过奖励
-            existing_reward = session.query(AssemblyReward).filter(
-                and_(
-                    AssemblyReward.tg == tg,
-                    AssemblyReward.car_id == car_id,
-                    AssemblyReward.obtained_date == today
-                )
-            ).first()
+            # 对于白名单奖励，检查是否曾经获得过（终身限制）
+            if reward_config.reward_type == "white":
+                existing_reward = session.query(AssemblyReward).filter(
+                    and_(
+                        AssemblyReward.tg == tg,
+                        AssemblyReward.car_id == car_id,
+                        AssemblyReward.reward_type == "white"
+                    )
+                ).first()
+                
+                if existing_reward:
+                    return {"success": False, "message": "该奖励每人仅能获得一次"}
             
-            if existing_reward:
-                return {"success": False, "message": "今日已获得此汽车的奖励"}
+            # 对于 coins, title, badge, code 奖励，不限制重复获得
             
             # 处理不同类型的奖励
             if reward_config.reward_type == "coins":
@@ -1068,6 +1071,52 @@ def sql_give_assembly_reward(tg: int, car_id: int) -> dict:
                     "reward_value": reward_config.reward_value,
                     "description": reward_config.reward_description,
                     "message": f"恭喜获得{reward_config.reward_value}个白名单！请联系 @MEBimmerSupportBot 领取"
+                }
+            
+            # 称号奖励
+            elif reward_config.reward_type == "title":
+                reward_record = AssemblyReward(
+                    tg=tg,
+                    car_id=car_id,
+                    car_name=car.car_name,
+                    reward_type=reward_config.reward_type,
+                    reward_value=reward_config.reward_value,
+                    reward_description=reward_config.reward_description,
+                    obtained_date=today,
+                    obtained_time=current_time
+                )
+                session.add(reward_record)
+                session.commit()
+                
+                return {
+                    "success": True,
+                    "reward_type": "title",
+                    "reward_value": reward_config.reward_value,
+                    "description": reward_config.reward_description,
+                    "message": f"恭喜获得称号：{reward_config.reward_value}！"
+                }
+            
+            # 徽章奖励
+            elif reward_config.reward_type == "badge":
+                reward_record = AssemblyReward(
+                    tg=tg,
+                    car_id=car_id,
+                    car_name=car.car_name,
+                    reward_type=reward_config.reward_type,
+                    reward_value=reward_config.reward_value,
+                    reward_description=reward_config.reward_description,
+                    obtained_date=today,
+                    obtained_time=current_time
+                )
+                session.add(reward_record)
+                session.commit()
+                
+                return {
+                    "success": True,
+                    "reward_type": "badge",
+                    "reward_value": reward_config.reward_value,
+                    "description": reward_config.reward_description,
+                    "message": f"恭喜获得徽章：{reward_config.reward_value}！"
                 }
             
             return {"success": False, "message": "未知的奖励类型"}
