@@ -1,0 +1,25 @@
+{
+  "bot_name": "testbot",
+  "bot_token": "dummy_token",
+  "owner_api": 123456,
+  "owner_hash": "dummy_hash",
+  "owner": "testowner",
+  "group": ["-100123456"],
+  "main_group": "testgroup",
+  "chanel": "testchannel",
+  "bot_photo": "https://example.com/photo.png",
+  "admins": [],
+  "money": "Coins",
+  "emby_api": "dummy_api",
+  "emby_url": "http://127.0.0.1:8096",
+  "emby_line": "example.com",
+  "db_host": "localhost",
+  "db_user": "root",
+  "db_pwd": "password",
+  "db_name": "bavabot",
+  "db_port": 3306,
+  "hunt_daily_limit": 5,
+  "hunt": {
+    "rewards": {}
+  }
+}
