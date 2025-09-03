@@ -353,6 +353,11 @@ async def start_hunt(_, msg):
     # 获取奖励信息
     from bot.sql_helper.sql_hunt import sql_get_reward_config
     reward_config = sql_get_reward_config(daily_car.id)
+    
+    # 检查白名单用户是否参加白名单奖励游戏
+    if user.lv == 'a' and reward_config and reward_config.reward_type == 'white':
+        return await sendMessage(msg, "❌ 您已是白名单用户")
+    
     reward_text = ""
     if reward_config:
         if reward_config.reward_type == "coins":
@@ -364,7 +369,6 @@ async def start_hunt(_, msg):
     user_nickname = msg.from_user.first_name
     
     # 获取用户当前金币
-    user = sql_get_emby(msg.from_user.id)
     current_coins = user.iv if user else 0
     
     # 发送游戏界面消息
