@@ -411,7 +411,7 @@ async def hunt_bulk_action(_, call):
     required_coins = quantity
     user = sql_get_emby(call.from_user.id)
     if not user or user.iv < required_coins:
-        return await callAnswer(call, f"❌ {sakura_b}不足，批量寻找{quantity}次需要 {required_coins} 个", show_alert=True)
+        return await callAnswer(call, f"❌ {sakura_b}不足，寻找{quantity}次需要 {required_coins} 个", show_alert=True)
     
     # 扣除金币
     if not sql_update_emby(Emby.tg == call.from_user.id, iv=user.iv - required_coins):
