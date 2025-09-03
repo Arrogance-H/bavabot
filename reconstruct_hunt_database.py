@@ -39,15 +39,25 @@ def load_config_standalone():
         with open(config_file, 'r', encoding='utf-8') as f:
             config = json.load(f)
             
-        required_keys = ['db_host', 'db_user', 'db_pwd', 'db_name', 'db_port']
+        # Required keys - db_port is optional and defaults to 3306
+        required_keys = ['db_host', 'db_user', 'db_pwd', 'db_name']
         missing_keys = [key for key in required_keys if key not in config]
         
         if missing_keys:
             print(f"✗ Missing database configuration keys: {missing_keys}")
             return None
             
+        # Return config with defaults for optional fields
+        result = {
+            'db_host': config['db_host'],
+            'db_user': config['db_user'],
+            'db_pwd': config['db_pwd'],
+            'db_name': config['db_name'],
+            'db_port': config.get('db_port', 3306)  # Default to 3306 if not specified
+        }
+            
         print("✓ Database configuration loaded from config.json")
-        return config
+        return result
         
     except Exception as e:
         print(f"✗ Failed to load configuration: {e}")
