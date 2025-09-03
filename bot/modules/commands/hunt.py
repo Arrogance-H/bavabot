@@ -159,9 +159,7 @@ async def handle_game_completion(call, hunt_id: int, daily_car, equipment_found_
         LOGGER.warning(f"清空用户 {call.from_user.id} 装备失败")
     
     # 编辑当前消息显示简化的完成信息
-    await editMessage(call, message_text, buttons=ikb([
-        [("🏠 返回开始页面", "back_start")]
-    ]))
+    await editMessage(call, message_text)
     
     # 发送独立的完成通知消息
     completion_time = datetime.datetime.now()
@@ -684,9 +682,7 @@ async def hunt_end(_, call):
         result_text += f"\n💡 记住：装备仅当天有效哦！\n☺️ 感谢参与寻宝游戏！"
         
         await callAnswer(call, "🏁 游戏结束")
-        await editMessage(call, result_text, buttons=ikb([
-            [("🏠 返回开始页面", "back_start")]
-        ]))
+        await editMessage(call, result_text)
         
         # 5分钟后删除结束消息（游戏结束后自动删除）
         asyncio.create_task(delete_message_after_delay(call.message, 300))  # 300秒 = 5分钟
