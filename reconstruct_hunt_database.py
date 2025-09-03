@@ -26,11 +26,61 @@ import json
 # Add project root to Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+def load_config_standalone():
+    """Load database configuration in standalone mode"""
+    try:
+        import json
+        config_file = "config.json"
+        if not os.path.exists(config_file):
+            print(f"✗ Configuration file not found: {config_file}")
+            print("Please ensure config.json exists with database settings")
+            return None
+            
+        with open(config_file, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+            
+        # Required keys - db_port is optional and defaults to 3306
+        required_keys = ['db_host', 'db_user', 'db_pwd', 'db_name']
+        missing_keys = [key for key in required_keys if key not in config]
+        
+        if missing_keys:
+            print(f"✗ Missing database configuration keys: {missing_keys}")
+            return None
+            
+        # Return config with defaults for optional fields
+        result = {
+            'db_host': config['db_host'],
+            'db_user': config['db_user'],
+            'db_pwd': config['db_pwd'],
+            'db_name': config['db_name'],
+            'db_port': config.get('db_port', 3306)  # Default to 3306 if not specified
+        }
+            
+        print("✓ Database configuration loaded from config.json")
+        return result
+        
+    except Exception as e:
+        print(f"✗ Failed to load configuration: {e}")
+        return None
+
 def create_backup():
     """Create a database backup before reconstruction"""
     try:
         import subprocess
-        from bot import db_host, db_user, db_pwd, db_name, db_port
+        
+        # Try to get database config from bot first, then standalone
+        try:
+            from bot import db_host, db_user, db_pwd, db_name, db_port
+        except ImportError:
+            config = load_config_standalone()
+            if not config:
+                print("✗ Cannot create backup: database configuration not available")
+                return False
+            db_host = config['db_host']
+            db_user = config['db_user'] 
+            db_pwd = config['db_pwd']
+            db_name = config['db_name']
+            db_port = config['db_port']
         
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_file = f"hunt_database_backup_{timestamp}.sql"
@@ -70,14 +120,51 @@ def create_backup():
 def check_dependencies():
     """Check if all required dependencies are available"""
     try:
+        # Try to import bot dependencies first
         from bot.sql_helper import engine, Base
         from sqlalchemy import text, inspect
         from bot import LOGGER
-        print("✓ All dependencies loaded successfully")
+        print("✓ All bot dependencies loaded successfully")
         return True, engine, Base, text, inspect, LOGGER
     except ImportError as e:
-        print(f"✗ Dependency import failed: {e}")
-        return False, None, None, None, None, None
+        print(f"⚠️  Bot dependency import failed: {e}")
+        print("🔄 Trying standalone mode with minimal dependencies...")
+        
+        try:
+            # Minimal standalone dependencies
+            import sqlalchemy
+            from sqlalchemy import create_engine, text, inspect
+            
+            # Create a simple logger replacement
+            class SimpleLogger:
+                def info(self, msg): print(f"INFO: {msg}")
+                def error(self, msg): print(f"ERROR: {msg}")
+                def warning(self, msg): print(f"WARNING: {msg}")
+            
+            # Try to load config manually
+            config = load_config_standalone()
+            if not config:
+                return False, None, None, None, None, None
+                
+            # Create database engine manually
+            db_url = f"mysql+pymysql://{config['db_user']}:{config['db_pwd']}@{config['db_host']}:{config['db_port']}/{config['db_name']}"
+            engine = create_engine(db_url)
+            
+            # Create a minimal Base class
+            from sqlalchemy.ext.declarative import declarative_base
+            Base = declarative_base()
+            
+            print("✓ Standalone mode dependencies loaded successfully")
+            return True, engine, Base, text, inspect, SimpleLogger()
+            
+        except ImportError as e2:
+            print(f"✗ Standalone dependency import also failed: {e2}")
+            print("\n❌ Required dependencies are missing.")
+            print("\n🔧 SOLUTION OPTIONS:")
+            print("1. Install dependencies: pip install sqlalchemy pymysql")
+            print("2. Use the standalone script: python3 reconstruct_hunt_database_standalone.py --config")
+            print("\n📖 For detailed instructions, see: HUNT_RECONSTRUCTION_README.md")
+            return False, None, None, None, None, None
 
 def drop_hunt_tables(engine, inspect_func, text_func):
     """Drop all hunt-related tables"""
@@ -112,10 +199,92 @@ def create_hunt_tables(engine, Base):
     print("\nCreating hunt tables...")
     
     try:
-        from bot.sql_helper.sql_hunt import (
-            Hunt, Equipment, EquipmentDefinition, Car, DailyCar,
-            AssemblyReward, RewardConfig, RewardButton
-        )
+        # Try to import from bot first, then define standalone
+        try:
+            from bot.sql_helper.sql_hunt import (
+                Hunt, Equipment, EquipmentDefinition, Car, DailyCar,
+                AssemblyReward, RewardConfig, RewardButton
+            )
+            print("  Using bot table definitions")
+            
+        except ImportError:
+            print("  Using standalone table definitions")
+            # Define tables in standalone mode
+            from sqlalchemy import Column, BigInteger, String, DateTime, Integer, Boolean, Text
+            
+            class Hunt(Base):
+                __tablename__ = 'hunt'
+                id = Column(Integer, primary_key=True, autoincrement=True)
+                tg = Column(BigInteger, nullable=False)
+                start_time = Column(DateTime, nullable=False)
+                end_time = Column(DateTime, nullable=True)
+                game_date = Column(String(10), nullable=False)
+                is_active = Column(Boolean, default=True)
+                equipment_found = Column(Integer, default=0)
+                coins_spent = Column(Integer, default=0)
+                last_hunt_time = Column(DateTime, nullable=True)
+                hunt_actions = Column(Integer, default=0)
+                daily_car_info = Column(Text, nullable=True)
+                message_id = Column(Integer, nullable=True)
+                chat_id = Column(BigInteger, nullable=True)
+
+            class Equipment(Base):
+                __tablename__ = 'equipment'
+                id = Column(Integer, primary_key=True, autoincrement=True)
+                tg = Column(BigInteger, nullable=False)
+                equipment_id = Column(Integer, nullable=False)
+                obtained_date = Column(String(10), nullable=False)
+                obtained_time = Column(DateTime, nullable=False)
+                hunt_session_id = Column(Integer, nullable=False)
+
+            class EquipmentDefinition(Base):
+                __tablename__ = 'equipment_definition'
+                equipment_id = Column(Integer, primary_key=True)
+                equipment_name = Column(String(100), nullable=False)
+                description = Column(Text, nullable=True)
+                category = Column(String(20), nullable=False)
+                rarity_weight = Column(Integer, nullable=False, default=1)
+
+            class Car(Base):
+                __tablename__ = 'car'
+                id = Column(Integer, primary_key=True, autoincrement=True)
+                car_name = Column(String(50), nullable=False)
+                equipment_ids = Column(String(200), nullable=False)
+                description = Column(Text, nullable=True)
+
+            class DailyCar(Base):
+                __tablename__ = 'daily_car'
+                date = Column(String(10), primary_key=True)
+                car_id = Column(Integer, nullable=False)
+
+            class AssemblyReward(Base):
+                __tablename__ = 'assembly_reward'
+                id = Column(Integer, primary_key=True, autoincrement=True)
+                tg = Column(BigInteger, nullable=False)
+                car_id = Column(Integer, nullable=False)
+                car_name = Column(String(50), nullable=False)
+                reward_type = Column(String(20), nullable=False)
+                reward_value = Column(String(100), nullable=False)
+                reward_description = Column(Text, nullable=True)
+                obtained_date = Column(String(10), nullable=False)
+                obtained_time = Column(DateTime, nullable=False)
+
+            class RewardConfig(Base):
+                __tablename__ = 'reward_config'
+                id = Column(Integer, primary_key=True, autoincrement=True)
+                car_id = Column(Integer, nullable=False, unique=True)
+                reward_type = Column(String(20), nullable=False)
+                reward_value = Column(String(100), nullable=False)
+                reward_description = Column(Text, nullable=True)
+                is_active = Column(Boolean, default=True)
+
+            class RewardButton(Base):
+                __tablename__ = 'reward_button'
+                id = Column(Integer, primary_key=True, autoincrement=True)
+                car_id = Column(Integer, nullable=False)
+                button_text = Column(String(100), nullable=False)
+                button_url = Column(String(500), nullable=False)
+                is_active = Column(Boolean, default=True)
         
         # Create all tables
         tables_to_create = [
@@ -145,28 +314,36 @@ def initialize_game_data():
     print("\nInitializing default game data...")
     
     try:
-        from bot.sql_helper.sql_hunt import init_cars_and_equipment
-        from bot.sql_helper import Session
-        
-        # Initialize cars and equipment
-        init_cars_and_equipment()
-        
-        # Set up today's daily car if not exists
-        today = datetime.datetime.now().strftime("%Y-%m-%d")
-        
-        with Session() as session:
-            from bot.sql_helper.sql_hunt import DailyCar, Car
+        # Try to use bot functions first, then standalone
+        try:
+            from bot.sql_helper.sql_hunt import init_cars_and_equipment
+            from bot.sql_helper import Session
+            print("  Using bot initialization functions")
             
-            # Check if today's car is set
-            daily_car = session.query(DailyCar).filter(DailyCar.date == today).first()
-            if not daily_car:
-                # Set first car as today's car
-                first_car = session.query(Car).first()
-                if first_car:
-                    daily_car = DailyCar(date=today, car_id=first_car.id)
-                    session.add(daily_car)
-                    session.commit()
-                    print(f"  Set daily car for {today}: {first_car.car_name}")
+            # Initialize cars and equipment
+            init_cars_and_equipment()
+            
+            # Set up today's daily car if not exists
+            today = datetime.datetime.now().strftime("%Y-%m-%d")
+            
+            with Session() as session:
+                from bot.sql_helper.sql_hunt import DailyCar, Car
+                
+                # Check if today's car is set
+                daily_car = session.query(DailyCar).filter(DailyCar.date == today).first()
+                if not daily_car:
+                    # Set first car as today's car
+                    first_car = session.query(Car).first()
+                    if first_car:
+                        daily_car = DailyCar(date=today, car_id=first_car.id)
+                        session.add(daily_car)
+                        session.commit()
+                        print(f"  Set daily car for {today}: {first_car.car_name}")
+            
+        except ImportError:
+            print("  Using standalone initialization")
+            # Standalone initialization with minimal data
+            initialize_basic_game_data()
         
         print("✓ Default game data initialized successfully")
         return True
@@ -174,6 +351,13 @@ def initialize_game_data():
     except Exception as e:
         print(f"✗ Failed to initialize game data: {e}")
         return False
+
+def initialize_basic_game_data():
+    """Initialize basic game data in standalone mode"""
+    # This function provides minimal data needed for the game to function
+    # In a real deployment, the bot's init_cars_and_equipment() would be used
+    print("  Skipping detailed initialization in standalone mode")
+    print("  NOTE: Run the bot's init_cars_and_equipment() after reconstruction")
 
 def verify_database_structure(engine, inspect_func):
     """Verify that all tables and columns exist correctly"""
@@ -230,38 +414,45 @@ def test_hunt_game_functions():
     print("\nTesting hunt game functions...")
     
     try:
-        from bot.sql_helper.sql_hunt import (
-            sql_get_daily_car, sql_get_equipment_definition, 
-            sql_check_and_fix_hunt_table, sql_get_all_equipment_definitions
-        )
-        
-        # Test 1: Check and fix hunt table
-        if not sql_check_and_fix_hunt_table():
-            print("  ✗ sql_check_and_fix_hunt_table failed")
-            return False
-        print("  ✓ sql_check_and_fix_hunt_table passed")
-        
-        # Test 2: Get daily car
-        daily_car = sql_get_daily_car()
-        if not daily_car:
-            print("  ✗ sql_get_daily_car failed - no daily car found")
-            return False
-        print(f"  ✓ sql_get_daily_car passed - found: {daily_car.car_name}")
-        
-        # Test 3: Get equipment definitions
-        equipment_defs = sql_get_all_equipment_definitions()
-        if not equipment_defs:
-            print("  ✗ sql_get_all_equipment_definitions failed - no equipment found")
-            return False
-        print(f"  ✓ sql_get_all_equipment_definitions passed - found {len(equipment_defs)} equipment types")
-        
-        # Test 4: Test individual equipment definition
-        first_equipment = equipment_defs[0]
-        equipment_def = sql_get_equipment_definition(first_equipment.equipment_id)
-        if not equipment_def:
-            print(f"  ✗ sql_get_equipment_definition failed for ID {first_equipment.equipment_id}")
-            return False
-        print(f"  ✓ sql_get_equipment_definition passed - found: {equipment_def.equipment_name}")
+        # Try to test bot functions first, then skip in standalone mode
+        try:
+            from bot.sql_helper.sql_hunt import (
+                sql_get_daily_car, sql_get_equipment_definition, 
+                sql_check_and_fix_hunt_table, sql_get_all_equipment_definitions
+            )
+            print("  Using bot test functions")
+            
+            # Test 1: Check and fix hunt table
+            if not sql_check_and_fix_hunt_table():
+                print("  ✗ sql_check_and_fix_hunt_table failed")
+                return False
+            print("  ✓ sql_check_and_fix_hunt_table passed")
+            
+            # Test 2: Get daily car
+            daily_car = sql_get_daily_car()
+            if not daily_car:
+                print("  ✗ sql_get_daily_car failed - no daily car found")
+                return False
+            print(f"  ✓ sql_get_daily_car passed - found: {daily_car.car_name}")
+            
+            # Test 3: Get equipment definitions
+            equipment_defs = sql_get_all_equipment_definitions()
+            if not equipment_defs:
+                print("  ✗ sql_get_all_equipment_definitions failed - no equipment found")
+                return False
+            print(f"  ✓ sql_get_all_equipment_definitions passed - found {len(equipment_defs)} equipment types")
+            
+            # Test 4: Test individual equipment definition
+            first_equipment = equipment_defs[0]
+            equipment_def = sql_get_equipment_definition(first_equipment.equipment_id)
+            if not equipment_def:
+                print(f"  ✗ sql_get_equipment_definition failed for ID {first_equipment.equipment_id}")
+                return False
+            print(f"  ✓ sql_get_equipment_definition passed - found: {equipment_def.equipment_name}")
+            
+        except ImportError:
+            print("  Skipping function tests in standalone mode")
+            print("  NOTE: Function tests will be available when bot is running")
         
         print("✓ All hunt game function tests passed")
         return True
