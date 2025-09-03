@@ -143,20 +143,12 @@ async def handle_game_completion(call, hunt_id: int, daily_car, equipment_found_
                 reward_description = reward_config.reward_description
                 claim_info = "请查看游戏详情"
         else:
-            # 检查是否是重复奖励的情况
+            # 检查失败原因
             error_message = reward_result.get("message", "")
             if "该奖励每人仅能获得一次" in error_message:
-                # 白名单类型奖励，显示终身限制提示
+                # 仅白名单类型奖励显示终身限制提示
                 reward_description = reward_config.reward_description
                 claim_info = "✅已获得过（每人仅限一次）"
-            elif "今日已获得此汽车的奖励" in error_message:
-                # 用户今日已获得此奖励，显示提示信息
-                if reward_config.reward_type == "coins":
-                    reward_description = f"{reward_config.reward_value}{sakura_b}"
-                    claim_info = "✅今日已领取"
-                else:
-                    reward_description = reward_config.reward_description
-                    claim_info = "✅今日已领取"
             else:
                 # 其他发放失败的情况
                 if reward_config.reward_type == "coins":
