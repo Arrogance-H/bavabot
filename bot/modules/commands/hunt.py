@@ -77,7 +77,7 @@ def hunt_game_ikb(hunt_id: int, last_hunt_time: int = 0):
     return ikb([
         [(hunt_btn_text, f"hunt_action_{hunt_id}")],
         [(bulk_10_text, f"hunt_bulk_action_{hunt_id}_10"), (bulk_50_text, f"hunt_bulk_action_{hunt_id}_50")],
-        [("❌ 结束游戏", f"hunt_end_{hunt_id}"), ("🏠 返回主页", "back_start")]
+        [("❌ 结束游戏", f"hunt_end_{hunt_id}"), ("🏠 返回主页", f"hunt_game_{hunt_id}")]
     ])
 
 
