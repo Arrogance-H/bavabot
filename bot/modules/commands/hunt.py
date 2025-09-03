@@ -84,8 +84,7 @@ def hunt_game_ikb(hunt_id: int, last_hunt_time: int = 0):
 def hunt_whitelist_choice_ikb(hunt_id: int):
     """创建白名单用户选择按钮"""
     return ikb([
-        [("✅ 继续游戏", f"hunt_whitelist_continue_{hunt_id}")],
-        [("❌ 离开", f"hunt_whitelist_leave_{hunt_id}")]
+        [("✅ 继续游戏", f"hunt_whitelist_continue_{hunt_id}"), ("❌ 结束游戏", f"hunt_whitelist_leave_{hunt_id}")]
     ])
 
 
