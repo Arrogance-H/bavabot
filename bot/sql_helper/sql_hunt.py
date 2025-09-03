@@ -127,6 +127,17 @@ AssemblyReward.__table__.create(bind=engine, checkfirst=True)
 RewardConfig.__table__.create(bind=engine, checkfirst=True)
 RewardButton.__table__.create(bind=engine, checkfirst=True)
 
+# 自动检查并修复数据库结构 - Docker环境下的自动修复
+try:
+    from bot import LOGGER
+    # 在表创建后立即检查结构
+    if sql_check_and_fix_hunt_table():
+        LOGGER.info("🎮 Hunt database structure verified and ready")
+    else:
+        LOGGER.warning("⚠️ Hunt database structure check failed - some features may not work")
+except Exception as e:
+    LOGGER.error(f"❌ Hunt database auto-check failed: {e}")
+
 
 def init_cars_and_equipment():
     """初始化汽车配置和装备定义"""
@@ -262,7 +273,7 @@ def add_car_with_equipment(car_name: str, equipment_ids: str, description: str =
 
 
 def sql_check_and_fix_hunt_table():
-    """检查并修复hunt表结构"""
+    """检查并修复hunt表结构 - 自动添加所有缺失的列"""
     try:
         from sqlalchemy import inspect, text
         inspector = inspect(engine)
@@ -276,33 +287,43 @@ def sql_check_and_fix_hunt_table():
         columns = inspector.get_columns('hunt')
         column_names = [col['name'] for col in columns]
         
+        # 定义所有需要的列及其SQL定义
+        required_columns = {
+            'hunt_actions': "ALTER TABLE hunt ADD COLUMN hunt_actions INT DEFAULT 0 COMMENT '寻找装备的次数'",
+            'daily_car_info': "ALTER TABLE hunt ADD COLUMN daily_car_info TEXT NULL COMMENT '缓存的每日汽车信息'",
+            'message_id': "ALTER TABLE hunt ADD COLUMN message_id INT NULL COMMENT '关联的消息ID'", 
+            'chat_id': "ALTER TABLE hunt ADD COLUMN chat_id BIGINT NULL COMMENT '消息所在的聊天ID'"
+        }
+        
         missing_columns = []
-        if 'hunt_actions' not in column_names:
-            missing_columns.append('hunt_actions')
-        if 'daily_car_info' not in column_names:
-            missing_columns.append('daily_car_info')
-            
+        for column_name in required_columns.keys():
+            if column_name not in column_names:
+                missing_columns.append(column_name)
+        
         if missing_columns:
-            LOGGER.warning(f"Hunt table missing columns: {missing_columns}")
+            LOGGER.info(f"🔧 Hunt table missing columns: {missing_columns}, attempting automatic fix...")
             # 尝试添加缺失的列
             with engine.connect() as conn:
-                for column in missing_columns:
+                added_columns = []
+                for column_name in missing_columns:
                     try:
-                        if column == 'hunt_actions':
-                            sql = text("ALTER TABLE hunt ADD COLUMN hunt_actions INT DEFAULT 0")
-                        elif column == 'daily_car_info':
-                            sql = text("ALTER TABLE hunt ADD COLUMN daily_car_info TEXT NULL")
+                        sql = text(required_columns[column_name])
                         conn.execute(sql)
                         conn.commit()
-                        LOGGER.info(f"Successfully added column: {column}")
+                        added_columns.append(column_name)
+                        LOGGER.info(f"✅ Successfully added column: {column_name}")
                     except Exception as e:
-                        LOGGER.error(f"Failed to add column {column}: {e}")
+                        LOGGER.error(f"❌ Failed to add column {column_name}: {e}")
                         return False
-            return True
+                
+                if added_columns:
+                    LOGGER.info(f"🎉 Database structure automatically fixed! Added columns: {added_columns}")
+                return True
         
+        LOGGER.info("✅ Hunt table structure is up to date")
         return True  # 所有列都存在
     except Exception as e:
-        LOGGER.error(f"Error checking hunt table structure: {e}")
+        LOGGER.error(f"❌ Error checking hunt table structure: {e}")
         return False
 
 
