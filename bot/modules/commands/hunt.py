@@ -77,7 +77,7 @@ def hunt_game_ikb(hunt_id: int, last_hunt_time: int = 0):
     return ikb([
         [(hunt_btn_text, f"hunt_action_{hunt_id}")],
         [(bulk_10_text, f"hunt_bulk_action_{hunt_id}_10"), (bulk_50_text, f"hunt_bulk_action_{hunt_id}_50")],
-        [("❌ 结束游戏", f"hunt_end_{hunt_id}")]
+        [("❌ 结束游戏", f"hunt_end_{hunt_id}"), ("🏠 返回主页", "back_start")]
     ])
 
 
@@ -137,13 +137,24 @@ async def handle_game_completion(call, hunt_id: int, daily_car, equipment_found_
                 reward_description = reward_config.reward_description
                 claim_info = "请查看游戏详情"
         else:
-            # 发放失败的情况
-            if reward_config.reward_type == "coins":
-                reward_description = f"{reward_config.reward_value}{sakura_b}"
-                claim_info = "❌发放失败，请联系管理员"
+            # 检查是否是重复奖励的情况
+            error_message = reward_result.get("message", "")
+            if "今日已获得此汽车的奖励" in error_message:
+                # 用户今日已获得此奖励，显示提示信息
+                if reward_config.reward_type == "coins":
+                    reward_description = f"{reward_config.reward_value}{sakura_b}"
+                    claim_info = "✅今日已领取"
+                else:
+                    reward_description = reward_config.reward_description
+                    claim_info = "✅今日已领取"
             else:
-                reward_description = reward_config.reward_description
-                claim_info = "❌奖励发放失败，请联系管理员"
+                # 其他发放失败的情况
+                if reward_config.reward_type == "coins":
+                    reward_description = f"{reward_config.reward_value}{sakura_b}"
+                    claim_info = "❌发放失败，请联系管理员"
+                else:
+                    reward_description = reward_config.reward_description
+                    claim_info = "❌奖励发放失败，请联系管理员"
     else:
         reward_description = "无奖励配置"
         claim_info = "无需领取"
