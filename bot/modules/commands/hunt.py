@@ -81,6 +81,14 @@ def hunt_game_ikb(hunt_id: int, last_hunt_time: int = 0):
     ])
 
 
+def hunt_whitelist_choice_ikb(hunt_id: int):
+    """创建白名单用户选择按钮"""
+    return ikb([
+        [("✅ 继续游戏", f"hunt_whitelist_continue_{hunt_id}")],
+        [("❌ 离开", f"hunt_whitelist_leave_{hunt_id}")]
+    ])
+
+
 def get_equipment_color_emoji(category: str) -> str:
     """获取装备颜色对应的emoji"""
     color_map = {
@@ -356,8 +364,14 @@ async def start_hunt(_, msg):
     
     # 检查白名单用户是否参加白名单奖励游戏
     if user.lv == 'a' and reward_config and reward_config.reward_type == 'white':
-        msg_obj = await sendMessage(msg, "❌ 您已是白名单用户")
-        asyncio.create_task(delete_message_after_delay(msg_obj, 30))
+        choice_message = await sendMessage(
+            msg, 
+            "⚠️ 您已是白名单用户，是否继续游戏？",
+            buttons=hunt_whitelist_choice_ikb(hunt_id)
+        )
+        # 更新hunt会话的消息信息，以便后续操作能找到消息
+        if choice_message and hasattr(choice_message, 'id'):
+            sql_update_hunt_message_info(hunt_id, choice_message.id, choice_message.chat.id)
         return
         
     
@@ -793,3 +807,95 @@ async def hunt_game_return(_, call):
         f"👇 点击下方按钮继续寻找装备！",
         buttons=hunt_game_ikb(hunt_id)
     )
+
+
+@bot.on_callback_query(filters.regex(r'^hunt_whitelist_continue_(\d+)$'))
+async def hunt_whitelist_continue(_, call):
+    """白名单用户选择继续游戏"""
+    hunt_id = int(call.matches[0].group(1))
+    
+    # 验证游戏会话
+    is_valid, hunt = await validate_hunt_session(call, hunt_id)
+    if not is_valid:
+        return
+    
+    # 获取用户信息
+    user = sql_get_emby(call.from_user.id)
+    if not user:
+        await callAnswer(call, "❌ 用户信息获取失败", show_alert=True)
+        return
+    
+    # 获取今日汽车和装备信息
+    daily_car = sql_get_daily_car()
+    if not daily_car:
+        await callAnswer(call, "❌ 今日汽车配置错误", show_alert=True)
+        return
+    
+    # 构建装备显示信息
+    required_equipment_ids = [int(x) for x in daily_car.equipment_ids.split(',')]
+    equipment_display = ""
+    for equipment_id in required_equipment_ids:
+        equipment_def = sql_get_equipment_definition(equipment_id)
+        if equipment_def:
+            color_emoji = get_equipment_color_emoji(equipment_def.category)
+            equipment_display += f"{color_emoji} {equipment_def.equipment_name}\n"
+        else:
+            equipment_display += f"⚪ 装备 {equipment_id}\n"
+    
+    # 获取奖励信息
+    from bot.sql_helper.sql_hunt import sql_get_reward_config
+    reward_config = sql_get_reward_config(daily_car.id)
+    
+    # 获取今日游戏次数
+    today_count = sql_get_today_hunt_count(call.from_user.id)
+    
+    # 获取用户昵称
+    user_nickname = call.from_user.first_name
+    
+    await callAnswer(call, "✅ 继续游戏")
+    
+    # 设置游戏界面，但用editMessage而不是sendMessage
+    from bot.sql_helper.sql_hunt import sql_get_today_hunt_actions
+    
+    # 获取用户当前金币
+    current_coins = user.iv if user else 0
+    
+    # 构建奖励文本
+    reward_text = ""
+    if reward_config:
+        if reward_config.reward_type == "coins":
+            reward_text = f"🎁 完成奖励: {reward_config.reward_value}{sakura_b}\n"
+        else:
+            reward_text = f"🎁 完成奖励: {reward_config.reward_description}\n"
+    
+    # 编辑消息为游戏界面
+    await editMessage(
+        call,
+        f"🏎️ **寻宝游戏开始！**\n\n"
+        f"👤 **{user_nickname}** 正在寻宝...\n\n"
+        f"🎯 今日目标汽车: **{daily_car.car_name}**\n"
+        f"{reward_text}\n"
+        f"🔧 需要装备:\n{equipment_display}\n"
+        f"💰 每次寻找消耗 1{sakura_b}\n"
+        f"💰 当前{sakura_b}: {current_coins}{sakura_b}\n"
+        f"🕹️ 今日剩余游戏次数: {config.hunt_daily_limit - today_count - 1}\n"
+        f"📊 今日寻宝次数: {sql_get_today_hunt_actions(call.from_user.id)}次\n\n"
+        f"👇 点击下方按钮开始寻找装备！",
+        buttons=hunt_game_ikb(hunt_id)
+    )
+
+
+@bot.on_callback_query(filters.regex(r'^hunt_whitelist_leave_(\d+)$'))
+async def hunt_whitelist_leave(_, call):
+    """白名单用户选择离开游戏"""
+    hunt_id = int(call.matches[0].group(1))
+    
+    # 验证游戏会话
+    is_valid, hunt = await validate_hunt_session(call, hunt_id)
+    if not is_valid:
+        return
+    
+    # 结束游戏并删除消息
+    sql_end_hunt(hunt_id)
+    await callAnswer(call, "👋 已离开游戏")
+    await deleteMessage(call)
