@@ -303,13 +303,12 @@ def sql_check_and_fix_hunt_table():
         if missing_columns:
             LOGGER.info(f"🔧 Hunt table missing columns: {missing_columns}, attempting automatic fix...")
             # 尝试添加缺失的列
-            with engine.connect() as conn:
+            with engine.begin() as conn:
                 added_columns = []
                 for column_name in missing_columns:
                     try:
                         sql = text(required_columns[column_name])
                         conn.execute(sql)
-                        conn.commit()
                         added_columns.append(column_name)
                         LOGGER.info(f"✅ Successfully added column: {column_name}")
                     except Exception as e:
