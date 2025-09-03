@@ -66,7 +66,7 @@ def members_ikb(is_admin: bool = False, account: bool = False) -> InlineKeyboard
         #      [('♻️ 主界面', 'back_start')]])
 
 
-back_start_ikb = ikb([[('❌ 关闭', 'closeit')]])
+back_start_ikb = ikb([[('💫 回到首页', 'back_start')]])
 back_members_ikb = ikb([[('💨 返回', 'members')]])
 back_manage_ikb = ikb([[('💨 返回', 'manage')]])
 re_create_ikb = ikb([[('🍥 重新输入', 'create'), ('💫 用户主页', 'members')]])
@@ -144,13 +144,13 @@ def open_menu_ikb(openstats, timingstats) -> InlineKeyboardMarkup:
 
 back_free_ikb = ikb([[('🔙 返回上一级', 'open-menu')]])
 back_open_menu_ikb = ikb([[('🪪 重新定时', 'open_timing'), ('🔙 注册状态', 'open-menu')]])
-re_cr_link_ikb = ikb([[('♻️ 继续创建', 'cr_link'), ('❌ 关闭', 'closeit')]])
+re_cr_link_ikb = ikb([[('♻️ 继续创建', 'cr_link'), ('🎗️ 返回主页', 'manage')]])
 close_it_ikb = ikb([[('❌ - Close', 'closeit')]])
 
 
 def ch_link_ikb(ls: list) -> InlineKeyboardMarkup:
     lines = array_chunk(ls, 2)
-    lines.append([["❌ 关闭", "closeit"]])
+    lines.append([["💫 回到首页", "manage"]])
     return ikb(lines)
 
 
@@ -356,7 +356,7 @@ back_config_p_ikb = ikb([[("🎮  ️返回主控", "back_config")]])
 
 
 def back_set_ikb(method) -> InlineKeyboardMarkup:
-    return ikb([[("♻️ 重新设置", f"{method}"), ("❌ 关闭", "closeit")]])
+    return ikb([[("♻️ 重新设置", f"{method}"), ("🔙 返回主页", "back_config")]])
 
 
 def try_set_buy(ls: list) -> InlineKeyboardMarkup:
@@ -460,7 +460,7 @@ def sched_buttons():
 #     return ikb(lines)
 
 
-
+# checkin_button = ikb([[('🔋 重新签到', 'checkin'), ('🎮 返回主页', 'back_start')]])
 
 """ Request_media """
 
