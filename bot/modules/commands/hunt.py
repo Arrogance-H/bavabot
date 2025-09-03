@@ -647,6 +647,9 @@ async def hunt_end(_, call):
         if call.from_user.username:
             user_nickname += f" (@{call.from_user.username})"
         
+        # 获取缓存的每日汽车信息
+        daily_car = sql_get_cached_daily_car(hunt)
+        
         # 获取用户今日装备
         equipment_list = sql_get_user_equipment(call.from_user.id, today_only=True)
         equipment_counts = {}
@@ -657,6 +660,11 @@ async def hunt_end(_, call):
         result_text += f"👤 **{user_nickname}** 已经结束寻宝\n\n"
         result_text += f"⏱️ 游戏时长: {duration_minutes}分{duration_seconds}秒\n"
         result_text += f"💰 消耗{sakura_b}: {hunt.coins_spent}\n\n"
+        
+        # 显示目标汽车信息
+        if daily_car:
+            result_text += f"🏎️ **目标汽车:** {daily_car.car_name}\n\n"
+        
         result_text += f"🎒 **已获得目标装备:**\n"
         
         if equipment_counts:
@@ -678,6 +686,30 @@ async def hunt_end(_, call):
                         result_text += f"⚪ 装备 {equipment_id}\n"
         else:
             result_text += "空空如也...\n"
+        
+        # 添加缺少的目标装备信息
+        if daily_car:
+            target_equipment_ids = [int(x) for x in daily_car.equipment_ids.split(',')]
+            missing_equipment = []
+            
+            for target_id in target_equipment_ids:
+                have_count = equipment_counts.get(target_id, 0)
+                if have_count < 1:
+                    # 获取装备定义
+                    equipment_def = sql_get_equipment_definition(target_id)
+                    if equipment_def:
+                        equipment_name = equipment_def.equipment_name
+                        color_emoji = get_equipment_color_emoji(equipment_def.category)
+                        missing_equipment.append(f"{color_emoji} {equipment_name}")
+                    else:
+                        missing_equipment.append(f"⚪ 装备 {target_id}")
+            
+            if missing_equipment:
+                result_text += f"\n❌ **仍缺少目标装备:**\n"
+                for missing in missing_equipment:
+                    result_text += f"{missing}\n"
+            else:
+                result_text += f"\n✅ **已收集全部目标装备！**\n"
         
         result_text += f"\n💡 记住：装备仅当天有效哦！\n☺️ 感谢参与寻宝游戏！"
         
