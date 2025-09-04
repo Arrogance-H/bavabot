@@ -339,6 +339,7 @@ def config_preparation() -> InlineKeyboardMarkup:
     fuxx_pt = '✅' if fuxx_pitao else '❎'
     red_envelope_status = '✅' if red_envelope.status else '❎'
     allow_private = '✅' if red_envelope.allow_private else '❎'
+    code_lottery_status = '✅' if config.code_lottery.status else '❎'
     keyboard = ikb(
         [[('📄 导出日志', 'log_out'), ('📌 设置探针', 'set_tz')],
          [('🎬 显/隐指定库', 'set_block'), (f'{fuxx_pt} 皮套人过滤功能', 'set_fuxx_pitao')],
@@ -348,6 +349,7 @@ def config_preparation() -> InlineKeyboardMarkup:
          [(f'{red_envelope_status} 红包', 'set_red_envelope_status'), (f'{allow_private} 专属红包', 'set_red_envelope_allow_private')],
          [(f'设置赠送资格天数({config.kk_gift_days}天)', 'set_kk_gift_days'), (f'设置活跃检测天数({config.activity_check_days}天)', 'set_activity_check_days')],
          [(f'设置封存账号天数({config.freeze_days}天)', 'set_freeze_days'), (f'设置寻宝游戏限制({config.hunt_daily_limit}次/日)', 'set_hunt_daily_limit')],
+         [(f'{code_lottery_status} Code Lottery抽奖', 'set_code_lottery_status')],
          [('🔙 返回', 'manage')]])
     return keyboard
 
