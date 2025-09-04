@@ -75,6 +75,7 @@ def fix_code_lottery_rounds_table(connection):
                 'winner_count': 'INT DEFAULT 1 COMMENT "获奖人数"',
                 'status': 'VARCHAR(20) DEFAULT "active" COMMENT "状态：active, completed, cancelled"',
                 'draw_time': 'DATETIME NULL COMMENT "实际开奖时间"',
+                'duration_minutes': 'INT NOT NULL DEFAULT 30 COMMENT "抽奖持续时间（分钟）"',
                 'created_at': 'DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT "创建时间"'
             }
             
