@@ -133,6 +133,7 @@ class RedEnvelope(BaseModel):
     allow_private: bool = True # 是否允许专属红包
 
 class CodeLottery(BaseModel):
+    status: bool = False  # 是否启用抽奖系统
     admin_only: bool = True  # 是否只有管理员可以控制
     entry_fee: int = 3  # 参与费用（花币）
     guaranteed_win_count: int = 10  # 保底中奖次数
