@@ -75,7 +75,7 @@ async def start_codelottery_command(_, msg):
         f"• 时间到期后自动开奖"
     )
     
-    await sendMessage(msg, lottery_msg, reply_markup=keyboard, timer=0)
+    await sendMessage(msg, lottery_msg, buttons=keyboard, timer=0)
     LOGGER.info(f"管理员{msg.from_user.id}开启第{next_round}次抽奖，持续{config.code_lottery.duration_minutes}分钟")
 
 
