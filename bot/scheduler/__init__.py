@@ -7,3 +7,4 @@ from .ranks_task import week_ranks, day_ranks
 from .sync_favorites import sync_favorites
 from .sync_mp_download import sync_download_tasks
 from .hunt_scheduler import cleanup_hunt_equipment, cleanup_expired_hunts
+from .codelottery_scheduler import auto_draw_expired_lotteries

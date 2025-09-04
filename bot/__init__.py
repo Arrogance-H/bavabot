@@ -78,7 +78,9 @@ user_p = [
     BotCommand("srank", "[用户/禁言] 查看计分"),
     # 车库游戏用户命令 (Hunt Game User Commands)
     BotCommand("hunt", "[用户] 开始寻宝游戏"),
-    BotCommand("hunt_stats", "[用户] 查看寻宝游戏统计信息")]
+    BotCommand("hunt_stats", "[用户] 查看寻宝游戏统计信息"),
+    # 抽奖系统用户命令 (Code Lottery System User Commands)
+    BotCommand("codelottery_stats", "[用户] 查看抽奖统计")]
 
 # 取消 BotCommand("exchange", "[私聊] 使用注册码")
 admin_p = user_p + [

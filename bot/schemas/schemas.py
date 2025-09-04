@@ -132,6 +132,15 @@ class RedEnvelope(BaseModel):
     status: bool = True  # 是否开启红包
     allow_private: bool = True # 是否允许专属红包
 
+class CodeLottery(BaseModel):
+    status: bool = False  # 是否开启抽奖系统
+    admin_only: bool = True  # 是否只有管理员可以控制
+    entry_fee: int = 3  # 参与费用（花币）
+    guaranteed_win_count: int = 10  # 保底中奖次数
+    lottery_name: str = "ME注册资格"  # 抽奖名称
+    duration_minutes: int = 30  # 抽奖持续时间（分钟）
+    winner_count: int = 1  # 每次抽奖获奖人数
+
 class Config(BaseModel):
     bot_name: str
     bot_token: str
@@ -190,6 +199,7 @@ class Config(BaseModel):
     moviepilot: MP = Field(default_factory=MP)
     auto_update: AutoUpdate = Field(default_factory=AutoUpdate)
     red_envelope: RedEnvelope = Field(default_factory=RedEnvelope)
+    code_lottery: CodeLottery = Field(default_factory=CodeLottery)
     api: API = Field(default_factory=API)
 
     def __init__(self, **data):
