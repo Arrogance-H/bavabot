@@ -28,5 +28,6 @@ from .hunt_admin import (
 from .codelottery import (
     start_codelottery_command,   # 管理员开启抽奖 (/codelottery_start)
     stop_codelottery_command,    # 管理员停止抽奖 (/codelottery_stop)
+    manual_codelottery_draw_command,  # 管理员手动开奖 (/codelottery_draw)
     codelottery_stats_command    # 抽奖统计 (/codelottery_stats)
 )

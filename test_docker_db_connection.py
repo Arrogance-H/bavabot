@@ -197,7 +197,7 @@ def create_test_summary():
     print("   ✅ 用户等级限制 (lv='c')")
     print("   ✅ 参与费用控制 (3花币)")
     print("   ✅ 保底机制 (10次必中)")
-    print("   ✅ 管理员控制 (/codelottery_start, /codelottery_stop)")
+    print("   ✅ 管理员控制 (/codelottery_start, /codelottery_stop, /codelottery_draw)")
     print("   ✅ 自动调度器 (过期检测)")
     print("   ✅ 获奖者通知 (私信+群组)")
 
