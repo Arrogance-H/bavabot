@@ -24,8 +24,9 @@ from .hunt_admin import (
     hunt_statistics          # 游戏统计信息 (/hunt_stats)
 )
 
-# 抽奖系统命令 (Lottery System Commands)
-from .lottery import (
-    lottery_command,         # 抽奖命令 (/lottery)
-    lottery_stats_command    # 抽奖统计 (/lottery_stats)
+# 抽奖系统命令 (CodeLottery System Commands)
+from .codelottery import (
+    start_codelottery_command,   # 管理员开启抽奖 (/codelottery_start)
+    stop_codelottery_command,    # 管理员停止抽奖 (/codelottery_stop)
+    codelottery_stats_command    # 抽奖统计 (/codelottery_stats)
 )
