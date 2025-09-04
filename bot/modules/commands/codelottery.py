@@ -5,7 +5,7 @@ from pyrogram import filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from bot import bot, LOGGER, config, group, save_config
-from bot.func_helper.filters import admins_on_filter
+from bot.func_helper.filters import admins_on_filter, user_in_group_filter
 from bot.func_helper.msg_utils import callAnswer, editMessage, sendMessage
 from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby
 from bot.sql_helper.sql_codelottery import (
@@ -22,9 +22,6 @@ from bot.sql_helper.sql_codelottery import (
 async def start_codelottery_command(_, message):
     """管理员开启抽奖命令"""
     try:
-        if not config.code_lottery.status:
-            await message.reply('❌ 抽奖系统未启用，请先在配置中启用。')
-            return
         
         # 检查是否已有活跃抽奖
         active_lottery = sql_get_active_lottery()
@@ -63,10 +60,10 @@ async def start_codelottery_command(_, message):
         lottery_text = (
             f"🎉 **新抽奖活动开启！**\n\n"
             f"🎯 **奖品名称：** {lottery_name}\n"
-            f"💰 **参与费用：** {entry_fee} 花币（仅已注册用户）\n"
+            f"💰 **参与费用：** {entry_fee} 花币\n"
             f"🏆 **获奖人数：** {winner_count} 人\n"
             f"⏰ **抽奖时长：** {duration_minutes} 分钟\n"
-            f"🎲 **参与条件：** 所有用户均可参与（已注册用户需 lv=d 等级）\n\n"
+            f"🎲 **参与条件：** 群组成员且需要充值花币账户\n\n"
             f"💡 **保底机制：** 连续参与 {config.code_lottery.guaranteed_win_count} 次未中奖必中下次\n\n"
             f"点击下方按钮参与抽奖！"
         )
@@ -160,10 +157,9 @@ async def handle_join_lottery(_, call):
         user_id = call.from_user.id
         username = call.from_user.first_name or call.from_user.username or "Unknown"
         
-        # 检查用户等级
-        user_info = sql_get_emby(tg=user_id)
-        if user_info and user_info.lv != 'd':
-            await callAnswer(call, '❌ 只有 lv=d 等级的用户才能参与抽奖', True)
+        # 检查用户是否在群组中
+        if not await user_in_group_filter(_, call):
+            await callAnswer(call, '❌ 只有群组成员才能参与抽奖', True)
             return
         
         # 检查抽奖是否仍然活跃
@@ -172,16 +168,21 @@ async def handle_join_lottery(_, call):
             await callAnswer(call, '❌ 该抽奖已结束或不存在', True)
             return
         
-        # 检查用户花币是否足够（仅对有账户的用户）
-        if user_info and user_info.iv < active_lottery.entry_fee:
+        # 检查用户是否有emby账户以支付费用
+        user_info = sql_get_emby(tg=user_id)
+        if not user_info:
+            await callAnswer(call, '❌ 需要注册账户并充值花币才能参与抽奖', True)
+            return
+        
+        # 检查用户花币是否足够
+        if user_info.iv < active_lottery.entry_fee:
             await callAnswer(call, f'❌ 花币不足，需要 {active_lottery.entry_fee} 花币参与', True)
             return
         
         # 参与抽奖
         if sql_join_lottery(round_id, user_id, username):
-            # 扣除花币（仅对有账户的用户）
-            if user_info:
-                sql_update_emby(Emby.tg == user_id, iv=user_info.iv - active_lottery.entry_fee)
+            # 扣除花币
+            sql_update_emby(Emby.tg == user_id, iv=user_info.iv - active_lottery.entry_fee)
             
             await callAnswer(call, '🎉 参与抽奖成功！祝您好运！', True)
             LOGGER.info(f"【抽奖系统】用户 {username} ({user_id}) 参与了抽奖 {round_id}")
