@@ -28,6 +28,17 @@ async def delete_message_after_delay(message, delay_seconds: int):
         LOGGER.error(f"删除延迟消息失败: {e}")
 
 
+def ensure_user_exists(user_id: int) -> Emby:
+    """确保用户存在，如果不存在则创建基础记录并给予初始金币"""
+    user = sql_get_emby(user_id)
+    if not user:
+        from bot.sql_helper.sql_emby import sql_add_emby
+        sql_add_emby(user_id)
+        sql_update_emby(Emby.tg == user_id, iv=10)  # 给予10个初始金币
+        user = sql_get_emby(user_id)
+    return user
+
+
 async def validate_hunt_session(call, hunt_id: int) -> tuple[bool, any]:
     """
     验证车库游戏会话
@@ -257,9 +268,7 @@ async def start_hunt(_, msg):
     """开始车库游戏"""
     await msg.delete()
     
-    user = sql_get_emby(msg.from_user.id)
-    if not user:
-        return await sendMessage(msg, "❌ 您还未注册，请先注册后再参与车库游戏")
+    user = ensure_user_exists(msg.from_user.id)
     
     # 检查今日游戏次数
     today_count = sql_get_today_hunt_count(msg.from_user.id)
@@ -425,8 +434,8 @@ async def hunt_bulk_action(_, call):
     
     # 计算所需金币 (每次1金币)
     required_coins = quantity
-    user = sql_get_emby(call.from_user.id)
-    if not user or user.iv < required_coins:
+    user = ensure_user_exists(call.from_user.id)
+    if user.iv < required_coins:
         return await callAnswer(call, f"❌ {sakura_b}不足，寻找{quantity}次需要 {required_coins} 个", show_alert=True)
     
     # 扣除金币
@@ -548,8 +557,8 @@ async def hunt_action(_, call):
             return await callAnswer(call, f"⏰ 请等待 {remaining:.1f} 秒后再寻找", show_alert=True)
     
     # 检查用户金币
-    user = sql_get_emby(call.from_user.id)
-    if not user or user.iv < 1:
+    user = ensure_user_exists(call.from_user.id)
+    if user.iv < 1:
         return await callAnswer(call, f"❌ {sakura_b}不足，需要 1 个{sakura_b}", show_alert=True)
     
     # 扣除金币
@@ -783,7 +792,7 @@ async def hunt_game_return(_, call):
     car_name = daily_car.car_name if daily_car else "未知"
     
     # 获取用户当前金币
-    user = sql_get_emby(call.from_user.id)
+    user = ensure_user_exists(call.from_user.id)
     current_coins = user.iv if user else 0
     
     # 获取目标装备显示信息
@@ -819,9 +828,9 @@ async def hunt_whitelist_continue(_, call):
         return
     
     # 获取用户信息
-    user = sql_get_emby(call.from_user.id)
+    user = ensure_user_exists(call.from_user.id)
     if not user:
-        await callAnswer(call, "❌ 用户信息获取失败", show_alert=True)
+        await callAnswer(call, "❌ 用户信息创建失败", show_alert=True)
         return
     
     # 获取今日汽车和装备信息
