@@ -36,6 +36,7 @@ class CodeLotteryRound(Base):
     winner_count = Column(Integer, default=1)           # 获奖人数
     status = Column(String(20), default='active')       # 状态：active, completed, cancelled
     draw_time = Column(DateTime, nullable=True)         # 实际开奖时间
+    duration_minutes = Column(Integer, nullable=False)  # 抽奖持续时间（分钟）
     created_at = Column(DateTime, default=datetime.now)
 
 
@@ -118,6 +119,7 @@ def _migrate_code_lottery_rounds_table():
                 'winner_count': 'INT DEFAULT 1 COMMENT "获奖人数"',
                 'status': 'VARCHAR(20) DEFAULT "active" COMMENT "状态：active, completed, cancelled"',
                 'draw_time': 'DATETIME NULL COMMENT "实际开奖时间"',
+                'duration_minutes': 'INT NOT NULL DEFAULT 30 COMMENT "抽奖持续时间（分钟）"',
                 'created_at': 'DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT "创建时间"'
             }
             
@@ -237,7 +239,8 @@ def sql_create_lottery_round(creator_tg: int, lottery_name: str, duration_minute
                 end_time=end_time,
                 entry_fee=entry_fee,
                 winner_count=winner_count,
-                status='active'
+                status='active',
+                duration_minutes=duration_minutes
             )
             session.add(round_obj)
             session.commit()
