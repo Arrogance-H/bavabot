@@ -1,0 +1,12 @@
+{
+    "bot_name": "xxxbot",
+    "code_lottery": {
+        "status": true,
+        "admin_only": false,
+        "entry_fee": 5,
+        "guaranteed_win_count": 15,
+        "lottery_name": "自定义抽奖名称",
+        "duration_minutes": 45,
+        "winner_count": 2
+    }
+}
