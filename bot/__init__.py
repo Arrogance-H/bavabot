@@ -121,6 +121,9 @@ admin_p = user_p + [
     BotCommand("hunt_config_reward", "配置寻宝游戏奖励 [管理]"),
     BotCommand("hunt_list_rewards", "查看寻宝游戏奖励配置 [管理]"),
     BotCommand("hunt_config_button", "配置寻宝游戏领奖配置 [管理]"),
+    # 抽奖系统管理员命令 (Code Lottery System Admin Commands)
+    BotCommand("codelottery_start", "开启新的抽奖轮次 [管理]"),
+    BotCommand("codelottery_stop", "停止当前抽奖轮次 [管理]"),
 ]
 
 owner_p = admin_p + [
