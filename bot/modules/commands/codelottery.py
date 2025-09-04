@@ -173,7 +173,7 @@ async def codelottery_stats_command(_, message):
         
         if user_stats['guaranteed_count'] >= 6:
             stats_text += "💡 提示：您的保底次数即将满足，下次参与中奖概率更高！"
-        elif user_stats['guaranteed_count'] >= {config.code_lottery.guaranteed_win_count}:
+        elif user_stats['guaranteed_count'] >= config.code_lottery.guaranteed_win_count:
             stats_text += "🎉 恭喜：您已满足保底条件，下次参与必中！"
         
         await message.reply(stats_text)
