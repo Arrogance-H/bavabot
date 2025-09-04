@@ -477,3 +477,25 @@ async def set_hunt_daily_limit(_, call):
                               f"🎯 【寻宝游戏每日限制】\n\n{limit}次 **Done!**",
                               buttons=back_config_p_ikb)
             LOGGER.info(f"【admin】：{call.from_user.id} - 更新寻宝游戏每日限制为{limit}次完成")
+            
+@bot.on_callback_query(filters.regex('set_code_lottery_status') & admins_on_filter)
+async def set_code_lottery_status(_, call):
+    config.code_lottery.status = not config.code_lottery.status
+    if config.code_lottery.status:
+        message = '🎰 您已开启 Code Lottery 功能'
+        log_message = f"【admin】：管理员 {call.from_user.first_name} 已启用 Code Lottery 功能"
+    else:
+        message = '🎰 您已关闭 Code Lottery 功能'
+        log_message = f"【admin】：管理员 {call.from_user.first_name} 已关闭 Code Lottery 功能"
+    
+    await callAnswer(call, message, True)
+    await config_p_re(_, call)
+    save_config()
+    LOGGER.info(log_message)
+        
+            
+            
+
+
+
+
