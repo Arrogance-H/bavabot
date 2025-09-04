@@ -7,7 +7,7 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from bot import bot, LOGGER, config, group, save_config
 from bot.func_helper.filters import admins_on_filter, user_in_group_filter
 from bot.func_helper.msg_utils import callAnswer, editMessage, sendMessage
-from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, sql_add_emby, Emby
+from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby
 from bot.sql_helper.sql_codelottery import (
     sql_create_lottery_round,
     sql_get_active_lottery,
@@ -168,12 +168,11 @@ async def handle_join_lottery(_, call):
             await callAnswer(call, '❌ 该抽奖已结束或不存在', True)
             return
         
-        # 获取或创建用户记录
+        # 检查用户是否在数据库中有记录
         user_info = sql_get_emby(tg=user_id)
         if not user_info:
-            # 自动创建基础用户记录
-            sql_add_emby(user_id)
-            user_info = sql_get_emby(tg=user_id)
+            await callAnswer(call, '❌ 请先使用 /start 命令与bot互动后再参与抽奖', True)
+            return
         
         # 检查用户花币是否足够
         if user_info.iv < active_lottery.entry_fee:
