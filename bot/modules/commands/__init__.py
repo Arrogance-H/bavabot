@@ -23,3 +23,10 @@ from .hunt_admin import (
     list_hunt_rewards,       # 查看奖励配置 (/hunt_list_rewards)
     hunt_statistics          # 游戏统计信息 (/hunt_stats)
 )
+
+# 抽奖系统命令 (CodeLottery System Commands)
+from .codelottery import (
+    start_codelottery_command,   # 管理员开启抽奖 (/codelottery_start)
+    stop_codelottery_command,    # 管理员停止抽奖 (/codelottery_stop)
+    codelottery_stats_command    # 抽奖统计 (/codelottery_stats)
+)
