@@ -492,8 +492,7 @@ async def set_code_lottery_status(_, call):
     await config_p_re(_, call)
     save_config()
     LOGGER.info(log_message)
-        
-            
+
             
 
 
