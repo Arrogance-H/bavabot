@@ -70,8 +70,8 @@ class Uplaysinfo:
                         viewing_time_seconds = int(play_record[1])
                         viewing_time_minutes = viewing_time_seconds // 60
                         
-                        # 基础积分：排名积分 + 时长积分(每分钟1积分)
-                        points = rank_points[rank - 1] + viewing_time_minutes if rank <= 10 else viewing_time_minutes
+                        # 基础积分：仅时长积分(每分钟1积分)，取消排名积分奖励
+                        points = viewing_time_minutes
                         
                         # 新增奖励机制：
                         # 1. 观看时长超过60分钟，额外获得19积分
