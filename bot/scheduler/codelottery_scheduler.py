@@ -4,7 +4,7 @@
 import asyncio
 import random
 from datetime import datetime, timedelta
-from bot import LOGGER, schedall, bot, config, sakura_b
+from bot import LOGGER, bot, config, sakura_b
 from bot.sql_helper.sql_codelottery import (
     sql_get_expired_lottery_rounds,
     sql_get_lottery_participants,
