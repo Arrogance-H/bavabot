@@ -67,10 +67,25 @@ class Uplaysinfo:
                         tg = member_info["tg"]
 
                         # 计算积分
-                        points = rank_points[rank - 1] + (int(play_record[1]) // 60) if rank <= 10 else (
-                                    int(play_record[1]) // 60)
-                        new_iv = member_info["iv"] + points
-                        leaderboard_data.append([member_info["tg"], new_iv, f'{medal}{emby_name}', points])
+                        viewing_time_seconds = int(play_record[1])
+                        viewing_time_minutes = viewing_time_seconds // 60
+                        
+                        # 奖励机制：只有观看60分钟及以上才有奖励
+                        if viewing_time_minutes >= 60:
+                            # 观看时长超过60分钟，获得19积分
+                            points = 19
+                            
+                            # 前三名额外奖励
+                            if rank == 1:
+                                points += 3
+                            elif rank == 2:
+                                points += 2
+                            elif rank == 3:
+                                points += 1
+                            
+                            # 只有获得积分的用户才加入奖励列表
+                            new_iv = member_info["iv"] + points
+                            leaderboard_data.append([member_info["tg"], new_iv, f'{medal}{emby_name}', points])
 
                     formatted_time = await convert_s(int(play_record[1]))
                     page_data += f'{medal}**第{cn2an.an2cn(rank)}名** | [{emby_name}](https://www.google.com/search?q={tg})\n' \
