@@ -150,7 +150,6 @@
     }
   },
   "code_lottery": {
-    "status": false,
     "admin_only": true,
     "entry_fee": 3,
     "guaranteed_win_count": 10,
