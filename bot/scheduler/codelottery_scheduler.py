@@ -4,6 +4,7 @@
 import asyncio
 import random
 from datetime import datetime, timedelta
+from pyrogram.errors import FloodWait
 from bot import LOGGER, bot, config, sakura_b, group
 from bot.sql_helper.sql_codelottery import (
     sql_get_expired_lottery_rounds,
@@ -85,10 +86,28 @@ async def auto_draw_expired_lotteries():
                     draw_msg += f"\n🎁 获奖者请联系me领奖"
                     
                     # 发送开奖结果到群组
+                    LOGGER.info(f"【抽奖定时】准备发送开奖结果到群组 {group[0]}")
                     try:
                         await bot.send_message(group[0], draw_msg)
+                        LOGGER.info(f"【抽奖定时】成功发送开奖结果到群组")
+                    except FloodWait as f:
+                        LOGGER.warning(f"【抽奖定时】群组消息发送遇到限流: {f}")
+                        await asyncio.sleep(f.value * 1.2)
+                        try:
+                            await bot.send_message(group[0], draw_msg)
+                            LOGGER.info(f"【抽奖定时】群组消息重试发送成功")
+                        except Exception as retry_e:
+                            LOGGER.error(f"【抽奖定时】群组消息重试发送失败: {retry_e}")
                     except Exception as e:
                         LOGGER.error(f"【抽奖定时】发送开奖结果失败: {e}")
+                        LOGGER.error(f"【抽奖定时】群组ID: {group[0]}, 消息长度: {len(draw_msg)}")
+                        # 尝试发送简化版本的消息（无markdown格式）
+                        try:
+                            simple_msg = draw_msg.replace("**", "")  # 移除markdown格式
+                            await bot.send_message(group[0], simple_msg)
+                            LOGGER.info(f"【抽奖定时】简化消息发送成功")
+                        except Exception as simple_e:
+                            LOGGER.error(f"【抽奖定时】简化消息也发送失败: {simple_e}")
                     
                     # 私信通知获奖者
                     for winner in winners:
@@ -103,8 +122,25 @@ async def auto_draw_expired_lotteries():
                         
                         try:
                             await bot.send_message(winner['tg'], winner_msg)
-                        except:
-                            pass  # 用户可能没有私聊机器人
+                            LOGGER.info(f"【抽奖定时】成功发送中奖通知给用户{winner['tg']}")
+                        except FloodWait as f:
+                            LOGGER.warning(f"【抽奖定时】私信发送遇到限流: {f}")
+                            await asyncio.sleep(f.value * 1.2)
+                            try:
+                                await bot.send_message(winner['tg'], winner_msg)
+                                LOGGER.info(f"【抽奖定时】私信重试发送成功给用户{winner['tg']}")
+                            except Exception as retry_e:
+                                LOGGER.error(f"【抽奖定时】私信重试发送失败给用户{winner['tg']}: {retry_e}")
+                        except Exception as e:
+                            LOGGER.error(f"【抽奖定时】发送私信给用户{winner['tg']}失败: {e}")
+                            # 尝试发送简化版本的消息（无markdown格式）
+                            try:
+                                simple_winner_msg = winner_msg.replace("**", "")  # 移除markdown格式
+                                await bot.send_message(winner['tg'], simple_winner_msg)
+                                LOGGER.info(f"【抽奖定时】简化私信发送成功给用户{winner['tg']}")
+                            except Exception as simple_e:
+                                LOGGER.error(f"【抽奖定时】简化私信也发送失败给用户{winner['tg']}: {simple_e}")
+                                # 用户可能没有私聊机器人，这是正常的
                         
                         LOGGER.info(f"【抽奖定时】用户{winner['tg']}({winner['nickname']})在第{round_obj.id}轮抽奖中获奖")
                     
