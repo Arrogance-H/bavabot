@@ -4,7 +4,7 @@
 import asyncio
 import random
 from datetime import datetime, timedelta
-from bot import LOGGER, bot, config, sakura_b
+from bot import LOGGER, bot, config, sakura_b, group
 from bot.sql_helper.sql_codelottery import (
     sql_get_expired_lottery_rounds,
     sql_get_lottery_participants,
@@ -86,8 +86,7 @@ async def auto_draw_expired_lotteries():
                     
                     # 发送开奖结果到群组
                     try:
-                        from bot import main_group
-                        await bot.send_message(main_group, draw_msg)
+                        await bot.send_message(group[0], draw_msg)
                     except Exception as e:
                         LOGGER.error(f"【抽奖定时】发送开奖结果失败: {e}")
                     
