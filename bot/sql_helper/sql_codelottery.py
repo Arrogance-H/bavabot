@@ -107,10 +107,10 @@ def _migrate_code_lottery_rounds_table():
             
             # 需要添加的列定义
             required_columns = {
-                'lottery_name': 'VARCHAR(200) NOT NULL COMMENT "抽奖名称"',
+                'lottery_name': 'VARCHAR(200) NOT NULL DEFAULT "Unknown Lottery" COMMENT "抽奖名称"',
                 'creator_tg': 'BIGINT NOT NULL DEFAULT 0 COMMENT "创建者TG ID"',
-                'start_time': 'DATETIME NOT NULL COMMENT "开始时间"',
-                'end_time': 'DATETIME NOT NULL COMMENT "结束时间"',
+                'start_time': 'DATETIME NOT NULL DEFAULT "1970-01-01 00:00:00" COMMENT "开始时间"',
+                'end_time': 'DATETIME NOT NULL DEFAULT "1970-01-01 00:00:00" COMMENT "结束时间"',
                 'entry_fee': 'INT DEFAULT 3 COMMENT "参与费用"',
                 'winner_count': 'INT DEFAULT 1 COMMENT "获奖人数"',
                 'status': 'VARCHAR(20) DEFAULT "active" COMMENT "状态：active, completed, cancelled"',
@@ -122,17 +122,26 @@ def _migrate_code_lottery_rounds_table():
             columns_added = False
             for col_name, col_definition in required_columns.items():
                 if col_name not in existing_columns:
-                    alter_sql = f"ALTER TABLE code_lottery_rounds ADD COLUMN {col_name} {col_definition}"
-                    session.execute(text(alter_sql))
-                    columns_added = True
+                    try:
+                        alter_sql = f"ALTER TABLE code_lottery_rounds ADD COLUMN {col_name} {col_definition}"
+                        session.execute(text(alter_sql))
+                        columns_added = True
+                    except Exception as col_error:
+                        # Skip individual column errors but continue with others
+                        pass
                     
             if columns_added:
                 session.commit()
                     
     except Exception as e:
-        # Silently handle migration errors to avoid breaking the module import
-        # Errors will surface when functions are actually called
-        pass
+        # Handle migration errors - attempt rollback for any partial changes
+        try:
+            with Session() as session:
+                session.rollback()
+        except:
+            pass
+        # Migration errors should not break module import, but they will surface
+        # when functions are actually called if columns are still missing
 
 
 def _migrate_code_lottery_users_table():
@@ -166,17 +175,26 @@ def _migrate_code_lottery_users_table():
             columns_added = False
             for col_name, col_definition in required_columns.items():
                 if col_name not in existing_columns:
-                    alter_sql = f"ALTER TABLE code_lottery_users ADD COLUMN {col_name} {col_definition}"
-                    session.execute(text(alter_sql))
-                    columns_added = True
+                    try:
+                        alter_sql = f"ALTER TABLE code_lottery_users ADD COLUMN {col_name} {col_definition}"
+                        session.execute(text(alter_sql))
+                        columns_added = True
+                    except Exception as col_error:
+                        # Skip individual column errors but continue with others
+                        pass
                     
             if columns_added:
                 session.commit()
                     
     except Exception as e:
-        # Silently handle migration errors to avoid breaking the module import
-        # Errors will surface when functions are actually called
-        pass
+        # Handle migration errors - attempt rollback for any partial changes
+        try:
+            with Session() as session:
+                session.rollback()
+        except:
+            pass
+        # Migration errors should not break module import, but they will surface
+        # when functions are actually called if columns are still missing
 
 
 # 执行迁移（仅在模块加载时运行一次）
