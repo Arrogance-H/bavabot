@@ -87,6 +87,46 @@ CodeLotteryWinner.__table__.create(bind=engine, checkfirst=True)
 CodeLotteryUser.__table__.create(bind=engine, checkfirst=True)
 
 
+def _migrate_code_lottery_rounds_table():
+    """
+    检查并修复 code_lottery_rounds 表结构
+    确保所有必需的列都存在
+    """
+    from sqlalchemy import inspect, text
+    
+    try:
+        with Session() as session:
+            inspector = inspect(engine)
+            
+            # 检查表是否存在
+            if 'code_lottery_rounds' not in inspector.get_table_names():
+                return  # 表不存在，create 会处理
+                
+            # 获取现有列
+            existing_columns = [col['name'] for col in inspector.get_columns('code_lottery_rounds')]
+            
+            # 需要添加的列定义
+            required_columns = {
+                'creator_tg': 'BIGINT NOT NULL DEFAULT 0 COMMENT "创建者TG ID"'
+            }
+            
+            # 检查并添加缺失的列
+            columns_added = False
+            for col_name, col_definition in required_columns.items():
+                if col_name not in existing_columns:
+                    alter_sql = f"ALTER TABLE code_lottery_rounds ADD COLUMN {col_name} {col_definition}"
+                    session.execute(text(alter_sql))
+                    columns_added = True
+                    
+            if columns_added:
+                session.commit()
+                    
+    except Exception as e:
+        # Silently handle migration errors to avoid breaking the module import
+        # Errors will surface when functions are actually called
+        pass
+
+
 def _migrate_code_lottery_users_table():
     """
     检查并修复 code_lottery_users 表结构
@@ -132,6 +172,7 @@ def _migrate_code_lottery_users_table():
 
 
 # 执行迁移（仅在模块加载时运行一次）
+_migrate_code_lottery_rounds_table()
 _migrate_code_lottery_users_table()
 
 

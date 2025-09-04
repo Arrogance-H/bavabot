@@ -2,8 +2,8 @@
 """
 CodeLottery Database Column Migration Fix
 
-This script fixes the missing column issue in the code_lottery_users table.
-Run this script to add the missing 'total_participation' and other columns.
+This script fixes the missing column issue in the code_lottery_rounds and code_lottery_users tables.
+Run this script to add the missing 'creator_tg' and other columns.
 
 Usage:
     python3 fix_codelottery_columns.py [--host HOST] [--port PORT] [--user USER] [--password PASS] [--database DB]
@@ -16,7 +16,7 @@ import sys
 import os
 
 def fix_codelottery_database(host, port, user, password, database):
-    """Fix the code_lottery_users table by adding missing columns"""
+    """Fix the code_lottery_rounds and code_lottery_users tables by adding missing columns"""
     try:
         import pymysql
         
@@ -30,6 +30,73 @@ def fix_codelottery_database(host, port, user, password, database):
             charset='utf8mb4'
         )
         
+        success = True
+        
+        # Fix code_lottery_rounds table
+        success &= fix_code_lottery_rounds_table(connection)
+        
+        # Fix code_lottery_users table
+        success &= fix_code_lottery_users_table(connection)
+        
+        connection.close()
+        return success
+        
+    except ImportError:
+        print("❌ PyMySQL library not found. Please install it: pip install pymysql")
+        return False
+    except Exception as e:
+        print(f"❌ Database connection failed: {e}")
+        return False
+
+
+def fix_code_lottery_rounds_table(connection):
+    """Fix the code_lottery_rounds table by adding missing columns"""
+    try:
+        with connection.cursor() as cursor:
+            # Check if table exists
+            cursor.execute("SHOW TABLES LIKE 'code_lottery_rounds'")
+            if not cursor.fetchone():
+                print("✅ Table code_lottery_rounds does not exist yet - will be created by bot")
+                return True
+                
+            print("📋 Checking code_lottery_rounds table structure...")
+            cursor.execute("DESCRIBE code_lottery_rounds")
+            existing_columns = [row[0] for row in cursor.fetchall()]
+            print(f"   Current columns: {existing_columns}")
+            
+            # Define the required columns
+            required_columns = {
+                'creator_tg': 'BIGINT NOT NULL DEFAULT 0 COMMENT "创建者TG ID"'
+            }
+            
+            # Add missing columns
+            columns_added = []
+            for col_name, col_definition in required_columns.items():
+                if col_name not in existing_columns:
+                    print(f"🔧 Adding missing column: {col_name}")
+                    alter_sql = f"ALTER TABLE code_lottery_rounds ADD COLUMN {col_name} {col_definition}"
+                    cursor.execute(alter_sql)
+                    columns_added.append(col_name)
+                else:
+                    print(f"✅ Column {col_name} already exists")
+            
+            if columns_added:
+                connection.commit()
+                print(f"✅ Successfully added columns to code_lottery_rounds: {columns_added}")
+            else:
+                print("✅ code_lottery_rounds table structure is already correct")
+                
+            return True
+            
+    except Exception as e:
+        print(f"❌ Failed to fix code_lottery_rounds table: {e}")
+        connection.rollback()
+        return False
+
+
+def fix_code_lottery_users_table(connection):
+    """Fix the code_lottery_users table by adding missing columns"""
+    try:
         with connection.cursor() as cursor:
             # Check if table exists
             cursor.execute("SHOW TABLES LIKE 'code_lottery_users'")
@@ -37,7 +104,7 @@ def fix_codelottery_database(host, port, user, password, database):
                 print("✅ Table code_lottery_users does not exist yet - will be created by bot")
                 return True
                 
-            print("📋 Checking current table structure...")
+            print("📋 Checking code_lottery_users table structure...")
             cursor.execute("DESCRIBE code_lottery_users")
             existing_columns = [row[0] for row in cursor.fetchall()]
             print(f"   Current columns: {existing_columns}")
@@ -61,28 +128,18 @@ def fix_codelottery_database(host, port, user, password, database):
                     columns_added.append(col_name)
                 else:
                     print(f"✅ Column {col_name} already exists")
-                    
+            
             if columns_added:
                 connection.commit()
-                print(f"✅ Successfully added {len(columns_added)} columns: {', '.join(columns_added)}")
+                print(f"✅ Successfully added columns to code_lottery_users: {columns_added}")
             else:
-                print("✅ All required columns already exist - no changes needed")
+                print("✅ code_lottery_users table structure is already correct")
                 
-            # Verify final structure
-            print("📋 Verifying final table structure...")
-            cursor.execute("DESCRIBE code_lottery_users")
-            final_columns = [row[0] for row in cursor.fetchall()]
-            print(f"   Final columns: {final_columns}")
+            return True
             
-        connection.close()
-        print("🎉 Database migration completed successfully!")
-        return True
-        
-    except ImportError:
-        print("❌ PyMySQL not installed. Install it with: pip install PyMySQL")
-        return False
     except Exception as e:
-        print(f"❌ Migration failed: {e}")
+        print(f"❌ Failed to fix code_lottery_users table: {e}")
+        connection.rollback()
         return False
 
 def load_bot_config():
