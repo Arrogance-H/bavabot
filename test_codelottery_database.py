@@ -53,7 +53,7 @@ def test_codelottery_system():
     round_obj = sql_create_lottery_round(
         round_number=1,
         lottery_name="ME注册资格测试",
-        max_participants=3,
+        duration_minutes=30,
         entry_fee=3,
         winner_count=1,
         created_by=999999
@@ -119,7 +119,7 @@ def test_codelottery_system():
         new_round = sql_create_lottery_round(
             round_number=2,
             lottery_name="ME注册资格测试2",
-            max_participants=5,
+            duration_minutes=30,
             entry_fee=3,
             winner_count=1,
             created_by=999999
@@ -161,7 +161,7 @@ def test_user_progression():
         round_obj = sql_create_lottery_round(
             round_number=100 + i,
             lottery_name=f"测试轮次{i+1}",
-            max_participants=1,
+            duration_minutes=30,
             entry_fee=3,
             winner_count=1,
             created_by=999999

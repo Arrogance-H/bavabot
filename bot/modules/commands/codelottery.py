@@ -2,6 +2,7 @@
 抽奖系统命令 (CodeLottery System)
 """
 import random
+import datetime
 from pyrogram import filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from bot import bot, prefixes, sakura_b, LOGGER, config
@@ -43,7 +44,7 @@ async def start_codelottery_command(_, msg):
     new_round = sql_create_lottery_round(
         round_number=next_round,
         lottery_name=config.code_lottery.lottery_name,
-        max_participants=config.code_lottery.max_participants,
+        duration_minutes=config.code_lottery.duration_minutes,
         entry_fee=config.code_lottery.entry_fee,
         winner_count=config.code_lottery.winner_count,
         created_by=msg.from_user.id
@@ -61,20 +62,21 @@ async def start_codelottery_command(_, msg):
     lottery_msg = (
         f"🎉 **{config.code_lottery.lottery_name}** 🎉\n\n"
         f"📅 第 **{next_round}** 次开启抽奖\n"
-        f"👥 参与人数限制：**{config.code_lottery.max_participants}** 人\n"
+        f"⏰ 抽奖时间：**{config.code_lottery.duration_minutes}** 分钟\n"
         f"💰 参与费用：**{config.code_lottery.entry_fee}** {sakura_b}\n"
         f"🏆 获奖人数：**{config.code_lottery.winner_count}** 人\n"
         f"🔑 参与条件：仅限lv=c用户\n\n"
-        f"📊 当前参与人数：**0**/{config.code_lottery.max_participants}\n\n"
+        f"📊 当前参与人数：**0** 人\n"
+        f"⏱️ 结束时间：**{new_round.end_time.strftime('%H:%M:%S')}**\n\n"
         f"💡 **重要提示**：\n"
         f"• 每人只能参与一次\n"
         f"• 参与费用将自动扣除\n"
         f"• 累计参与{config.code_lottery.guaranteed_win_count}次后必定中奖\n"
-        f"• 人数满员后自动开奖"
+        f"• 时间到期后自动开奖"
     )
     
     await sendMessage(msg, lottery_msg, reply_markup=keyboard, timer=0)
-    LOGGER.info(f"管理员{msg.from_user.id}开启第{next_round}次抽奖")
+    LOGGER.info(f"管理员{msg.from_user.id}开启第{next_round}次抽奖，持续{config.code_lottery.duration_minutes}分钟")
 
 
 @bot.on_callback_query(filters.regex(r'^join_codelottery_(\d+)$'))
@@ -125,42 +127,47 @@ async def join_codelottery_callback(_, callback_query):
     # 扣除参与费用
     sql_update_emby(Emby.tg == user_id, iv=user.iv - config.code_lottery.entry_fee)
     
-    # 获取当前参与人数
+    # 获取当前参与人数和轮次信息
     participants = sql_get_lottery_participants(round_id)
     current_count = len(participants)
-    
-    # 更新抽奖信息
     round_obj = sql_get_active_lottery_round()
+    
     if round_obj:
+        # 计算剩余时间
+        import datetime
+        now = datetime.datetime.now()
+        if now < round_obj.end_time:
+            remaining_time = round_obj.end_time - now
+            remaining_minutes = int(remaining_time.total_seconds() // 60)
+            remaining_seconds = int(remaining_time.total_seconds() % 60)
+            time_remaining = f"{remaining_minutes}分{remaining_seconds}秒"
+        else:
+            time_remaining = "已结束"
+        
         updated_msg = (
             f"🎉 **{round_obj.lottery_name}** 🎉\n\n"
             f"📅 第 **{round_obj.round_number}** 次开启抽奖\n"
-            f"👥 参与人数限制：**{round_obj.max_participants}** 人\n"
+            f"⏰ 抽奖时间：**{round_obj.duration_minutes}** 分钟\n"
             f"💰 参与费用：**{round_obj.entry_fee}** {sakura_b}\n"
             f"🏆 获奖人数：**{round_obj.winner_count}** 人\n"
             f"🔑 参与条件：仅限lv=c用户\n\n"
-            f"📊 当前参与人数：**{current_count}**/{round_obj.max_participants}\n\n"
+            f"📊 当前参与人数：**{current_count}** 人\n"
+            f"⏱️ 剩余时间：**{time_remaining}**\n\n"
             f"💡 **重要提示**：\n"
             f"• 每人只能参与一次\n"
             f"• 参与费用将自动扣除\n"
             f"• 累计参与{config.code_lottery.guaranteed_win_count}次后必定中奖\n"
-            f"• 人数满员后自动开奖"
+            f"• 时间到期后自动开奖"
         )
         
-        if current_count < round_obj.max_participants:
-            # 还没满员，继续显示参与按钮
+        # 如果抽奖还没结束，继续显示参与按钮
+        if now < round_obj.end_time:
             keyboard = InlineKeyboardMarkup([
                 [InlineKeyboardButton("🎲 参与抽奖", callback_data=f"join_codelottery_{round_id}")]
             ])
             await callback_query.edit_message_text(updated_msg, reply_markup=keyboard)
         else:
-            # 满员，开始开奖
-            await callback_query.edit_message_text(
-                updated_msg + "\n\n🎉 **参与人数已满，正在开奖...**"
-            )
-            
-            # 执行开奖
-            await conduct_lottery_draw(callback_query, round_id, participants)
+            await callback_query.edit_message_text(updated_msg + "\n\n⏰ **抽奖已结束，等待开奖中...**")
     
     # 私信通知参与者
     participation_msg = (
@@ -181,92 +188,6 @@ async def join_codelottery_callback(_, callback_query):
         pass  # 用户可能没有私聊机器人
     
     LOGGER.info(f"用户{user_id}参与第{round_id}轮抽奖，当前人数：{current_count}")
-
-
-async def conduct_lottery_draw(callback_query, round_id, participants):
-    """执行开奖逻辑"""
-    try:
-        round_obj = sql_get_active_lottery_round()
-        if not round_obj or round_obj.id != round_id:
-            return
-        
-        winner_count = min(round_obj.winner_count, len(participants))
-        
-        # 获取保底用户（参与次数达到条件的用户）
-        guaranteed_winners = []
-        regular_participants = []
-        
-        for participant in participants:
-            lottery_user = sql_get_codelottery_user(participant.tg)
-            if lottery_user and lottery_user.total_participations >= config.code_lottery.guaranteed_win_count:
-                guaranteed_winners.append(participant)
-            else:
-                regular_participants.append(participant)
-        
-        # 选择获奖者
-        winners = []
-        
-        # 首先添加保底获奖者
-        for guaranteed in guaranteed_winners[:winner_count]:
-            winners.append({
-                'tg': guaranteed.tg,
-                'nickname': guaranteed.nickname
-            })
-        
-        # 如果还有名额，从普通参与者中随机选择
-        remaining_slots = winner_count - len(winners)
-        if remaining_slots > 0 and regular_participants:
-            random_winners = random.sample(regular_participants, min(remaining_slots, len(regular_participants)))
-            for winner in random_winners:
-                winners.append({
-                    'tg': winner.tg,
-                    'nickname': winner.nickname
-                })
-        
-        # 完成抽奖
-        success, msg = sql_complete_lottery_round(round_id, winners)
-        
-        if success:
-            # 构建开奖信息
-            draw_msg = (
-                f"🎊 **开奖结果** 🎊\n\n"
-                f"🎲 抽奖名称：{round_obj.lottery_name}\n"
-                f"📅 轮次：第{round_obj.round_number}次\n"
-                f"👥 参与人数：{len(participants)}人\n"
-                f"🏆 获奖人数：{len(winners)}人\n\n"
-                f"🎉 **获奖名单** 🎉\n"
-            )
-            
-            for i, winner in enumerate(winners, 1):
-                lottery_user = sql_get_codelottery_user(winner['tg'])
-                total_participations = lottery_user.total_participations if lottery_user else 0
-                draw_msg += f"{i}. {winner['nickname']} (累计参与{total_participations}次)\n"
-            
-            draw_msg += f"\n🎁 获奖者请联系me领奖"
-            
-            # 更新消息
-            await callback_query.edit_message_text(draw_msg)
-            
-            # 私信通知获奖者
-            for winner in winners:
-                winner_msg = (
-                    f"🎊 **恭喜中奖！** 🎊\n\n"
-                    f"🎲 抽奖名称：{round_obj.lottery_name}\n"
-                    f"📅 轮次：第{round_obj.round_number}次\n"
-                    f"🏆 您已获奖！\n\n"
-                    f"📞 **请联系me领奖**"
-                )
-                
-                try:
-                    await bot.send_message(winner['tg'], winner_msg)
-                except:
-                    pass  # 用户可能没有私聊机器人
-                
-                LOGGER.info(f"用户{winner['tg']}({winner['nickname']})在第{round_id}轮抽奖中获奖")
-        
-    except Exception as e:
-        LOGGER.error(f"开奖失败: {e}")
-        await callback_query.edit_message_text("❌ 开奖过程中出现错误，请联系管理员")
 
 
 @bot.on_message(filters.command('codelottery_stop', prefixes) & admins_filter)
@@ -333,9 +254,20 @@ async def codelottery_stats_command(_, msg):
     active_round = global_stats.get('active_round')
     if active_round:
         participants = sql_get_lottery_participants(active_round.id)
+        import datetime
+        now = datetime.datetime.now()
+        if now < active_round.end_time:
+            remaining_time = active_round.end_time - now
+            remaining_minutes = int(remaining_time.total_seconds() // 60)
+            remaining_seconds = int(remaining_time.total_seconds() % 60)
+            time_remaining = f"{remaining_minutes}分{remaining_seconds}秒"
+        else:
+            time_remaining = "已结束"
+        
         stats_msg += (
             f"🎲 **当前抽奖**：第{active_round.round_number}次\n"
-            f"   • 参与人数：{len(participants)}/{active_round.max_participants}\n"
+            f"   • 参与人数：{len(participants)}人\n"
+            f"   • 剩余时间：{time_remaining}\n"
             f"   • 参与费用：{active_round.entry_fee}{sakura_b}\n\n"
         )
     

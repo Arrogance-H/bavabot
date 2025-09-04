@@ -138,7 +138,7 @@ class CodeLottery(BaseModel):
     entry_fee: int = 3  # 参与费用（花币）
     guaranteed_win_count: int = 10  # 保底中奖次数
     lottery_name: str = "ME注册资格"  # 抽奖名称
-    max_participants: int = 100  # 最大参与人数
+    duration_minutes: int = 30  # 抽奖持续时间（分钟）
     winner_count: int = 1  # 每次抽奖获奖人数
 
 class Config(BaseModel):

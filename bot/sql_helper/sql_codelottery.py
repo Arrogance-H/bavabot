@@ -30,12 +30,13 @@ class CodeLotteryRound(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     round_number = Column(Integer, nullable=False)  # 第几次抽奖
     lottery_name = Column(String(100), nullable=False)  # 抽奖名称
-    max_participants = Column(Integer, nullable=False)  # 最大参与人数
+    duration_minutes = Column(Integer, nullable=False)  # 抽奖持续时间（分钟）
     entry_fee = Column(Integer, nullable=False)  # 参与费用
     winner_count = Column(Integer, default=1)  # 获奖人数
     status = Column(String(20), default='active')  # active, completed, cancelled
     created_by = Column(BigInteger, nullable=False)  # 创建者 (管理员)
     created_date = Column(DateTime, default=datetime.datetime.now)  # 创建时间
+    end_time = Column(DateTime, nullable=False)  # 抽奖结束时间
     completed_date = Column(DateTime, nullable=True)  # 完成时间
     
     # 关联关系
@@ -125,18 +126,22 @@ def sql_get_active_lottery_round():
             return None
 
 
-def sql_create_lottery_round(round_number: int, lottery_name: str, max_participants: int, 
+def sql_create_lottery_round(round_number: int, lottery_name: str, duration_minutes: int, 
                            entry_fee: int, winner_count: int, created_by: int):
     """创建新的抽奖轮次"""
     with Session() as session:
         try:
+            # 计算结束时间
+            end_time = datetime.datetime.now() + datetime.timedelta(minutes=duration_minutes)
+            
             round_obj = CodeLotteryRound(
                 round_number=round_number,
                 lottery_name=lottery_name,
-                max_participants=max_participants,
+                duration_minutes=duration_minutes,
                 entry_fee=entry_fee,
                 winner_count=winner_count,
-                created_by=created_by
+                created_by=created_by,
+                end_time=end_time
             )
             session.add(round_obj)
             session.commit()
@@ -169,13 +174,9 @@ def sql_join_lottery_round(round_id: int, tg: int, nickname: str):
             if not round_obj:
                 return None, "抽奖轮次无效"
             
-            # 检查参与人数是否已满
-            participant_count = session.query(func.count(CodeLotteryParticipant.id)).filter(
-                CodeLotteryParticipant.round_id == round_id
-            ).scalar()
-            
-            if participant_count >= round_obj.max_participants:
-                return None, "参与人数已满"
+            # 检查抽奖是否已过期
+            if datetime.datetime.now() > round_obj.end_time:
+                return None, "抽奖已结束"
             
             # 添加参与记录
             participant = CodeLotteryParticipant(
@@ -300,3 +301,18 @@ def sql_get_user_in_round(round_id: int, tg: int):
         except Exception as e:
             LOGGER.error(f"检查用户参与状态失败: {e}")
             return None
+
+
+def sql_get_expired_lottery_rounds():
+    """获取已过期但状态仍为活跃的抽奖轮次"""
+    with Session() as session:
+        try:
+            current_time = datetime.datetime.now()
+            expired_rounds = session.query(CodeLotteryRound).filter(
+                CodeLotteryRound.status == 'active',
+                CodeLotteryRound.end_time <= current_time
+            ).all()
+            return expired_rounds
+        except Exception as e:
+            LOGGER.error(f"获取过期抽奖轮次失败: {e}")
+            return []

@@ -155,7 +155,7 @@
     "entry_fee": 3,
     "guaranteed_win_count": 10,
     "lottery_name": "ME注册资格",
-    "max_participants": 100,
+    "duration_minutes": 30,
     "winner_count": 1
   }
 }
