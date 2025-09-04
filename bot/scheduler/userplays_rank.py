@@ -67,8 +67,24 @@ class Uplaysinfo:
                         tg = member_info["tg"]
 
                         # 计算积分
-                        points = rank_points[rank - 1] + (int(play_record[1]) // 60) if rank <= 10 else (
-                                    int(play_record[1]) // 60)
+                        viewing_time_seconds = int(play_record[1])
+                        viewing_time_minutes = viewing_time_seconds // 60
+                        
+                        # 基础积分：排名积分 + 时长积分(每分钟1积分)
+                        points = rank_points[rank - 1] + viewing_time_minutes if rank <= 10 else viewing_time_minutes
+                        
+                        # 新增奖励机制：
+                        # 1. 观看时长超过60分钟，额外获得19积分
+                        if viewing_time_minutes > 60:
+                            points += 19
+                        
+                        # 2. 前三名额外奖励
+                        if rank == 1:
+                            points += 3
+                        elif rank == 2:
+                            points += 2
+                        elif rank == 3:
+                            points += 1
                         new_iv = member_info["iv"] + points
                         leaderboard_data.append([member_info["tg"], new_iv, f'{medal}{emby_name}', points])
 
