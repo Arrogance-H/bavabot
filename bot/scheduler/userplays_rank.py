@@ -70,21 +70,24 @@ class Uplaysinfo:
                         viewing_time_seconds = int(play_record[1])
                         viewing_time_minutes = viewing_time_seconds // 60
                         
-                        # 基础积分：仅时长积分(每分钟1积分)，取消排名积分奖励
-                        points = viewing_time_minutes
-                        
-                        # 新增奖励机制：
-                        # 1. 观看时长超过60分钟，额外获得19积分
-                        if viewing_time_minutes > 60:
+                        # 奖励机制：只有观看60分钟及以上才有奖励
+                        if viewing_time_minutes >= 60:
+                            # 基础积分：时长积分(每分钟1积分)
+                            points = viewing_time_minutes
+                            
+                            # 观看时长超过60分钟，额外获得19积分
                             points += 19
-                        
-                        # 2. 前三名额外奖励
-                        if rank == 1:
-                            points += 3
-                        elif rank == 2:
-                            points += 2
-                        elif rank == 3:
-                            points += 1
+                            
+                            # 前三名额外奖励
+                            if rank == 1:
+                                points += 3
+                            elif rank == 2:
+                                points += 2
+                            elif rank == 3:
+                                points += 1
+                        else:
+                            # 观看时长不足60分钟，无奖励
+                            points = 0
                         new_iv = member_info["iv"] + points
                         leaderboard_data.append([member_info["tg"], new_iv, f'{medal}{emby_name}', points])
 
