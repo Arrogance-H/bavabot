@@ -61,6 +61,8 @@ activity_check_days = config.activity_check_days
 red_envelope = config.red_envelope
 hunt_daily_limit = config.hunt_daily_limit
 
+code_lottery = config.code_lottery
+
 moviepilot = config.moviepilot
 auto_update = config.auto_update
 api = config.api
