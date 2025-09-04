@@ -126,6 +126,7 @@ admin_p = user_p + [
     # 抽奖系统管理员命令 (Code Lottery System Admin Commands)
     BotCommand("codelottery_start", "开启新的抽奖轮次 [管理]"),
     BotCommand("codelottery_stop", "停止当前抽奖轮次 [管理]"),
+    BotCommand("codelottery_draw", "手动开奖当前抽奖轮次 [管理]"),
 ]
 
 owner_p = admin_p + [

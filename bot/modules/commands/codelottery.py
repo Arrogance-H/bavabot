@@ -122,6 +122,43 @@ async def stop_codelottery_command(_, message):
         LOGGER.error(f"【抽奖系统】停止抽奖出错：{e}")
 
 
+@bot.on_message(filters.command('codelottery_draw') & admins_on_filter)
+async def manual_codelottery_draw_command(_, message):
+    """管理员手动开奖命令"""
+    try:
+        active_lottery = sql_get_active_lottery()
+        if not active_lottery:
+            await message.reply('❌ 当前没有活跃的抽奖。')
+            return
+        
+        # 获取参与者数量
+        participants = sql_get_lottery_participants(active_lottery.id)
+        
+        await message.reply(
+            f'🎯 准备开奖...\n'
+            f'抽奖名称：{active_lottery.lottery_name}\n'
+            f'参与人数：{len(participants)}\n'
+            f'开奖人数：{active_lottery.winner_count}'
+        )
+        
+        # 执行开奖
+        from bot.scheduler.codelottery_scheduler import process_lottery_draw
+        await process_lottery_draw(active_lottery)
+        
+        await message.reply(
+            f'✅ 手动开奖完成！\n'
+            f'🎯 抽奖名称：{active_lottery.lottery_name}\n'
+            f'👥 参与人数：{len(participants)}\n'
+            f'📢 开奖结果已发送到群组'
+        )
+        
+        LOGGER.info(f"【抽奖系统】管理员 {message.from_user.first_name} 手动开奖：{active_lottery.lottery_name}")
+        
+    except Exception as e:
+        await message.reply(f'❌ 手动开奖时出错：{str(e)}')
+        LOGGER.error(f"【抽奖系统】手动开奖出错：{e}")
+
+
 @bot.on_message(filters.command('codelottery_stats'))
 async def codelottery_stats_command(_, message):
     """查看抽奖统计命令"""
