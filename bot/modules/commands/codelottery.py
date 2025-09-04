@@ -168,6 +168,15 @@ async def handle_join_lottery(_, call):
             await callAnswer(call, '❌ 该抽奖已结束或不存在', True)
             return
         
+        # 检查抽奖是否已过期
+        from datetime import datetime
+        if active_lottery.end_time <= datetime.now():
+            # 抽奖已过期，执行开奖
+            from bot.scheduler.codelottery_scheduler import process_lottery_draw
+            await process_lottery_draw(active_lottery)
+            await callAnswer(call, '⏰ 抽奖时间已截止，已自动开奖', True)
+            return
+        
         # 检查用户是否在数据库中有记录
         user_info = sql_get_emby(tg=user_id)
         if not user_info:
@@ -204,6 +213,15 @@ async def handle_lottery_stats(_, call):
         active_lottery = sql_get_active_lottery()
         if not active_lottery or active_lottery.id != round_id:
             await callAnswer(call, '❌ 该抽奖已结束或不存在', True)
+            return
+        
+        # 检查抽奖是否已过期
+        from datetime import datetime
+        if active_lottery.end_time <= datetime.now():
+            # 抽奖已过期，执行开奖
+            from bot.scheduler.codelottery_scheduler import process_lottery_draw
+            await process_lottery_draw(active_lottery)
+            await callAnswer(call, '⏰ 抽奖时间已截止，已自动开奖', True)
             return
         
         # 获取参与者信息

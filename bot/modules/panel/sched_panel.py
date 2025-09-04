@@ -39,7 +39,6 @@ action_dict = {
     "check_ex": check_expired,
     "low_activity": check_low_activity,
     "backup_db": auto_backup_db,
-    "auto_lottery": auto_draw_expired_lotteries,
 }
 
 # 字典，对应的操作函数的参数和id
@@ -51,7 +50,6 @@ args_dict = {
     "check_ex": {'hour': 1, 'minute': 30, 'id': 'check_expired'},
     "low_activity": {'hour': 8, 'minute': 30, 'id': 'check_low_activity'},
     "backup_db": {'hour': 2, 'minute': 30, 'id': 'backup_db'},
-    "auto_lottery": {'minutes': 1, 'id': 'auto_draw_expired_lotteries'},  # 每分钟检查一次过期抽奖
 }
 
 
@@ -60,11 +58,7 @@ def set_all_sche():
         if getattr(schedall, key):
             action = action_dict[key]
             args = args_dict[key]
-            # 特殊处理抽奖系统，使用interval而不是cron
-            if key == "auto_lottery":
-                scheduler.add_job(action, 'interval', **args)
-            else:
-                scheduler.add_job(action, 'cron', **args)
+            scheduler.add_job(action, 'cron', **args)
 
 
 set_all_sche()
@@ -87,11 +81,7 @@ async def sched_change_policy(_, call):
         if getattr(schedall, method):
             scheduler.remove_job(job_id=args['id'], jobstore='default')
         else:
-            # 特殊处理抽奖系统，使用interval而不是cron
-            if method == "auto_lottery":
-                scheduler.add_job(action, 'interval', **args)
-            else:
-                scheduler.add_job(action, 'cron', **args)
+            scheduler.add_job(action, 'cron', **args)
         setattr(schedall, method, not getattr(schedall, method))
         save_config()
         await asyncio.gather(callAnswer(call, f'⭕️ {method} 更改成功'), sched_panel(_, call.message))
