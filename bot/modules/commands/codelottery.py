@@ -7,7 +7,7 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from bot import bot, LOGGER, config, group, save_config
 from bot.func_helper.filters import admins_on_filter, user_in_group_filter
 from bot.func_helper.msg_utils import callAnswer, editMessage, sendMessage
-from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby
+from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, sql_add_emby, Emby
 from bot.sql_helper.sql_codelottery import (
     sql_create_lottery_round,
     sql_get_active_lottery,
@@ -63,7 +63,7 @@ async def start_codelottery_command(_, message):
             f"💰 **参与费用：** {entry_fee} 花币\n"
             f"🏆 **获奖人数：** {winner_count} 人\n"
             f"⏰ **抽奖时长：** {duration_minutes} 分钟\n"
-            f"🎲 **参与条件：** 群组成员且需要充值花币账户\n\n"
+            f"🎲 **参与条件：** 群组成员且需要花币支付参与费用\n\n"
             f"💡 **保底机制：** 连续参与 {config.code_lottery.guaranteed_win_count} 次未中奖必中下次\n\n"
             f"点击下方按钮参与抽奖！"
         )
@@ -168,11 +168,12 @@ async def handle_join_lottery(_, call):
             await callAnswer(call, '❌ 该抽奖已结束或不存在', True)
             return
         
-        # 检查用户是否有emby账户以支付费用
+        # 获取或创建用户记录
         user_info = sql_get_emby(tg=user_id)
         if not user_info:
-            await callAnswer(call, '❌ 需要注册账户并充值花币才能参与抽奖', True)
-            return
+            # 自动创建基础用户记录
+            sql_add_emby(user_id)
+            user_info = sql_get_emby(tg=user_id)
         
         # 检查用户花币是否足够
         if user_info.iv < active_lottery.entry_fee:
