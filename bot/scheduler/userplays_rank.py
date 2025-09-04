@@ -98,26 +98,70 @@ class Uplaysinfo:
 
     @staticmethod
     async def user_plays_rank(days=7, uplays=True):
-        a, n, ls = await Uplaysinfo.users_playback_list(days)
-        if not a:
-            return await bot.send_photo(chat_id=group[0], photo=bot_photo,
-                                        caption=f'🍥 获取过去{days}天UserPlays失败了嘤嘤嘤 ~ 手动重试 ')
-        play_button = await plays_list_button(n, 1, days)
-        send = await bot.send_photo(chat_id=group[0], photo=bot_photo, caption=a[0], reply_markup=play_button)
-        if uplays and _open.uplays:
-            if sql_update_embys(some_list=ls, method='iv'):
-                text = f'**自动将观看时长转换为{sakura_b}**\n\n'
-                for i in ls:
-                    text += f'[{i[2]}](tg://user?id={i[0]}) 获得了 {i[3]} {sakura_b}奖励\n'
-                n = 4096
-                chunks = [text[i:i + n] for i in range(0, len(text), n)]
-                for c in chunks:
-                    await bot.send_message(chat_id=group[0],
-                                           text=c + f'\n⏱️ 当前时间 - {datetime.now().strftime("%Y-%m-%d")}')
-                LOGGER.info(f'【userplayrank】： ->成功 数据库执行批量操作{ls}')
-            else:
-                await send.reply(f'**🎂！！！为用户增加{sakura_b}出错啦** @工程师看看吧~ ')
-                LOGGER.error(f'【userplayrank】：-？失败 数据库执行批量操作{ls}')
+        try:
+            a, n, ls = await Uplaysinfo.users_playback_list(days)
+            if not a:
+                error_msg = f'获取过去{days}天UserPlays数据失败'
+                await bot.send_photo(chat_id=group[0], photo=bot_photo,
+                                            caption=f'🍥 {error_msg}嘤嘤嘤 ~ 手动重试 ')
+                LOGGER.error(f'【userplayrank】: {error_msg}')
+                raise Exception(error_msg)
+            
+            play_button = await plays_list_button(n, 1, days)
+            send = await bot.send_photo(chat_id=group[0], photo=bot_photo, caption=a[0], reply_markup=play_button)
+            
+            if uplays and _open.uplays:
+                # 检查是否有用户需要结算
+                if not ls:
+                    await send.reply(f'📊 过去{days}天没有符合结算条件的用户（观看时间≥60分钟）')
+                    LOGGER.info(f'【userplayrank】: 过去{days}天没有符合结算条件的用户')
+                    return
+                
+                # 执行数据库更新
+                if sql_update_embys(some_list=ls, method='iv'):
+                    text = f'**✅ 自动将观看时长转换为{sakura_b} - 结算成功**\n\n'
+                    for i in ls:
+                        text += f'[{i[2]}](tg://user?id={i[0]}) 获得了 {i[3]} {sakura_b}奖励\n'
+                    
+                    # 添加结算统计信息
+                    total_coins = sum(item[3] for item in ls)
+                    text += f'\n📊 **结算统计**\n'
+                    text += f'- 结算用户数: {len(ls)}人\n'
+                    text += f'- 发放{sakura_b}总数: {total_coins}个\n'
+                    text += f'- 结算天数: {days}天\n'
+                    
+                    n = 4096
+                    chunks = [text[i:i + n] for i in range(0, len(text), n)]
+                    for c in chunks:
+                        await bot.send_message(chat_id=group[0],
+                                               text=c + f'\n⏱️ 结算时间 - {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
+                    LOGGER.info(f'【userplayrank】: 成功结算{len(ls)}个用户，发放{total_coins}个{sakura_b}')
+                else:
+                    error_msg = f'数据库更新失败 - 用户{sakura_b}增加操作执行失败'
+                    await send.reply(f'**🎂！！！为用户增加{sakura_b}出错啦** \n\n错误详情: {error_msg}\n@管理员 请检查数据库连接状态')
+                    LOGGER.error(f'【userplayrank】: {error_msg} - 影响用户列表: {ls}')
+                    raise Exception(error_msg)
+                    
+        except Exception as e:
+            # 如果这是从定时任务调用的，错误会被上层的错误处理函数捕获
+            # 如果这是手动调用的，直接记录日志
+            error_msg = f'用户观影结算执行异常: {str(e)}'
+            LOGGER.error(f'【userplayrank】: {error_msg}')
+            
+            # 如果不是数据库错误（已经发过通知），发送通用错误通知
+            if 'sql_update_embys' not in str(e) and 'UserPlays数据失败' not in str(e):
+                try:
+                    await bot.send_message(
+                        chat_id=group[0], 
+                        text=f'❌ **观影结算系统错误**\n\n'
+                             f'错误信息: {error_msg}\n'
+                             f'发生时间: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n\n'
+                             f'@管理员 请检查系统状态'
+                    )
+                except:
+                    pass  # 避免通知发送失败导致的二次异常
+            
+            raise  # 重新抛出异常，让上层错误处理函数处理
 
     @staticmethod
     async def check_low_activity():
