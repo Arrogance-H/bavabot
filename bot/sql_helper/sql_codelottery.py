@@ -87,6 +87,54 @@ CodeLotteryWinner.__table__.create(bind=engine, checkfirst=True)
 CodeLotteryUser.__table__.create(bind=engine, checkfirst=True)
 
 
+def _migrate_code_lottery_users_table():
+    """
+    检查并修复 code_lottery_users 表结构
+    确保所有必需的列都存在
+    """
+    from sqlalchemy import inspect, text
+    
+    try:
+        with Session() as session:
+            inspector = inspect(engine)
+            
+            # 检查表是否存在
+            if 'code_lottery_users' not in inspector.get_table_names():
+                return  # 表不存在，create 会处理
+                
+            # 获取现有列
+            existing_columns = [col['name'] for col in inspector.get_columns('code_lottery_users')]
+            
+            # 需要添加的列定义
+            required_columns = {
+                'total_participation': 'INT DEFAULT 0 COMMENT "总参与次数"',
+                'total_wins': 'INT DEFAULT 0 COMMENT "总获奖次数"',  
+                'guaranteed_count': 'INT DEFAULT 0 COMMENT "当前保底次数"',
+                'last_participation': 'DATETIME NULL COMMENT "最后参与时间"',
+                'last_win': 'DATETIME NULL COMMENT "最后获奖时间"'
+            }
+            
+            # 检查并添加缺失的列
+            columns_added = False
+            for col_name, col_definition in required_columns.items():
+                if col_name not in existing_columns:
+                    alter_sql = f"ALTER TABLE code_lottery_users ADD COLUMN {col_name} {col_definition}"
+                    session.execute(text(alter_sql))
+                    columns_added = True
+                    
+            if columns_added:
+                session.commit()
+                    
+    except Exception as e:
+        # Silently handle migration errors to avoid breaking the module import
+        # Errors will surface when functions are actually called
+        pass
+
+
+# 执行迁移（仅在模块加载时运行一次）
+_migrate_code_lottery_users_table()
+
+
 def sql_create_lottery_round(creator_tg: int, lottery_name: str, duration_minutes: int, 
                            entry_fee: int, winner_count: int) -> Optional[int]:
     """创建新的抽奖轮次"""
