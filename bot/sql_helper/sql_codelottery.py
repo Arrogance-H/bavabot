@@ -88,6 +88,8 @@ def sql_get_codelottery_user(tg: int):
     with Session() as session:
         try:
             user = session.query(CodeLotteryUser).filter(CodeLotteryUser.tg == tg).first()
+            if user:
+                session.refresh(user)
             return user
         except Exception as e:
             LOGGER.error(f"获取抽奖用户记录失败: {e}")
@@ -101,11 +103,13 @@ def sql_create_codelottery_user(tg: int):
             # 检查是否已存在
             existing = session.query(CodeLotteryUser).filter(CodeLotteryUser.tg == tg).first()
             if existing:
+                session.refresh(existing)
                 return existing
             
             user = CodeLotteryUser(tg=tg)
             session.add(user)
             session.commit()
+            session.refresh(user)
             return user
         except Exception as e:
             LOGGER.error(f"创建抽奖用户记录失败: {e}")
@@ -120,6 +124,8 @@ def sql_get_active_lottery_round():
             round_obj = session.query(CodeLotteryRound).filter(
                 CodeLotteryRound.status == 'active'
             ).first()
+            if round_obj:
+                session.refresh(round_obj)
             return round_obj
         except Exception as e:
             LOGGER.error(f"获取活跃抽奖轮次失败: {e}")
@@ -145,6 +151,7 @@ def sql_create_lottery_round(round_number: int, lottery_name: str, duration_minu
             )
             session.add(round_obj)
             session.commit()
+            session.refresh(round_obj)
             return round_obj
         except Exception as e:
             LOGGER.error(f"创建抽奖轮次失败: {e}")
@@ -195,6 +202,7 @@ def sql_join_lottery_round(round_id: int, tg: int, nickname: str):
             user.updated_date = datetime.datetime.now()
             
             session.commit()
+            session.refresh(participant)
             return participant, "参与成功"
             
         except Exception as e:
@@ -210,6 +218,9 @@ def sql_get_lottery_participants(round_id: int):
             participants = session.query(CodeLotteryParticipant).filter(
                 CodeLotteryParticipant.round_id == round_id
             ).all()
+            # Refresh all participants to load attributes
+            for participant in participants:
+                session.refresh(participant)
             return participants
         except Exception as e:
             LOGGER.error(f"获取参与者列表失败: {e}")
@@ -276,6 +287,8 @@ def sql_get_lottery_statistics():
             active_round = session.query(CodeLotteryRound).filter(
                 CodeLotteryRound.status == 'active'
             ).first()
+            if active_round:
+                session.refresh(active_round)
             
             return {
                 'total_users': total_users,
@@ -297,6 +310,8 @@ def sql_get_user_in_round(round_id: int, tg: int):
                 CodeLotteryParticipant.round_id == round_id,
                 CodeLotteryParticipant.tg == tg
             ).first()
+            if participant:
+                session.refresh(participant)
             return participant
         except Exception as e:
             LOGGER.error(f"检查用户参与状态失败: {e}")
@@ -312,6 +327,9 @@ def sql_get_expired_lottery_rounds():
                 CodeLotteryRound.status == 'active',
                 CodeLotteryRound.end_time <= current_time
             ).all()
+            # Refresh all rounds to load attributes
+            for round_obj in expired_rounds:
+                session.refresh(round_obj)
             return expired_rounds
         except Exception as e:
             LOGGER.error(f"获取过期抽奖轮次失败: {e}")
