@@ -69,7 +69,7 @@
   "schedall": {
     "dayrank": true,
     "weekrank": true,
-    "dayplayrank": false,
+    "dayplayrank": true,
     "weekplayrank": false,
     "check_ex": true,
     "low_activity": false,

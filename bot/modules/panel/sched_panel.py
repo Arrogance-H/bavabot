@@ -54,11 +54,18 @@ args_dict = {
 
 
 def set_all_sche():
+    """
+    初始化所有定时任务
+    根据配置文件中的 schedall 设置来启动相应的定时任务
+    """
     for key, value in action_dict.items():
         if getattr(schedall, key):
             action = action_dict[key]
             args = args_dict[key]
             scheduler.add_job(action, 'cron', **args)
+            LOGGER.info(f"【定时任务】启动 {key} 定时任务，调度时间: {args}")
+        else:
+            LOGGER.info(f"【定时任务】跳过 {key} 定时任务 (配置为禁用)")
 
 
 set_all_sche()
@@ -78,15 +85,30 @@ async def sched_change_policy(_, call):
         # 根据method的值来添加或移除相应的任务
         action = action_dict[method]
         args = args_dict[method]
-        if getattr(schedall, method):
+        
+        current_state = getattr(schedall, method)
+        LOGGER.info(f"【定时任务管理】切换 {method} 状态，当前: {current_state}")
+        
+        if current_state:
+            # 当前启用，需要禁用
             scheduler.remove_job(job_id=args['id'], jobstore='default')
+            LOGGER.info(f"【定时任务管理】已禁用 {method}")
         else:
+            # 当前禁用，需要启用
             scheduler.add_job(action, 'cron', **args)
-        setattr(schedall, method, not getattr(schedall, method))
+            LOGGER.info(f"【定时任务管理】已启用 {method}，调度时间: {args}")
+            
+        setattr(schedall, method, not current_state)
         save_config()
-        await asyncio.gather(callAnswer(call, f'⭕️ {method} 更改成功'), sched_panel(_, call.message))
+        
+        new_state = "启用" if not current_state else "禁用"
+        await asyncio.gather(callAnswer(call, f'⭕️ {method} {new_state}成功'), sched_panel(_, call.message))
     except IndexError:
+        LOGGER.error(f"【定时任务管理】解析回调数据失败: {call.data}")
         await sched_panel(_, call.message)
+    except Exception as e:
+        LOGGER.error(f"【定时任务管理】切换任务状态失败: {e}")
+        await callAnswer(call, f'❌ 操作失败: {str(e)}', True)
 
 
 @bot.on_message(filters.command('check_ex', prefixes) & admins_on_filter)
@@ -117,6 +139,78 @@ async def run_low_ac(_, msg):
     await deleteMessage(msg)
     send = await msg.reply(f"⭕ 不活跃检测运行ing···")
     await asyncio.gather(check_low_activity(), send.delete())
+
+
+@bot.on_message(filters.command('sched_status', prefixes) & admins_on_filter)
+async def check_sched_status(_, msg):
+    """检查所有定时任务的状态"""
+    await deleteMessage(msg)
+    
+    status_text = "**🕐 定时任务状态**\n\n"
+    
+    for key in action_dict.keys():
+        config_enabled = getattr(schedall, key, False)
+        args = args_dict[key]
+        job_id = args['id']
+        
+        # 检查任务是否在调度器中
+        scheduler_job = None
+        try:
+            scheduler_job = scheduler.SCHEDULER.get_job(job_id)
+        except:
+            pass
+            
+        status_emoji = "✅" if config_enabled else "❌"
+        scheduler_status = "🟢运行中" if scheduler_job else "🔴未运行"
+        
+        schedule_info = ""
+        if 'hour' in args and 'minute' in args:
+            if 'day_of_week' in args:
+                schedule_info = f"每周{args['day_of_week']} {args['hour']:02d}:{args['minute']:02d}"
+            else:
+                schedule_info = f"每日 {args['hour']:02d}:{args['minute']:02d}"
+        
+        status_text += f"{status_emoji} **{key}**\n"
+        status_text += f"   配置状态: {'启用' if config_enabled else '禁用'}\n"
+        status_text += f"   调度器状态: {scheduler_status}\n"
+        if schedule_info:
+            status_text += f"   执行时间: {schedule_info}\n"
+        status_text += "\n"
+    
+    await msg.reply(status_text)
+
+
+@bot.on_message(filters.command('dayplayrank', prefixes) & admins_on_filter)
+async def toggle_dayplayrank(_, msg):
+    """手动启用/禁用每日观影排行榜定时任务"""
+    await deleteMessage(msg)
+    
+    try:
+        # 获取当前状态
+        current_state = getattr(schedall, 'dayplayrank', False)
+        action = action_dict['dayplayrank']
+        args = args_dict['dayplayrank']
+        
+        if current_state:
+            # 当前启用，禁用它
+            scheduler.remove_job(job_id=args['id'], jobstore='default')
+            setattr(schedall, 'dayplayrank', False)
+            status_text = "❌ 已禁用每日观影排行榜定时任务"
+            LOGGER.info("【手动操作】禁用 dayplayrank 定时任务")
+        else:
+            # 当前禁用，启用它
+            scheduler.add_job(action, 'cron', **args)
+            setattr(schedall, 'dayplayrank', True)
+            status_text = f"✅ 已启用每日观影排行榜定时任务\n⏰ 执行时间: 每日 {args['hour']:02d}:{args['minute']:02d}"
+            LOGGER.info(f"【手动操作】启用 dayplayrank 定时任务，执行时间: {args}")
+        
+        save_config()
+        await msg.reply(status_text)
+        
+    except Exception as e:
+        error_msg = f"❌ 操作失败: {str(e)}"
+        LOGGER.error(f"【手动操作】切换 dayplayrank 失败: {e}")
+        await msg.reply(error_msg)
 
 
 @bot.on_message(filters.command('uranks', prefixes) & admins_on_filter)
