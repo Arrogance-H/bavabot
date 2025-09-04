@@ -229,7 +229,6 @@ async def codelottery_dbcheck_command(_, message):
             # 检查配置
             status_text += (
                 f"\n📊 **系统配置**\n"
-                f"• 状态：{'启用' if config.code_lottery.status else '禁用'}\n"
                 f"• 仅管理员：{'是' if config.code_lottery.admin_only else '否'}\n"
                 f"• 参与费用：{config.code_lottery.entry_fee} JOY币\n"
                 f"• 保底次数：{config.code_lottery.guaranteed_win_count}\n"
