@@ -29,7 +29,7 @@ async def admins_on_filter(filt, client, update) -> bool:
     return bool(uid == owner or uid in admins or uid in group)
 
 
-async def admins_filter(update):
+async def admins_filter(filt, client, update) -> bool:
     """
     过滤admins中id，包括owner
     """
