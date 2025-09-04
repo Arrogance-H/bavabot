@@ -82,11 +82,10 @@ class Uplaysinfo:
                                 points += 2
                             elif rank == 3:
                                 points += 1
-                        else:
-                            # 观看时长不足60分钟，无奖励
-                            points = 0
-                        new_iv = member_info["iv"] + points
-                        leaderboard_data.append([member_info["tg"], new_iv, f'{medal}{emby_name}', points])
+                            
+                            # 只有获得积分的用户才加入奖励列表
+                            new_iv = member_info["iv"] + points
+                            leaderboard_data.append([member_info["tg"], new_iv, f'{medal}{emby_name}', points])
 
                     formatted_time = await convert_s(int(play_record[1]))
                     page_data += f'{medal}**第{cn2an.an2cn(rank)}名** | [{emby_name}](https://www.google.com/search?q={tg})\n' \
