@@ -60,12 +60,11 @@ async def start_codelottery_command(_, message):
         lottery_text = (
             f"🎉 **新抽奖活动开启！**\n\n"
             f"🎯 **奖品名称：** {lottery_name}\n"
-            f"💰 **参与费用：** {entry_fee} 花币\n"
+            f"💰 **参与费用：** {entry_fee} JOY币\n"
             f"🏆 **获奖人数：** {winner_count} 人\n"
             f"⏰ **抽奖时长：** {duration_minutes} 分钟\n"
-            f"🎲 **参与条件：** 群组成员、等级为d且需要花币支付参与费用\n\n"
             f"💡 **保底机制：** 连续参与 {config.code_lottery.guaranteed_win_count} 次未中奖必中下次\n\n"
-            f"点击下方按钮参与抽奖！"
+            f"👇 点击下方按钮参与抽奖！"
         )
         
         keyboard = InlineKeyboardMarkup([
@@ -169,14 +168,12 @@ async def codelottery_stats_command(_, message):
             f"🎯 **个人抽奖统计**\n\n"
             f"👤 用户：{message.from_user.first_name}\n"
             f"🎫 参与次数：{user_stats['total_participation']}\n"
-            f"🏆 获奖次数：{user_stats['total_wins']}\n"
-            f"📈 中奖率：{user_stats['win_rate']}\n"
-            f"🎲 保底次数：{user_stats['guaranteed_count']}/10\n\n"
+            f"🎲 保底次数：{user_stats['guaranteed_count']}/{config.code_lottery.guaranteed_win_count}\n\n"
         )
         
-        if user_stats['guaranteed_count'] >= 8:
+        if user_stats['guaranteed_count'] >= 6:
             stats_text += "💡 提示：您的保底次数即将满足，下次参与中奖概率更高！"
-        elif user_stats['guaranteed_count'] >= 10:
+        elif user_stats['guaranteed_count'] >= {config.code_lottery.guaranteed_win_count}:
             stats_text += "🎉 恭喜：您已满足保底条件，下次参与必中！"
         
         await message.reply(stats_text)
@@ -222,12 +219,12 @@ async def handle_join_lottery(_, call):
         
         # 检查用户等级是否为d
         if user_info.lv != 'd':
-            await callAnswer(call, '❌ 只有等级为d的用户才能参与抽奖', True)
+            await callAnswer(call, '❌ 只有未注册的用户才能参与抽奖', True)
             return
         
         # 检查用户花币是否足够
         if user_info.iv < active_lottery.entry_fee:
-            await callAnswer(call, f'❌ 花币不足，需要 {active_lottery.entry_fee} 花币参与', True)
+            await callAnswer(call, f'❌ JOY币不足，需要 {active_lottery.entry_fee} JOY币参与', True)
             return
         
         # 参与抽奖
@@ -279,9 +276,7 @@ async def handle_lottery_stats(_, call):
             f"⏰ 结束时间：{active_lottery.end_time.strftime('%H:%M:%S')}\n\n"
             f"👤 **您的统计：**\n"
             f"🎫 参与次数：{user_stats['total_participation']}\n"
-            f"🏆 获奖次数：{user_stats['total_wins']}\n"
-            f"📈 中奖率：{user_stats['win_rate']}\n"
-            f"🎲 保底次数：{user_stats['guaranteed_count']}/10"
+            f"🎲 保底次数：{user_stats['guaranteed_count']}/{config.code_lottery.guaranteed_win_count}"
         )
         
         await callAnswer(call, stats_text, True)
