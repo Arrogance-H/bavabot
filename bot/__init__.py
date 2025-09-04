@@ -130,6 +130,7 @@ admin_p = user_p + [
     BotCommand("force_settlement", "紧急手动结算执行 [管理]"),
     BotCommand("settlement_status", "查看结算系统状态和配置 [管理]"),
     BotCommand("test_settlement_error", "测试错误通知系统 [管理]"),
+    BotCommand("codelottery_draw", "手动开奖当前抽奖轮次 [管理]"),
 ]
 
 owner_p = admin_p + [
