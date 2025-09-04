@@ -26,7 +26,32 @@ async def admins_on_filter(filt, client, update) -> bool:
     """
     user = update.from_user or update.sender_chat
     uid = user.id
-    return bool(uid == owner or uid in admins or uid in group)
+    
+    # Check if user is owner or in admin list
+    if uid == owner or uid in admins:
+        return True
+    
+    # Check if user ID is explicitly in group list (for special users)
+    if uid in group:
+        return True
+    
+    # Check if user is actually a member of any authorized group
+    for i in group:
+        try:
+            u = await client.get_chat_member(chat_id=int(i), user_id=uid)
+            if u.status in [ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.MEMBER,
+                            ChatMemberStatus.OWNER]:
+                return True
+        except BadRequest as e:
+            if e.ID == 'USER_NOT_PARTICIPANT':
+                continue
+            elif e.ID == 'CHAT_ADMIN_REQUIRED':
+                LOGGER.error(f"bot不能在 {i} 中工作，请检查bot是否在群组及其权限设置")
+                continue
+            else:
+                continue
+    
+    return False
 
 
 async def admins_filter(filt, client, update) -> bool:

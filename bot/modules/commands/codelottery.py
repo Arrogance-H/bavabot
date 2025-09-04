@@ -6,7 +6,7 @@ import datetime
 from pyrogram import filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from bot import bot, prefixes, sakura_b, LOGGER, config
-from bot.func_helper.filters import user_in_group_on_filter, admins_filter
+from bot.func_helper.filters import user_in_group_on_filter, admins_on_filter
 from bot.func_helper.msg_utils import sendMessage, deleteMessage
 from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby
 from bot.sql_helper.sql_codelottery import (
@@ -22,7 +22,7 @@ from bot.sql_helper.sql_codelottery import (
 )
 
 
-@bot.on_message(filters.command('codelottery_start', prefixes) & admins_filter)
+@bot.on_message(filters.command('codelottery_start', prefixes) & admins_on_filter)
 async def start_codelottery_command(_, msg):
     """管理员开启抽奖命令"""
     await deleteMessage(msg)
@@ -189,7 +189,7 @@ async def join_codelottery_callback(_, callback_query):
     LOGGER.info(f"用户{user_id}参与第{round_id}轮抽奖，当前人数：{current_count}")
 
 
-@bot.on_message(filters.command('codelottery_stop', prefixes) & admins_filter)
+@bot.on_message(filters.command('codelottery_stop', prefixes) & admins_on_filter)
 async def stop_codelottery_command(_, msg):
     """管理员停止抽奖命令"""
     await deleteMessage(msg)
