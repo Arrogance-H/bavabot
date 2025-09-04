@@ -65,7 +65,7 @@ async def start_codelottery_command(_, msg):
         f"⏰ 抽奖时间：**{config.code_lottery.duration_minutes}** 分钟\n"
         f"💰 参与费用：**{config.code_lottery.entry_fee}** {sakura_b}\n"
         f"🏆 获奖人数：**{config.code_lottery.winner_count}** 人\n"
-        f"🔑 参与条件：仅限lv=c用户\n\n"
+        f"🔑 参与条件：仅限未注册用户\n\n"
         f"📊 当前参与人数：**0** 人\n"
         f"⏱️ 结束时间：**{new_round.end_time.strftime('%H:%M:%S')}**\n\n"
         f"💡 **重要提示**：\n"
@@ -101,7 +101,7 @@ async def join_codelottery_callback(_, callback_query):
     if user.lv != 'c':
         level_names = {'a': '白名单用户', 'b': '普通用户', 'd': '未注册用户'}
         level_name = level_names.get(user.lv, '未知等级用户')
-        return await callback_query.edit_message_text(f"❌ 您已有账号，仅限lv=c用户参与抽奖\n您当前是：{level_name}")
+        return await callback_query.edit_message_text(f"⚠️ 您已有账号！")
     
     # 检查用户余额
     if user.iv < config.code_lottery.entry_fee:
@@ -150,7 +150,7 @@ async def join_codelottery_callback(_, callback_query):
             f"⏰ 抽奖时间：**{round_obj.duration_minutes}** 分钟\n"
             f"💰 参与费用：**{round_obj.entry_fee}** {sakura_b}\n"
             f"🏆 获奖人数：**{round_obj.winner_count}** 人\n"
-            f"🔑 参与条件：仅限lv=c用户\n\n"
+            f"🔑 参与条件：仅限未注册用户\n\n"
             f"📊 当前参与人数：**{current_count}** 人\n"
             f"⏱️ 剩余时间：**{time_remaining}**\n\n"
             f"💡 **重要提示**：\n"
@@ -243,8 +243,6 @@ async def codelottery_stats_command(_, msg):
         stats_msg += (
             f"👤 **您的统计**：\n"
             f"   • 总参与次数：{personal_record.total_participations}\n"
-            f"   • 总获奖次数：{personal_record.total_wins}\n"
-            f"   • 个人中奖率：{personal_win_rate}%\n"
             f"   • 距离保底还需：{next_guaranteed}次\n\n"
         )
     else:
@@ -278,7 +276,7 @@ async def codelottery_stats_command(_, msg):
         f"   • 总参与次数：{global_stats['total_participations']}\n"
         f"   • 总获奖次数：{global_stats['total_wins']}\n\n"
         f"ℹ️ **规则提醒**：\n"
-        f"   • 仅限lv=c用户参与\n"
+        f"   • 仅限未注册用户参与\n"
         f"   • 参与费用：{config.code_lottery.entry_fee}{sakura_b}\n"
         f"   • 累计参与{config.code_lottery.guaranteed_win_count}次后必定中奖\n"
         f"   • 每轮抽奖每人只能参与一次"
