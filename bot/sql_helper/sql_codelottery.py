@@ -16,6 +16,7 @@ from sqlalchemy import (
     func,
     and_,
     or_,
+    text,
 )
 
 
@@ -202,11 +203,23 @@ _migrate_code_lottery_rounds_table()
 _migrate_code_lottery_users_table()
 
 
+def sql_check_database_connection() -> bool:
+    """检查数据库连接是否正常"""
+    try:
+        with Session() as session:
+            session.execute(text("SELECT 1"))
+            return True
+    except Exception as e:
+        from bot import LOGGER
+        LOGGER.error(f"【抽奖系统】数据库连接检查失败: {type(e).__name__}: {str(e)}")
+        return False
+
+
 def sql_create_lottery_round(creator_tg: int, lottery_name: str, duration_minutes: int, 
                            entry_fee: int, winner_count: int) -> Optional[int]:
     """创建新的抽奖轮次"""
-    with Session() as session:
-        try:
+    try:
+        with Session() as session:
             start_time = datetime.now()
             end_time = start_time + timedelta(minutes=duration_minutes)
             
@@ -222,23 +235,34 @@ def sql_create_lottery_round(creator_tg: int, lottery_name: str, duration_minute
             session.add(round_obj)
             session.commit()
             return round_obj.id
-        except Exception as e:
+    except Exception as e:
+        # Import logger inside function to avoid circular imports
+        from bot import LOGGER
+        LOGGER.error(f"【抽奖系统】创建抽奖轮次失败: {type(e).__name__}: {str(e)}")
+        try:
             session.rollback()
-            return None
+        except:
+            pass
+        return None
 
 
 def sql_get_active_lottery() -> Optional[CodeLotteryRound]:
     """获取当前活跃的抽奖轮次"""
-    with Session() as session:
-        return session.query(CodeLotteryRound).filter(
-            CodeLotteryRound.status == 'active'
-        ).first()
+    try:
+        with Session() as session:
+            return session.query(CodeLotteryRound).filter(
+                CodeLotteryRound.status == 'active'
+            ).first()
+    except Exception as e:
+        from bot import LOGGER
+        LOGGER.error(f"【抽奖系统】获取活跃抽奖失败: {type(e).__name__}: {str(e)}")
+        return None
 
 
 def sql_join_lottery(round_id: int, tg: int, username: str) -> bool:
     """用户参与抽奖"""
-    with Session() as session:
-        try:
+    try:
+        with Session() as session:
             # 检查是否已经参与
             existing = session.query(CodeLotteryParticipant).filter(
                 and_(
@@ -274,9 +298,14 @@ def sql_join_lottery(round_id: int, tg: int, username: str) -> bool:
             
             session.commit()
             return True
-        except Exception as e:
+    except Exception as e:
+        from bot import LOGGER
+        LOGGER.error(f"【抽奖系统】用户参与抽奖失败: {type(e).__name__}: {str(e)}")
+        try:
             session.rollback()
-            return False
+        except:
+            pass
+        return False
 
 
 def sql_get_lottery_participants(round_id: int) -> List[CodeLotteryParticipant]:
@@ -392,26 +421,36 @@ def sql_cancel_lottery(round_id: int) -> bool:
 
 def sql_get_lottery_stats(tg: int) -> dict:
     """获取用户抽奖统计"""
-    with Session() as session:
-        user_stats = session.query(CodeLotteryUser).filter(
-            CodeLotteryUser.tg == tg
-        ).first()
-        
-        if not user_stats:
+    try:
+        with Session() as session:
+            user_stats = session.query(CodeLotteryUser).filter(
+                CodeLotteryUser.tg == tg
+            ).first()
+            
+            if not user_stats:
+                return {
+                    'total_participation': 0,
+                    'total_wins': 0,
+                    'guaranteed_count': 0,
+                    'win_rate': '0%'
+                }
+            
+            win_rate = (user_stats.total_wins / user_stats.total_participation * 100) if user_stats.total_participation > 0 else 0
+            
             return {
-                'total_participation': 0,
-                'total_wins': 0,
-                'guaranteed_count': 0,
-                'win_rate': '0%'
+                'total_participation': user_stats.total_participation,
+                'total_wins': user_stats.total_wins,
+                'guaranteed_count': user_stats.guaranteed_count,
+                'win_rate': f'{win_rate:.1f}%'
             }
-        
-        win_rate = (user_stats.total_wins / user_stats.total_participation * 100) if user_stats.total_participation > 0 else 0
-        
+    except Exception as e:
+        from bot import LOGGER
+        LOGGER.error(f"【抽奖系统】获取用户统计失败: {type(e).__name__}: {str(e)}")
         return {
-            'total_participation': user_stats.total_participation,
-            'total_wins': user_stats.total_wins,
-            'guaranteed_count': user_stats.guaranteed_count,
-            'win_rate': f'{win_rate:.1f}%'
+            'total_participation': 0,
+            'total_wins': 0,
+            'guaranteed_count': 0,
+            'win_rate': '0%'
         }
 
 

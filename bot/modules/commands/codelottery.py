@@ -14,7 +14,8 @@ from bot.sql_helper.sql_codelottery import (
     sql_join_lottery,
     sql_cancel_lottery,
     sql_get_lottery_stats,
-    sql_get_lottery_participants
+    sql_get_lottery_participants,
+    sql_check_database_connection
 )
 
 
@@ -22,6 +23,13 @@ from bot.sql_helper.sql_codelottery import (
 async def start_codelottery_command(_, message):
     """管理员开启抽奖命令"""
     try:
+        # 检查数据库连接
+        if not sql_check_database_connection():
+            await message.reply(
+                '❌ 数据库连接失败，无法创建抽奖\n'
+                '💡 请检查数据库服务状态或联系管理员'
+            )
+            return
         
         # 检查是否已有活跃抽奖
         active_lottery = sql_get_active_lottery()
@@ -53,7 +61,14 @@ async def start_codelottery_command(_, message):
         )
         
         if not round_id:
-            await message.reply('❌ 创建抽奖失败，请稍后重试。')
+            await message.reply(
+                '❌ 创建抽奖失败，请稍后重试\n'
+                '💡 可能的原因：\n'
+                '• 数据库连接问题\n'
+                '• 数据库表结构问题\n'
+                '• 数据库权限不足\n'
+                '请检查日志获取详细错误信息'
+            )
             return
         
         # 发送抽奖通知
@@ -162,6 +177,14 @@ async def manual_codelottery_draw_command(_, message):
 async def codelottery_stats_command(_, message):
     """查看抽奖统计命令"""
     try:
+        # 检查数据库连接
+        if not sql_check_database_connection():
+            await message.reply(
+                '❌ 数据库连接失败，无法查询统计信息\n'
+                '💡 请检查数据库服务状态或联系管理员'
+            )
+            return
+            
         user_stats = sql_get_lottery_stats(message.from_user.id)
         
         stats_text = (
@@ -181,6 +204,53 @@ async def codelottery_stats_command(_, message):
     except Exception as e:
         await message.reply(f'❌ 查询统计时出错：{str(e)}')
         LOGGER.error(f"【抽奖系统】查询统计出错：{e}")
+
+
+@bot.on_message(filters.command('codelottery_dbcheck') & admins_on_filter)
+async def codelottery_dbcheck_command(_, message):
+    """管理员检查抽奖系统数据库状态"""
+    try:
+        # 检查数据库连接
+        db_status = sql_check_database_connection()
+        
+        if db_status:
+            status_text = "✅ 数据库连接正常\n"
+            
+            # 尝试获取活跃抽奖
+            try:
+                active_lottery = sql_get_active_lottery()
+                if active_lottery:
+                    status_text += f"🎯 当前活跃抽奖：{active_lottery.lottery_name}\n"
+                else:
+                    status_text += "📋 当前无活跃抽奖\n"
+            except Exception as e:
+                status_text += f"⚠️ 查询活跃抽奖时出错：{str(e)}\n"
+            
+            # 检查配置
+            status_text += (
+                f"\n📊 **系统配置**\n"
+                f"• 状态：{'启用' if config.code_lottery.status else '禁用'}\n"
+                f"• 仅管理员：{'是' if config.code_lottery.admin_only else '否'}\n"
+                f"• 参与费用：{config.code_lottery.entry_fee} JOY币\n"
+                f"• 保底次数：{config.code_lottery.guaranteed_win_count}\n"
+                f"• 默认时长：{config.code_lottery.duration_minutes}分钟\n"
+                f"• 获奖人数：{config.code_lottery.winner_count}\n"
+            )
+        else:
+            status_text = (
+                "❌ 数据库连接失败\n"
+                "💡 可能的原因：\n"
+                "• MySQL服务未启动\n"
+                "• 数据库配置错误\n"
+                "• 网络连接问题\n"
+                "• 数据库权限不足\n"
+            )
+        
+        await message.reply(status_text)
+        
+    except Exception as e:
+        await message.reply(f'❌ 检查数据库状态时出错：{str(e)}')
+        LOGGER.error(f"【抽奖系统】数据库状态检查出错：{e}")
 
 
 @bot.on_callback_query(filters.regex(r'join_lottery_(\d+)'))
