@@ -3,6 +3,7 @@
 ## Problem
 The CodeLottery system was failing with these errors:
 ```
+(pymysql.err.OperationalError) (1054, "Unknown column 'code_lottery_rounds.start_time' in 'field list'")
 (pymysql.err.OperationalError) (1054, "Unknown column 'code_lottery_rounds.creator_tg' in 'field list'")
 (pymysql.err.OperationalError) (1054, "Unknown column 'code_lottery_users.total_participation' in 'field list'")
 ```
@@ -34,15 +35,15 @@ python3 fix_codelottery_columns.py --host localhost --user myuser --password myp
 
 ### code_lottery_rounds table
 - `id` (INT, PRIMARY KEY) - Round ID
-- `lottery_name` (VARCHAR(200)) - Lottery name
+- `lottery_name` (VARCHAR(200), NOT NULL) - Lottery name (FIXED)
 - `creator_tg` (BIGINT, NOT NULL) - Creator Telegram ID (FIXED)
-- `start_time` (DATETIME) - Start time
-- `end_time` (DATETIME) - End time
-- `entry_fee` (INT) - Entry fee
-- `winner_count` (INT) - Winner count
-- `status` (VARCHAR(20)) - Status
-- `draw_time` (DATETIME) - Draw time
-- `created_at` (DATETIME) - Created time
+- `start_time` (DATETIME, NOT NULL) - Start time (FIXED)
+- `end_time` (DATETIME, NOT NULL) - End time (FIXED)
+- `entry_fee` (INT, DEFAULT 3) - Entry fee (FIXED)
+- `winner_count` (INT, DEFAULT 1) - Winner count (FIXED)
+- `status` (VARCHAR(20), DEFAULT 'active') - Status (FIXED)
+- `draw_time` (DATETIME, NULL) - Draw time (FIXED)
+- `created_at` (DATETIME, DEFAULT CURRENT_TIMESTAMP) - Created time (FIXED)
 
 ### code_lottery_users table
 - `tg` (BIGINT, PRIMARY KEY) - Telegram user ID
@@ -53,8 +54,8 @@ python3 fix_codelottery_columns.py --host localhost --user myuser --password myp
 - `last_win` (DATETIME, NULL) - Last win time
 
 ## Files Modified
-- `bot/sql_helper/sql_codelottery.py` - Added automatic migration functions for both tables
-- `fix_codelottery_columns.py` - Standalone migration script (UPDATED to handle both tables)
+- `bot/sql_helper/sql_codelottery.py` - Added automatic migration for ALL missing columns in code_lottery_rounds table
+- `fix_codelottery_columns.py` - Updated standalone migration script to handle ALL missing columns
 
 ## Testing
-After applying the fix, the lottery creation and `/codelottery_stats` commands should work without errors.
+After applying the fix, lottery creation and `/codelottery_stats` commands should work without the "Unknown column" errors.

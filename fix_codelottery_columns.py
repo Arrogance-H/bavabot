@@ -66,7 +66,15 @@ def fix_code_lottery_rounds_table(connection):
             
             # Define the required columns
             required_columns = {
-                'creator_tg': 'BIGINT NOT NULL DEFAULT 0 COMMENT "创建者TG ID"'
+                'lottery_name': 'VARCHAR(200) NOT NULL COMMENT "抽奖名称"',
+                'creator_tg': 'BIGINT NOT NULL DEFAULT 0 COMMENT "创建者TG ID"',
+                'start_time': 'DATETIME NOT NULL COMMENT "开始时间"',
+                'end_time': 'DATETIME NOT NULL COMMENT "结束时间"',
+                'entry_fee': 'INT DEFAULT 3 COMMENT "参与费用"',
+                'winner_count': 'INT DEFAULT 1 COMMENT "获奖人数"',
+                'status': 'VARCHAR(20) DEFAULT "active" COMMENT "状态：active, completed, cancelled"',
+                'draw_time': 'DATETIME NULL COMMENT "实际开奖时间"',
+                'created_at': 'DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT "创建时间"'
             }
             
             # Add missing columns
