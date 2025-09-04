@@ -9,6 +9,7 @@ from bot import bot, prefixes, sakura_b, LOGGER, config
 from bot.func_helper.filters import user_in_group_on_filter
 from bot.func_helper.msg_utils import sendMessage, editMessage, callAnswer, deleteMessage
 from bot.func_helper.fix_bottons import ikb
+from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby
 from bot.sql_helper.sql_hunt import (
     sql_start_hunt, sql_end_hunt, sql_get_active_hunt, sql_get_hunt_by_id, sql_add_equipment,
     sql_get_user_equipment, sql_get_today_hunt_count, sql_get_total_hunt_actions, sql_get_today_hunt_actions, sql_get_daily_car,
@@ -25,6 +26,17 @@ async def delete_message_after_delay(message, delay_seconds: int):
         await deleteMessage(message)
     except Exception as e:
         LOGGER.error(f"删除延迟消息失败: {e}")
+
+
+def ensure_user_exists(user_id: int) -> Emby:
+    """确保用户存在，如果不存在则创建基础记录并给予初始金币"""
+    user = sql_get_emby(user_id)
+    if not user:
+        from bot.sql_helper.sql_emby import sql_add_emby
+        sql_add_emby(user_id)
+        sql_update_emby(Emby.tg == user_id, iv=10)  # 给予10个初始金币
+        user = sql_get_emby(user_id)
+    return user
 
 
 
@@ -197,6 +209,7 @@ async def handle_game_completion(call, hunt_id: int, daily_car, equipment_found_
     notification_text += f"   TG ID: `{call.from_user.id}`\n\n"
     notification_text += f"⏰ **完成时间:** {completion_time.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
     notification_text += f"🏎️ **目标汽车:** {daily_car.car_name}\n\n"
+    notification_text += f"💰 **消耗JOY币:** {hunt.coins_spent}\n\n"
     notification_text += f"🎁 **获得奖励:** {reward_description}\n\n"
     notification_text += f"📋 **领奖信息:** {claim_info}\n\n"
     notification_text += f"🎮 恭喜完成寻宝挑战！"
@@ -258,6 +271,9 @@ async def start_hunt(_, msg):
     """开始车库游戏"""
     await msg.delete()
     
+    # 确保用户存在（自动创建emby账户）
+    user = ensure_user_exists(msg.from_user.id)
+    
     # 检查今日游戏次数
     today_count = sql_get_today_hunt_count(msg.from_user.id)
     if today_count >= config.hunt_daily_limit:
@@ -290,6 +306,7 @@ async def start_hunt(_, msg):
             f"🏎️ **寻宝游戏进行中**\n\n"
             f"👤 **{user_nickname}** 正在寻宝...\n\n"
             f"🎯 今日目标汽车: **{car_name}**\n"
+            f"💰 当前{sakura_b}: {user.iv}{sakura_b}\n"
             f"📊 今日寻宝次数: {sql_get_today_hunt_actions(msg.from_user.id)}次\n\n"
             f"{equipment_display}\n\n"
             f"💪 继续您的寻宝之旅吧！",
@@ -367,6 +384,9 @@ async def start_hunt(_, msg):
     # 获取用户昵称
     user_nickname = msg.from_user.first_name
     
+    # 获取用户当前金币
+    current_coins = user.iv if user else 0
+    
     # 发送游戏界面消息
     hunt_message = await sendMessage(
         msg,
@@ -375,6 +395,8 @@ async def start_hunt(_, msg):
         f"🎯 今日目标汽车: **{car_name}**\n"
         f"{reward_text}\n"
         f"🔧 需要装备:\n{equipment_display}\n"
+        f"💰 每次寻找消耗 1{sakura_b}\n"
+        f"💰 当前{sakura_b}: {current_coins}{sakura_b}\n"
         f"🕹️ 今日剩余游戏次数: {config.hunt_daily_limit - today_count - 1}\n"
         f"📊 今日寻宝次数: {sql_get_today_hunt_actions(msg.from_user.id)}次\n\n"
         f"👇 点击下方按钮开始寻找装备！",
@@ -400,6 +422,16 @@ async def hunt_bulk_action(_, call):
     is_valid, hunt = await validate_hunt_session(call, hunt_id)
     if not is_valid:
         return
+    
+    # 计算所需金币 (每次1金币)
+    required_coins = quantity
+    user = ensure_user_exists(call.from_user.id)
+    if user.iv < required_coins:
+        return await callAnswer(call, f"❌ {sakura_b}不足，寻找{quantity}次需要 {required_coins} 个", show_alert=True)
+    
+    # 扣除金币
+    if not sql_update_emby(Emby.tg == call.from_user.id, iv=user.iv - required_coins):
+        return await callAnswer(call, f"❌ 扣除{sakura_b}失败", show_alert=True)
     
     # 获取今日目标汽车装备ID (从缓存)
     daily_car = sql_get_cached_daily_car(hunt)
@@ -488,6 +520,7 @@ async def hunt_bulk_action(_, call):
     result_text += f"\n🏎️ **当前状态:**\n"
     result_text += f"👤 **{call.from_user.first_name}** 正在寻宝...\n"
     result_text += f"🎯 目标汽车: {car_name}\n"
+    result_text += f"💰 当前{sakura_b}: {user.iv - required_coins}{sakura_b}\n"
     result_text += f"📊 今日寻宝次数: {sql_get_today_hunt_actions(call.from_user.id)}次\n\n"
     result_text += f"{equipment_display}\n\n"
     result_text += f"💪 继续寻找装备吧！"
@@ -513,6 +546,15 @@ async def hunt_action(_, call):
         if time_since_last < 1:
             remaining = 1 - time_since_last
             return await callAnswer(call, f"⏰ 请等待 {remaining:.1f} 秒后再寻找", show_alert=True)
+    
+    # 检查用户金币
+    user = ensure_user_exists(call.from_user.id)
+    if user.iv < 1:
+        return await callAnswer(call, f"❌ {sakura_b}不足，需要 1 个{sakura_b}", show_alert=True)
+    
+    # 扣除金币
+    if not sql_update_emby(Emby.tg == call.from_user.id, iv=user.iv - 1):
+        return await callAnswer(call, f"❌ 扣除{sakura_b}失败", show_alert=True)
     
     # 根据稀有度权重随机获得装备
     equipment_id = sql_random_equipment_by_rarity()
@@ -572,6 +614,7 @@ async def hunt_action(_, call):
                         f"🏎️ **寻宝游戏进行中**\n\n"
                         f"👤 **{user_nickname}** 正在寻宝...\n\n"
                         f"🎯 今日目标汽车: **{car_name}**\n"
+                        f"💰 当前{sakura_b}: {user.iv - 1}{sakura_b}\n"
                         f"📊 今日寻宝次数: {sql_get_today_hunt_actions(call.from_user.id)}次\n"
                         f"✅ 刚获得: {color_emoji} {equipment_name} (目标装备)\n\n"
                         f"{equipment_display}\n\n"
@@ -606,6 +649,7 @@ async def hunt_action(_, call):
                     f"🏎️ **寻宝游戏进行中**\n\n"
                     f"👤 **{user_nickname}** 正在寻宝...\n\n"
                     f"🎯 今日目标汽车: **{car_name}**\n"
+                    f"💰 当前{sakura_b}: {user.iv - 1}{sakura_b}\n"
                     f"📊 今日寻宝次数: {sql_get_today_hunt_actions(call.from_user.id)}次\n"
                     f"🗑️ 刚丢弃: {color_emoji} {equipment_name} (非目标装备)\n\n"
                     f"{equipment_display}\n\n"
@@ -613,10 +657,12 @@ async def hunt_action(_, call):
                     buttons=hunt_game_ikb(hunt_id, int(current_time.timestamp()))
                 )
         else:
-            # 如果装备定义不存在
+            # 如果装备定义不存在，退还金币
+            sql_update_emby(Emby.tg == call.from_user.id, iv=user.iv)
             await callAnswer(call, "❌ 寻找失败，请重试", show_alert=True)
     else:
-        # 如果随机装备失败
+        # 如果随机装备失败，退还金币
+        sql_update_emby(Emby.tg == call.from_user.id, iv=user.iv)
         await callAnswer(call, "❌ 寻找失败，请重试", show_alert=True)
 
 
@@ -657,7 +703,8 @@ async def hunt_end(_, call):
         
         result_text = f"🏁 **寻宝结束**\n\n"
         result_text += f"👤 **{user_nickname}** 已经结束寻宝\n\n"
-        result_text += f"⏱️ 游戏时长: {duration_minutes}分{duration_seconds}秒\n\n"
+        result_text += f"⏱️ 游戏时长: {duration_minutes}分{duration_seconds}秒\n"
+        result_text += f"💰 消耗{sakura_b}: {hunt.coins_spent}{sakura_b}\n\n"
         
         # 显示目标汽车信息
         if daily_car:
@@ -735,6 +782,10 @@ async def hunt_game_return(_, call):
     daily_car = sql_get_cached_daily_car(hunt)
     car_name = daily_car.car_name if daily_car else "未知"
     
+    # 获取用户当前金币
+    user = ensure_user_exists(call.from_user.id)
+    current_coins = user.iv if user else 0
+    
     # 获取目标装备显示信息
     target_equipment_ids = []
     equipment_display = ""
@@ -749,6 +800,7 @@ async def hunt_game_return(_, call):
         f"🏎️ **寻宝进行中**\n\n"
         f"👤 **{call.from_user.first_name}** 正在寻宝...\n\n"
         f"🎯 今日目标汽车: **{car_name}**\n"
+        f"💰 当前{sakura_b}: {current_coins}{sakura_b}\n"
         f"📊 今日寻宝次数: {sql_get_today_hunt_actions(call.from_user.id)}次\n\n"
         f"{equipment_display}\n\n"
         f"👇 点击下方按钮继续寻找装备！",
@@ -793,10 +845,16 @@ async def hunt_whitelist_continue(_, call):
     # 获取用户昵称
     user_nickname = call.from_user.first_name
     
+    # 获取用户信息
+    user = ensure_user_exists(call.from_user.id)
+    
     await callAnswer(call, "✅ 继续游戏")
     
     # 设置游戏界面，但用editMessage而不是sendMessage
     from bot.sql_helper.sql_hunt import sql_get_today_hunt_actions
+    
+    # 获取用户当前金币
+    current_coins = user.iv if user else 0
     
     # 构建奖励文本
     reward_text = ""
@@ -814,6 +872,8 @@ async def hunt_whitelist_continue(_, call):
         f"🎯 今日目标汽车: **{daily_car.car_name}**\n"
         f"{reward_text}\n"
         f"🔧 需要装备:\n{equipment_display}\n"
+        f"💰 每次寻找消耗 1{sakura_b}\n"
+        f"💰 当前{sakura_b}: {current_coins}{sakura_b}\n"
         f"🕹️ 今日剩余游戏次数: {config.hunt_daily_limit - today_count - 1}\n"
         f"📊 今日寻宝次数: {sql_get_today_hunt_actions(call.from_user.id)}次\n\n"
         f"👇 点击下方按钮开始寻找装备！",
