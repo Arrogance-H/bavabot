@@ -63,7 +63,7 @@ async def start_codelottery_command(_, message):
             f"💰 **参与费用：** {entry_fee} 花币\n"
             f"🏆 **获奖人数：** {winner_count} 人\n"
             f"⏰ **抽奖时长：** {duration_minutes} 分钟\n"
-            f"🎲 **参与条件：** 群组成员且需要花币支付参与费用\n\n"
+            f"🎲 **参与条件：** 群组成员、等级为d且需要花币支付参与费用\n\n"
             f"💡 **保底机制：** 连续参与 {config.code_lottery.guaranteed_win_count} 次未中奖必中下次\n\n"
             f"点击下方按钮参与抽奖！"
         )
@@ -181,6 +181,11 @@ async def handle_join_lottery(_, call):
         user_info = sql_get_emby(tg=user_id)
         if not user_info:
             await callAnswer(call, '❌ 请先使用 /start 命令与bot互动后再参与抽奖', True)
+            return
+        
+        # 检查用户等级是否为d
+        if user_info.lv != 'd':
+            await callAnswer(call, '❌ 只有等级为d的用户才能参与抽奖', True)
             return
         
         # 检查用户花币是否足够
