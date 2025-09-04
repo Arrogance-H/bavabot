@@ -202,6 +202,14 @@ async def update_bot(force: bool = False, msg: Message = None, manual: bool = Fa
     resp = requests.get(commit_url)
     if resp.status_code == 200:
         latest_commit = resp.json()[0]["sha"]
+        
+        # Initialize commit_sha if it's null/empty to prevent false updates
+        if auto_update.commit_sha is None or auto_update.commit_sha == "":
+            auto_update.commit_sha = latest_commit
+            save_config()
+            LOGGER.info(f"【AutoUpdate】初始化commit_sha为: {latest_commit[:8]}")
+            return
+            
         if latest_commit != auto_update.commit_sha:
             up_description = resp.json()[0]["commit"]["message"]
             await execute("git fetch --all")
