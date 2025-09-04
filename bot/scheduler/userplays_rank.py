@@ -72,11 +72,8 @@ class Uplaysinfo:
                         
                         # 奖励机制：只有观看60分钟及以上才有奖励
                         if viewing_time_minutes >= 60:
-                            # 基础积分：时长积分(每分钟1积分)
-                            points = viewing_time_minutes
-                            
-                            # 观看时长超过60分钟，额外获得19积分
-                            points += 19
+                            # 观看时长超过60分钟，获得19积分
+                            points = 19
                             
                             # 前三名额外奖励
                             if rank == 1:
