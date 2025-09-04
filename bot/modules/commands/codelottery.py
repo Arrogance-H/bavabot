@@ -63,10 +63,10 @@ async def start_codelottery_command(_, message):
         lottery_text = (
             f"🎉 **新抽奖活动开启！**\n\n"
             f"🎯 **奖品名称：** {lottery_name}\n"
-            f"💰 **参与费用：** {entry_fee} 花币\n"
+            f"💰 **参与费用：** {entry_fee} 花币（仅已注册用户）\n"
             f"🏆 **获奖人数：** {winner_count} 人\n"
             f"⏰ **抽奖时长：** {duration_minutes} 分钟\n"
-            f"🎲 **参与条件：** 仅限 lv=c 用户参与\n\n"
+            f"🎲 **参与条件：** 所有用户均可参与（已注册用户需 lv=d 等级）\n\n"
             f"💡 **保底机制：** 连续参与 {config.code_lottery.guaranteed_win_count} 次未中奖必中下次\n\n"
             f"点击下方按钮参与抽奖！"
         )
@@ -162,12 +162,8 @@ async def handle_join_lottery(_, call):
         
         # 检查用户等级
         user_info = sql_get_emby(tg=user_id)
-        if not user_info:
-            await callAnswer(call, '❌ 请先注册账户才能参与抽奖', True)
-            return
-        
-        if user_info.lv != 'c':
-            await callAnswer(call, '❌ 只有 lv=c 等级的用户才能参与抽奖', True)
+        if user_info and user_info.lv != 'd':
+            await callAnswer(call, '❌ 只有 lv=d 等级的用户才能参与抽奖', True)
             return
         
         # 检查抽奖是否仍然活跃
@@ -176,15 +172,16 @@ async def handle_join_lottery(_, call):
             await callAnswer(call, '❌ 该抽奖已结束或不存在', True)
             return
         
-        # 检查用户花币是否足够
-        if user_info.iv < active_lottery.entry_fee:
+        # 检查用户花币是否足够（仅对有账户的用户）
+        if user_info and user_info.iv < active_lottery.entry_fee:
             await callAnswer(call, f'❌ 花币不足，需要 {active_lottery.entry_fee} 花币参与', True)
             return
         
         # 参与抽奖
         if sql_join_lottery(round_id, user_id, username):
-            # 扣除花币
-            sql_update_emby(Emby.tg == user_id, iv=user_info.iv - active_lottery.entry_fee)
+            # 扣除花币（仅对有账户的用户）
+            if user_info:
+                sql_update_emby(Emby.tg == user_id, iv=user_info.iv - active_lottery.entry_fee)
             
             await callAnswer(call, '🎉 参与抽奖成功！祝您好运！', True)
             LOGGER.info(f"【抽奖系统】用户 {username} ({user_id}) 参与了抽奖 {round_id}")
