@@ -66,6 +66,7 @@ def fix_code_lottery_rounds_table(connection):
             
             # Define the required columns
             required_columns = {
+                'round_number': 'INT NOT NULL DEFAULT 1 COMMENT "轮次号"',
                 'lottery_name': 'VARCHAR(200) NOT NULL COMMENT "抽奖名称"',
                 'creator_tg': 'BIGINT NOT NULL DEFAULT 0 COMMENT "创建者TG ID"',
                 'start_time': 'DATETIME NOT NULL COMMENT "开始时间"',

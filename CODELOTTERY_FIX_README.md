@@ -35,6 +35,7 @@ python3 fix_codelottery_columns.py --host localhost --user myuser --password myp
 
 ### code_lottery_rounds table
 - `id` (INT, PRIMARY KEY) - Round ID
+- `round_number` (INT, NOT NULL) - Round number (FIXED)
 - `lottery_name` (VARCHAR(200), NOT NULL) - Lottery name (FIXED)
 - `creator_tg` (BIGINT, NOT NULL) - Creator Telegram ID (FIXED)
 - `start_time` (DATETIME, NOT NULL) - Start time (FIXED)

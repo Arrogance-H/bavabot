@@ -27,6 +27,7 @@ class CodeLotteryRound(Base):
     __tablename__ = "code_lottery_rounds"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
+    round_number = Column(Integer, nullable=False)  # 轮次号
     lottery_name = Column(String(200), nullable=False)  # 抽奖名称
     creator_tg = Column(BigInteger, nullable=False)     # 创建者TG ID
     start_time = Column(DateTime, nullable=False)       # 开始时间
@@ -108,6 +109,7 @@ def _migrate_code_lottery_rounds_table():
             
             # 需要添加的列定义
             required_columns = {
+                'round_number': 'INT NOT NULL DEFAULT 1 COMMENT "轮次号"',
                 'lottery_name': 'VARCHAR(200) NOT NULL DEFAULT "Unknown Lottery" COMMENT "抽奖名称"',
                 'creator_tg': 'BIGINT NOT NULL DEFAULT 0 COMMENT "创建者TG ID"',
                 'start_time': 'DATETIME NOT NULL DEFAULT "1970-01-01 00:00:00" COMMENT "开始时间"',
@@ -223,7 +225,12 @@ def sql_create_lottery_round(creator_tg: int, lottery_name: str, duration_minute
             start_time = datetime.now()
             end_time = start_time + timedelta(minutes=duration_minutes)
             
+            # Calculate next round number
+            max_round = session.query(func.max(CodeLotteryRound.round_number)).scalar()
+            next_round_number = (max_round or 0) + 1
+            
             round_obj = CodeLotteryRound(
+                round_number=next_round_number,
                 lottery_name=lottery_name,
                 creator_tg=creator_tg,
                 start_time=start_time,
