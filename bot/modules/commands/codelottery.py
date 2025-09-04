@@ -134,7 +134,6 @@ async def join_codelottery_callback(_, callback_query):
     
     if round_obj:
         # 计算剩余时间
-        import datetime
         now = datetime.datetime.now()
         if now < round_obj.end_time:
             remaining_time = round_obj.end_time - now
@@ -252,7 +251,6 @@ async def codelottery_stats_command(_, msg):
     active_round = global_stats.get('active_round')
     if active_round:
         participants = sql_get_lottery_participants(active_round.id)
-        import datetime
         now = datetime.datetime.now()
         if now < active_round.end_time:
             remaining_time = active_round.end_time - now
