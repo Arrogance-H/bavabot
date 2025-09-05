@@ -61,8 +61,6 @@ activity_check_days = config.activity_check_days
 red_envelope = config.red_envelope
 hunt_daily_limit = config.hunt_daily_limit
 
-code_lottery = config.code_lottery
-
 moviepilot = config.moviepilot
 auto_update = config.auto_update
 api = config.api
@@ -80,9 +78,7 @@ user_p = [
     BotCommand("srank", "[用户/禁言] 查看计分"),
     # 车库游戏用户命令 (Hunt Game User Commands)
     BotCommand("hunt", "[用户] 开始寻宝游戏"),
-    BotCommand("hunt_stats", "[用户] 查看寻宝游戏统计信息"),
-    # 抽奖系统用户命令 (Code Lottery System User Commands)
-    BotCommand("codelottery_stats", "[用户] 查看抽奖统计")]
+    BotCommand("hunt_stats", "[用户] 查看寻宝游戏统计信息")]
 
 # 取消 BotCommand("exchange", "[私聊] 使用注册码")
 admin_p = user_p + [
@@ -123,11 +119,6 @@ admin_p = user_p + [
     BotCommand("hunt_config_reward", "配置寻宝游戏奖励 [管理]"),
     BotCommand("hunt_list_rewards", "查看寻宝游戏奖励配置 [管理]"),
     BotCommand("hunt_config_button", "配置寻宝游戏领奖配置 [管理]"),
-    # 抽奖系统管理员命令 (Code Lottery System Admin Commands)
-    BotCommand("codelottery_start", "开启新的抽奖轮次 [管理]"),
-    BotCommand("codelottery_stop", "停止当前抽奖轮次 [管理]"),
-    BotCommand("codelottery_draw", "手动开奖当前抽奖轮次 [管理]"),
-    BotCommand("codelottery_dbcheck", "检查抽奖系统数据库状态 [管理]"),
     # 结算系统管理员命令 (Settlement System Admin Commands)
     BotCommand("force_settlement", "紧急手动结算执行 [管理]"),
     BotCommand("settlement_status", "查看结算系统状态和配置 [管理]"),
