@@ -31,6 +31,14 @@ active_lotteries: Dict[str, 'Lottery'] = {}
 lottery_setup_sessions: Dict[int, 'LotterySetup'] = {}
 
 
+# 自定义过滤器：只处理在抽奖设置会话中的用户消息
+async def lottery_setup_filter(_, __, message):
+    """只允许正在进行抽奖设置的用户的消息通过"""
+    return message.from_user and message.from_user.id in lottery_setup_sessions
+
+lottery_setup_filter = filters.create(lottery_setup_filter)
+
+
 class Prize:
     """奖品类"""
     def __init__(self, name: str, quantity: int = 1):
@@ -103,14 +111,10 @@ async def start_lottery_setup(_, msg: Message):
         setup.last_message_id = sent_msg.id
 
 
-@bot.on_message(filters.private & ~filters.command("lottery", prefixes))
+@bot.on_message(filters.private & lottery_setup_filter)
 async def handle_lottery_setup(_, msg: Message):
     """处理抽奖设置过程中的消息"""
     user_id = msg.from_user.id
-    
-    if user_id not in lottery_setup_sessions:
-        return
-    
     setup = lottery_setup_sessions[user_id]
     text = msg.text
     
