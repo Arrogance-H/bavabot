@@ -36,7 +36,7 @@ async def sendMessage(message, text: str, buttons=None, timer=None, send=False, 
         send = await message.reply(text=text, quote=True, disable_web_page_preview=True, reply_markup=buttons)
         if timer is not None:
             return await deleteMessage(send, timer)
-        return True
+        return send
     except FloodWait as f:
         LOGGER.warning(str(f))
         await sleep(f.value * 1.2)
@@ -110,9 +110,9 @@ async def sendFile(message, file, file_name, caption=None, buttons=None):
     if isinstance(message, CallbackQuery):
         message = message.message
     try:
-        await message.reply_document(document=file, file_name=file_name, quote=False, caption=caption,
+        send = await message.reply_document(document=file, file_name=file_name, quote=False, caption=caption,
                                      reply_markup=buttons)
-        return True
+        return send
     except FloodWait as f:
         LOGGER.warning(str(f))
         await sleep(f.value * 1.2)
@@ -145,7 +145,7 @@ async def sendPhoto(message, photo, caption=None, buttons=None, timer=None, send
                                          reply_markup=buttons)
         if timer is not None:
             return await deleteMessage(send, timer)
-        return True
+        return send
     except FloodWait as f:
         LOGGER.warning(str(f))
         await sleep(f.value * 1.2)
