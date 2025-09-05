@@ -56,7 +56,7 @@ class Lottery:
         self.draw_time = None  # 手动开奖时间
         
         # 参与条件配置
-        self.participation_type = "all"  # "all", "emby", "paid"
+        self.participation_type = "all"  # "all", "emby", "d_only"
         self.entry_fee = 0  # 付费抽奖费用
         
         # 奖品和参与者
@@ -131,7 +131,6 @@ async def handle_lottery_setup(_, msg: Message):
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("🌍 所有人", "lottery_setup_participation_all")],
             [InlineKeyboardButton("🎬 Emby用户", "lottery_setup_participation_emby")],
-            [InlineKeyboardButton("💰 付费抽奖", "lottery_setup_participation_paid")],
             [InlineKeyboardButton("🔰 新用户专属", "lottery_setup_participation_d_only")]
         ])
         
@@ -200,33 +199,43 @@ async def handle_lottery_setup_callback(_, call: CallbackQuery):
     
     if data == "lottery_setup_participation_all":
         setup.lottery.participation_type = "all"
-        setup.step = "draw_type"
+        setup.step = "entry_fee_choice"
         
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("👤 手动开奖", "lottery_setup_draw_manual")],
-            [InlineKeyboardButton("🤖 自动开奖", "lottery_setup_draw_auto")]
+            [InlineKeyboardButton("💰 设置参与费用", "lottery_setup_fee_yes")],
+            [InlineKeyboardButton("🆓 免费参与", "lottery_setup_fee_no")]
         ])
         
-        await editMessage(call, "✅ 已设置为所有人可参与\n\n请选择开奖方式：", buttons=keyboard)
+        await editMessage(call, "✅ 已设置为所有人可参与\n\n是否需要设置参与费用？", buttons=keyboard)
     
     elif data == "lottery_setup_participation_emby":
         setup.lottery.participation_type = "emby"
-        setup.step = "draw_type"
+        setup.step = "entry_fee_choice"
         
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("👤 手动开奖", "lottery_setup_draw_manual")],
-            [InlineKeyboardButton("🤖 自动开奖", "lottery_setup_draw_auto")]
+            [InlineKeyboardButton("💰 设置参与费用", "lottery_setup_fee_yes")],
+            [InlineKeyboardButton("🆓 免费参与", "lottery_setup_fee_no")]
         ])
         
-        await editMessage(call, "✅ 已设置为仅Emby用户可参与\n\n请选择开奖方式：", buttons=keyboard)
-    
-    elif data == "lottery_setup_participation_paid":
-        setup.lottery.participation_type = "paid"
-        setup.step = "entry_fee"
-        await editMessage(call, "✅ 已设置为付费抽奖\n\n请输入参与费用（单位：" + sakura_b + "）：")
+        await editMessage(call, "✅ 已设置为仅Emby用户可参与\n\n是否需要设置参与费用？", buttons=keyboard)
     
     elif data == "lottery_setup_participation_d_only":
         setup.lottery.participation_type = "d_only"
+        setup.step = "entry_fee_choice"
+        
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("💰 设置参与费用", "lottery_setup_fee_yes")],
+            [InlineKeyboardButton("🆓 免费参与", "lottery_setup_fee_no")]
+        ])
+        
+        await editMessage(call, "✅ 已设置为仅新用户可参与\n\n是否需要设置参与费用？", buttons=keyboard)
+    
+    elif data == "lottery_setup_fee_yes":
+        setup.step = "entry_fee"
+        await editMessage(call, "💰 请输入参与费用（单位：" + sakura_b + "）：")
+    
+    elif data == "lottery_setup_fee_no":
+        setup.lottery.entry_fee = 0
         setup.step = "draw_type"
         
         keyboard = InlineKeyboardMarkup([
@@ -234,7 +243,7 @@ async def handle_lottery_setup_callback(_, call: CallbackQuery):
             [InlineKeyboardButton("🤖 自动开奖", "lottery_setup_draw_auto")]
         ])
         
-        await editMessage(call, "✅ 已设置为仅新用户可参与\n\n请选择开奖方式：", buttons=keyboard)
+        await editMessage(call, "✅ 已设置为免费参与\n\n请选择开奖方式：", buttons=keyboard)
     
     elif data == "lottery_setup_draw_manual":
         setup.lottery.draw_type = "manual"
@@ -278,7 +287,6 @@ def format_lottery_message(lottery: Lottery) -> str:
     participation_type_text = {
         "all": "🌍 所有人",
         "emby": "🎬 Emby用户",
-        "paid": f"💰 付费（{lottery.entry_fee} {sakura_b}）",
         "d_only": "🔰 新用户专属"
     }
     
@@ -289,6 +297,11 @@ def format_lottery_message(lottery: Lottery) -> str:
     
     prizes_text = "\n".join([f"• {prize.name} x{prize.quantity}" for prize in lottery.prizes])
     
+    # 构建参与条件文本
+    participation_text = participation_type_text[lottery.participation_type]
+    if lottery.entry_fee > 0:
+        participation_text += f" + 💰 付费（{lottery.entry_fee} {sakura_b}）"
+    
     text = f"""🎲 **{lottery.name}**
 
 📝 {lottery.description}
@@ -296,7 +309,7 @@ def format_lottery_message(lottery: Lottery) -> str:
 🎁 **奖品列表：**
 {prizes_text}
 
-👥 **参与条件：** {participation_type_text[lottery.participation_type]}
+👥 **参与条件：** {participation_text}
 🎯 **开奖方式：** {draw_type_text[lottery.draw_type]}"""
 
     if lottery.collection_location:
@@ -340,7 +353,8 @@ async def join_lottery(_, call: CallbackQuery):
         if not e or e.lv != 'd':
             return await callAnswer(call, "❌ 此抽奖仅限新用户参与", True)
     
-    elif lottery.participation_type == "paid":
+    # 检查付费条件
+    if lottery.entry_fee > 0:
         if not e or e.iv < lottery.entry_fee:
             return await callAnswer(call, f"❌ 余额不足，需要 {lottery.entry_fee} {sakura_b}", True)
         
