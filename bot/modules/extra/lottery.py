@@ -325,7 +325,7 @@ def format_lottery_message(lottery: Lottery) -> str:
     participation_type_text = {
         "all": "🌍 所有人",
         "emby": "🎬 ME用户",
-        "d_only": "🔰 ME补位"
+        "d_only": "🔰 ME未注册用户"
     }
     
     draw_type_text = {
@@ -347,16 +347,16 @@ def format_lottery_message(lottery: Lottery) -> str:
 🎁 奖品列表：
 {prizes_text}
 
-👥 参与条件：f"\n{participation_text}"
+👥 参与条件：\n{participation_text}\n
 🎯 开奖方式：{draw_type_text[lottery.draw_type]}"""
 
     if lottery.collection_location:
-        text += f"\n📍 领奖联系人: {lottery.collection_location}"
+        text += f"\n📍 领奖联系人: \n{lottery.collection_location}"
 
     text += f"""
 
-👨‍💼 创建者： {lottery.creator_name}
-📅 创建时间： {lottery.created_at.strftime('%Y-%m-%d %H:%M:%S')}
+👨‍💼 创建者：{lottery.creator_name}
+📅 创建时间：{lottery.created_at.strftime('%Y-%m-%d %H:%M:%S')}
 
 💫 当前参与人数： {len(lottery.participants)}"""
     
