@@ -31,6 +31,14 @@ active_lotteries: Dict[str, 'Lottery'] = {}
 lottery_setup_sessions: Dict[int, 'LotterySetup'] = {}
 
 
+# 自定义过滤器：只处理在抽奖设置会话中的用户消息
+async def lottery_setup_filter(_, __, message):
+    """只允许正在进行抽奖设置的用户的消息通过"""
+    return message.from_user and message.from_user.id in lottery_setup_sessions
+
+lottery_setup_filter = filters.create(lottery_setup_filter)
+
+
 class Prize:
     """奖品类"""
     def __init__(self, name: str, quantity: int = 1):
@@ -95,7 +103,8 @@ async def start_lottery_setup(_, msg: Message):
     
     text = (
         "🎲 **抽奖设置向导**\n\n"
-        "请输入抽奖名称："
+        "请输入抽奖名称：\n\n"
+        "💡 *随时发送 /cancel 可取消设置*"
     )
     
     sent_msg = await sendMessage(msg, text)
@@ -103,16 +112,18 @@ async def start_lottery_setup(_, msg: Message):
         setup.last_message_id = sent_msg.id
 
 
-@bot.on_message(filters.private & ~filters.command("lottery", prefixes))
+@bot.on_message(filters.private & lottery_setup_filter)
 async def handle_lottery_setup(_, msg: Message):
     """处理抽奖设置过程中的消息"""
     user_id = msg.from_user.id
-    
-    if user_id not in lottery_setup_sessions:
-        return
-    
     setup = lottery_setup_sessions[user_id]
     text = msg.text
+    
+    # 检查是否要取消抽奖设置
+    if text in ["/cancel", "/取消", "取消"]:
+        del lottery_setup_sessions[user_id]
+        return await sendMessage(msg, "❌ 抽奖设置已取消")
+    
     
     if setup.step == "name":
         setup.lottery.name = text
