@@ -313,7 +313,7 @@ def format_lottery_message(lottery: Lottery) -> str:
 🎯 **开奖方式：** {draw_type_text[lottery.draw_type]}"""
 
     if lottery.collection_location:
-        text += f"\n📍 **领奖地点：** {lottery.collection_location}"
+        text += f"\n📍 **领奖联系人：** {lottery.collection_location}"
 
     text += f"""
 
@@ -495,7 +495,7 @@ async def draw_lottery(lottery: Lottery, chat_id: int, message_id: int):
 🏆 **中奖内容：** {prize_name}"""
                 
                 if lottery.collection_location:
-                    private_msg += f"\n📍 **领奖地点：** {lottery.collection_location}"
+                    private_msg += f"\n📍 **领奖联系：** {lottery.collection_location}"
                 
                 private_msg += f"\n\n请及时联系管理员领取奖品！"
                 
