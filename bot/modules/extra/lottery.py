@@ -103,7 +103,8 @@ async def start_lottery_setup(_, msg: Message):
     
     text = (
         "🎲 **抽奖设置向导**\n\n"
-        "请输入抽奖名称："
+        "请输入抽奖名称：\n\n"
+        "💡 *随时发送 /cancel 可取消设置*"
     )
     
     sent_msg = await sendMessage(msg, text)
@@ -117,6 +118,12 @@ async def handle_lottery_setup(_, msg: Message):
     user_id = msg.from_user.id
     setup = lottery_setup_sessions[user_id]
     text = msg.text
+    
+    # 检查是否要取消抽奖设置
+    if text in ["/cancel", "/取消", "取消"]:
+        del lottery_setup_sessions[user_id]
+        return await sendMessage(msg, "❌ 抽奖设置已取消")
+    
     
     if setup.step == "name":
         setup.lottery.name = text
