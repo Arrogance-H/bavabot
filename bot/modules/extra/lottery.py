@@ -131,7 +131,8 @@ async def handle_lottery_setup(_, msg: Message):
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("🌍 所有人", "lottery_setup_participation_all")],
             [InlineKeyboardButton("🎬 Emby用户", "lottery_setup_participation_emby")],
-            [InlineKeyboardButton("💰 付费抽奖", "lottery_setup_participation_paid")]
+            [InlineKeyboardButton("💰 付费抽奖", "lottery_setup_participation_paid")],
+            [InlineKeyboardButton("🔰 新用户专属", "lottery_setup_participation_d_only")]
         ])
         
         await sendMessage(msg, "✅ 领奖地点已设置\n\n请选择参与条件：", buttons=keyboard)
@@ -224,6 +225,17 @@ async def handle_lottery_setup_callback(_, call: CallbackQuery):
         setup.step = "entry_fee"
         await editMessage(call, "✅ 已设置为付费抽奖\n\n请输入参与费用（单位：" + sakura_b + "）：")
     
+    elif data == "lottery_setup_participation_d_only":
+        setup.lottery.participation_type = "d_only"
+        setup.step = "draw_type"
+        
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("👤 手动开奖", "lottery_setup_draw_manual")],
+            [InlineKeyboardButton("🤖 自动开奖", "lottery_setup_draw_auto")]
+        ])
+        
+        await editMessage(call, "✅ 已设置为仅新用户可参与\n\n请选择开奖方式：", buttons=keyboard)
+    
     elif data == "lottery_setup_draw_manual":
         setup.lottery.draw_type = "manual"
         setup.step = "prizes"
@@ -266,7 +278,8 @@ def format_lottery_message(lottery: Lottery) -> str:
     participation_type_text = {
         "all": "🌍 所有人",
         "emby": "🎬 Emby用户",
-        "paid": f"💰 付费（{lottery.entry_fee} {sakura_b}）"
+        "paid": f"💰 付费（{lottery.entry_fee} {sakura_b}）",
+        "d_only": "🔰 新用户专属"
     }
     
     draw_type_text = {
@@ -315,15 +328,17 @@ async def join_lottery(_, call: CallbackQuery):
     if user_id in lottery.participants:
         return await callAnswer(call, "❌ 您已经参与过此抽奖了", True)
     
-    # 检查用户等级限制 - 禁止lv为d的用户参与抽奖
+    # 获取用户信息用于条件检查
     e = sql_get_emby(tg=user_id)
-    if e and e.lv == 'd':
-        return await callAnswer(call, "❌ 您的账号等级不足，无法参与抽奖", True)
     
     # 检查参与条件
     if lottery.participation_type == "emby":
         if not e or e.lv not in ['a', 'b']:
             return await callAnswer(call, "❌ 您需要有Emby账号才能参与此抽奖", True)
+    
+    elif lottery.participation_type == "d_only":
+        if not e or e.lv != 'd':
+            return await callAnswer(call, "❌ 此抽奖仅限新用户参与", True)
     
     elif lottery.participation_type == "paid":
         if not e or e.iv < lottery.entry_fee:
