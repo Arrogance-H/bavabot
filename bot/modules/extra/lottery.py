@@ -226,7 +226,7 @@ async def handle_lottery_setup_callback(_, call: CallbackQuery):
         setup.step = "entry_fee_choice"
         
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("💰 设置参与费用", "lottery_setup_fee_yes")],
+            [InlineKeyboardButton("💰 设置费用", "lottery_setup_fee_yes")],
             [InlineKeyboardButton("🆓 免费参与", "lottery_setup_fee_no")]
         ])
         
@@ -237,7 +237,7 @@ async def handle_lottery_setup_callback(_, call: CallbackQuery):
         setup.step = "entry_fee_choice"
         
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("💰 设置参与费用", "lottery_setup_fee_yes")],
+            [InlineKeyboardButton("💰 设置费用", "lottery_setup_fee_yes")],
             [InlineKeyboardButton("🆓 免费参与", "lottery_setup_fee_no")]
         ])
         
@@ -324,7 +324,7 @@ def format_lottery_message(lottery: Lottery) -> str:
     """格式化抽奖消息"""
     participation_type_text = {
         "all": "🌍 所有人",
-        "emby": "🎬 ME专属",
+        "emby": "🎬 ME用户",
         "d_only": "🔰 ME补位"
     }
     
@@ -338,7 +338,7 @@ def format_lottery_message(lottery: Lottery) -> str:
     # 构建参与条件文本
     participation_text = participation_type_text[lottery.participation_type]
     if lottery.entry_fee > 0:
-        participation_text += f"\n💰 付费（{lottery.entry_fee} {sakura_b}）"
+        participation_text += f"\n💰 支付（{lottery.entry_fee} {sakura_b}）"
     
     text = f"""🎟️ {lottery.name}
 
@@ -347,7 +347,7 @@ def format_lottery_message(lottery: Lottery) -> str:
 🎁 奖品列表：
 {prizes_text}
 
-👥 参与条件：{participation_text}
+👥 参与条件：f"\n{participation_text}"
 🎯 开奖方式：{draw_type_text[lottery.draw_type]}"""
 
     if lottery.collection_location:
