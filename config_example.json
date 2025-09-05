@@ -148,13 +148,5 @@
         "button_url": "https://example.com/title2"
       }
     }
-  },
-  "code_lottery": {
-    "admin_only": true,
-    "entry_fee": 3,
-    "guaranteed_win_count": 10,
-    "lottery_name": "ME注册资格",
-    "duration_minutes": 30,
-    "winner_count": 1
   }
 }
