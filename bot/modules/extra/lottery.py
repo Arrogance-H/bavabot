@@ -99,7 +99,8 @@ async def start_lottery_setup(_, msg: Message):
     )
     
     sent_msg = await sendMessage(msg, text)
-    setup.last_message_id = sent_msg.id
+    if sent_msg and hasattr(sent_msg, 'id'):
+        setup.last_message_id = sent_msg.id
 
 
 @bot.on_message(filters.private & ~filters.command("lottery", prefixes))
