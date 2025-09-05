@@ -22,7 +22,7 @@ from bot import bot, prefixes, sakura_b, group
 from bot.func_helper.filters import user_in_group_on_filter
 from bot.func_helper.msg_utils import sendMessage, sendPhoto, callAnswer, editMessage
 from bot.func_helper.utils import judge_admins, pwd_create
-from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby
+from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby
 
 # 存储活跃的抽奖活动
 active_lotteries: Dict[str, 'Lottery'] = {}
@@ -385,7 +385,7 @@ async def join_lottery(_, call: CallbackQuery):
             return await callAnswer(call, f"❌ 余额不足，需要 {lottery.entry_fee} {sakura_b}", True)
         
         # 扣除费用
-        sql_update_emby(sql_get_emby(tg=user_id).tg == user_id, iv=e.iv - lottery.entry_fee)
+        sql_update_emby(Emby.tg == user_id, iv=e.iv - lottery.entry_fee)
     
     # 添加参与者
     lottery.participants[user_id] = user_name
@@ -617,7 +617,7 @@ async def handle_terminate_lottery(_, call: CallbackQuery):
             try:
                 e = sql_get_emby(tg=participant_id)
                 if e:
-                    sql_update_emby(sql_get_emby(tg=participant_id).tg == participant_id, iv=e.iv + lottery.entry_fee)
+                    sql_update_emby(Emby.tg == participant_id, iv=e.iv + lottery.entry_fee)
                     # 发送退款通知
                     await bot.send_message(
                         participant_id, 
