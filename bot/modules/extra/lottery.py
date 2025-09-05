@@ -18,11 +18,11 @@ from pyrogram.types import (
     Message
 )
 
-from bot import bot, prefixes, sakura_b
+from bot import bot, prefixes, sakura_b, group
 from bot.func_helper.filters import user_in_group_on_filter
 from bot.func_helper.msg_utils import sendMessage, sendPhoto, callAnswer, editMessage
 from bot.func_helper.utils import judge_admins, pwd_create
-from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby
+from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby
 
 # 存储活跃的抽奖活动
 active_lotteries: Dict[str, 'Lottery'] = {}
@@ -67,6 +67,7 @@ class Lottery:
         self.is_active = False
         self.message_id = None
         self.chat_id = None
+        self.group_messages = {}  # {group_id: message_id} 记录在各群组的消息ID
 
 
 class LotterySetup:
@@ -278,8 +279,33 @@ async def finish_lottery_setup(msg: Message, setup: LotterySetup):
         [InlineKeyboardButton("🎯 开奖", f"lottery_draw_{lottery.id}")]
     ])
     
+    # 发送给创建者确认
     await sendMessage(msg, f"✅ 抽奖创建成功！\n\n{text}", buttons=keyboard)
-    await sendMessage(msg, "💡 提示：复制此消息到群组中即可开始抽奖")
+    
+    # 自动转发到所有授权群组
+    success_groups = []
+    failed_groups = []
+    
+    for group_id in group:
+        try:
+            sent_msg = await sendMessage(msg, text, buttons=keyboard, send=True, chat_id=group_id)
+            if sent_msg and hasattr(sent_msg, 'id'):
+                # 记录消息ID以便后续管理
+                if not hasattr(lottery, 'group_messages'):
+                    lottery.group_messages = {}
+                lottery.group_messages[group_id] = sent_msg.id
+                success_groups.append(group_id)
+        except Exception as e:
+            failed_groups.append(f"{group_id} (错误: {str(e)})")
+    
+    # 发送转发结果通知
+    if success_groups:
+        success_msg = f"🎉 抽奖已自动转发到 {len(success_groups)} 个群组"
+        if failed_groups:
+            success_msg += f"\n⚠️ {len(failed_groups)} 个群组转发失败"
+        await sendMessage(msg, success_msg)
+    else:
+        await sendMessage(msg, "❌ 自动转发失败，请手动复制抽奖消息到群组")
 
 
 def format_lottery_message(lottery: Lottery) -> str:
@@ -359,7 +385,7 @@ async def join_lottery(_, call: CallbackQuery):
             return await callAnswer(call, f"❌ 余额不足，需要 {lottery.entry_fee} {sakura_b}", True)
         
         # 扣除费用
-        sql_update_emby(sql_get_emby(tg=user_id).tg == user_id, iv=e.iv - lottery.entry_fee)
+        sql_update_emby(Emby.tg == user_id, iv=e.iv - lottery.entry_fee)
     
     # 添加参与者
     lottery.participants[user_id] = user_name
@@ -504,10 +530,26 @@ async def draw_lottery(lottery: Lottery, chat_id: int, message_id: int):
                 # 如果无法发送私信则忽略
                 pass
     
+    # 更新所有群组中的消息
+    if hasattr(lottery, 'group_messages'):
+        for group_id, msg_id in lottery.group_messages.items():
+            try:
+                await bot.edit_message_text(
+                    chat_id=group_id,
+                    message_id=msg_id,
+                    text=result_text
+                )
+            except Exception:
+                # 如果无法编辑某个群组的消息，尝试发送新消息
+                try:
+                    await bot.send_message(group_id, result_text)
+                except Exception:
+                    pass  # 忽略发送失败
+    
     # 移除抽奖
     del active_lotteries[lottery.id]
     
-    # 发送结果
+    # 发送结果到原始消息位置
     try:
         await bot.edit_message_text(
             chat_id=chat_id,
@@ -516,6 +558,93 @@ async def draw_lottery(lottery: Lottery, chat_id: int, message_id: int):
         )
     except Exception:
         await bot.send_message(chat_id, result_text)
+
+
+@bot.on_message(filters.command("terminate_lottery", prefixes) & filters.private)
+async def terminate_lottery_command(_, msg: Message):
+    """终止抽奖命令"""
+    if not judge_admins(msg.from_user.id):
+        return await sendMessage(msg, "❌ 只有管理员才能终止抽奖活动")
+    
+    if not active_lotteries:
+        return await sendMessage(msg, "❌ 当前没有活跃的抽奖活动")
+    
+    # 显示当前活跃的抽奖列表
+    keyboard_rows = []
+    for lottery_id, lottery in active_lotteries.items():
+        button_text = f"🎲 {lottery.name}"
+        if len(button_text) > 60:  # 限制按钮文本长度
+            button_text = button_text[:57] + "..."
+        keyboard_rows.append([InlineKeyboardButton(button_text, f"terminate_lottery_{lottery_id}")])
+    
+    keyboard = InlineKeyboardMarkup(keyboard_rows)
+    
+    text = f"🎯 **选择要终止的抽奖活动：**\n\n当前活跃抽奖数量：{len(active_lotteries)}"
+    await sendMessage(msg, text, buttons=keyboard)
+
+
+@bot.on_callback_query(filters.regex("terminate_lottery_"))
+async def handle_terminate_lottery(_, call: CallbackQuery):
+    """处理终止抽奖回调"""
+    if not judge_admins(call.from_user.id):
+        return await callAnswer(call, "❌ 只有管理员才能终止抽奖", True)
+    
+    lottery_id = call.data.split("_")[-1]
+    
+    if lottery_id not in active_lotteries:
+        return await callAnswer(call, "❌ 抽奖不存在或已结束", True)
+    
+    lottery = active_lotteries[lottery_id]
+    
+    # 检查权限（创建者或管理员）
+    if call.from_user.id != lottery.creator_id and not judge_admins(call.from_user.id):
+        return await callAnswer(call, "❌ 只有创建者或管理员才能终止抽奖", True)
+    
+    # 生成终止消息
+    termination_text = f"""❌ **抽奖已被终止**
+
+🎲 **抽奖名称：** {lottery.name}
+👨‍💼 **创建者：** {lottery.creator_name}
+👥 **参与人数：** {len(lottery.participants)}
+🔚 **终止者：** {call.from_user.first_name or '管理员'}
+📅 **终止时间：** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+此抽奖活动已被管理员终止，所有参与费用将被退还。"""
+    
+    # 退还参与费用
+    if lottery.entry_fee > 0:
+        for participant_id in lottery.participants.keys():
+            try:
+                e = sql_get_emby(tg=participant_id)
+                if e:
+                    sql_update_emby(Emby.tg == participant_id, iv=e.iv + lottery.entry_fee)
+                    # 发送退款通知
+                    await bot.send_message(
+                        participant_id, 
+                        f"💰 抽奖 '{lottery.name}' 已被终止，您的参与费用 {lottery.entry_fee} {sakura_b} 已退还。"
+                    )
+            except Exception:
+                pass  # 忽略退款失败的情况
+    
+    # 更新所有群组中的消息
+    if hasattr(lottery, 'group_messages'):
+        for group_id, msg_id in lottery.group_messages.items():
+            try:
+                await bot.edit_message_text(
+                    chat_id=group_id,
+                    message_id=msg_id,
+                    text=termination_text
+                )
+            except Exception:
+                try:
+                    await bot.send_message(group_id, termination_text)
+                except Exception:
+                    pass
+    
+    # 移除抽奖
+    del active_lotteries[lottery_id]
+    
+    await editMessage(call, f"✅ 抽奖 '{lottery.name}' 已成功终止")
 
 
 # Lottery module ends here
