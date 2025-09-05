@@ -36,7 +36,7 @@ async def sendMessage(message, text: str, buttons=None, timer=None, send=False, 
         send = await message.reply(text=text, quote=True, disable_web_page_preview=True, reply_markup=buttons)
         if timer is not None:
             return await deleteMessage(send, timer)
-        return send
+        return True
     except FloodWait as f:
         LOGGER.warning(str(f))
         await sleep(f.value * 1.2)
