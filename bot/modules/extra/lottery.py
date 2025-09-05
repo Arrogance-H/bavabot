@@ -419,9 +419,14 @@ async def join_lottery(_, call: CallbackQuery):
         len(lottery.participants) >= lottery.target_participants):
         await auto_draw_lottery(lottery, call.message.chat.id, call.message.id)
     else:
-        # 更新消息
+        # 更新消息，保持按钮可见
         text = format_lottery_message(lottery)
-        await editMessage(call, text)
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🎲 参与抽奖", f"lottery_join_{lottery.id}")],
+            [InlineKeyboardButton("📊 查看详情", f"lottery_info_{lottery.id}")],
+            [InlineKeyboardButton("🎯 开奖", f"lottery_draw_{lottery.id}")]
+        ])
+        await editMessage(call, text, buttons=keyboard)
 
 
 async def delete_message_after_delay(chat_id: int, message_id: int, delay: int):
