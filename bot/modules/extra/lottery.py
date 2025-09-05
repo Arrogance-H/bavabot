@@ -104,7 +104,7 @@ async def start_lottery_setup(_, msg: Message):
     text = (
         "🎲 **抽奖设置向导**\n\n"
         "请输入抽奖名称：\n\n"
-        "💡 *随时发送 /cancel 可取消设置*"
+        "💡 随时发送 /cancel 可取消设置"
     )
     
     sent_msg = await sendMessage(msg, text)
@@ -143,8 +143,8 @@ async def handle_lottery_setup(_, msg: Message):
         
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("🌍 所有人", "lottery_setup_participation_all")],
-            [InlineKeyboardButton("🎬 Emby用户", "lottery_setup_participation_emby")],
-            [InlineKeyboardButton("🔰 新用户专属", "lottery_setup_participation_d_only")]
+            [InlineKeyboardButton("🎬 ME专属", "lottery_setup_participation_emby")],
+            [InlineKeyboardButton("🔰 ME补位", "lottery_setup_participation_d_only")]
         ])
         
         await sendMessage(msg, "✅ 领奖地点已设置\n\n请选择参与条件：", buttons=keyboard)
@@ -286,7 +286,7 @@ async def finish_lottery_setup(msg: Message, setup: LotterySetup):
     
     # 生成参与按钮
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🎲 参与抽奖", f"lottery_join_{lottery.id}")],
+        [InlineKeyboardButton("🎟️ 参与抽奖", f"lottery_join_{lottery.id}")],
         [InlineKeyboardButton("📊 查看详情", f"lottery_info_{lottery.id}")],
         [InlineKeyboardButton("🎯 开奖", f"lottery_draw_{lottery.id}")]
     ])
@@ -324,8 +324,8 @@ def format_lottery_message(lottery: Lottery) -> str:
     """格式化抽奖消息"""
     participation_type_text = {
         "all": "🌍 所有人",
-        "emby": "🎬 Emby用户",
-        "d_only": "🔰 新用户专属"
+        "emby": "🎬 ME专属",
+        "d_only": "🔰 ME补位"
     }
     
     draw_type_text = {
@@ -338,27 +338,27 @@ def format_lottery_message(lottery: Lottery) -> str:
     # 构建参与条件文本
     participation_text = participation_type_text[lottery.participation_type]
     if lottery.entry_fee > 0:
-        participation_text += f" + 💰 付费（{lottery.entry_fee} {sakura_b}）"
+        participation_text += f"\n💰 付费（{lottery.entry_fee} {sakura_b}）"
     
-    text = f"""🎲 **{lottery.name}**
+    text = f"""🎟️ {lottery.name}
 
 📝 {lottery.description}
 
-🎁 **奖品列表：**
+🎁 奖品列表：
 {prizes_text}
 
-👥 **参与条件：** {participation_text}
-🎯 **开奖方式：** {draw_type_text[lottery.draw_type]}"""
+👥 参与条件：{participation_text}
+🎯 开奖方式：{draw_type_text[lottery.draw_type]}"""
 
     if lottery.collection_location:
-        text += f"\n📍 **领奖联系人：** {lottery.collection_location}"
+        text += f"\n📍 领奖联系人: {lottery.collection_location}"
 
     text += f"""
 
-👨‍💼 **创建者：** {lottery.creator_name}
-📅 **创建时间：** {lottery.created_at.strftime('%Y-%m-%d %H:%M:%S')}
+👨‍💼 创建者： {lottery.creator_name}
+📅 创建时间： {lottery.created_at.strftime('%Y-%m-%d %H:%M:%S')}
 
-💫 **当前参与人数：** {len(lottery.participants)}"""
+💫 当前参与人数： {len(lottery.participants)}"""
     
     return text
 
@@ -385,11 +385,11 @@ async def join_lottery(_, call: CallbackQuery):
     # 检查参与条件
     if lottery.participation_type == "emby":
         if not e or e.lv not in ['a', 'b']:
-            return await callAnswer(call, "❌ 您需要有Emby账号才能参与此抽奖", True)
+            return await callAnswer(call, "❌ 您需要有ME账号才能参与此抽奖", True)
     
     elif lottery.participation_type == "d_only":
         if not e or e.lv != 'd':
-            return await callAnswer(call, "❌ 此抽奖仅限新用户参与", True)
+            return await callAnswer(call, "❌ 此抽奖限未注册用户参与", True)
     
     # 检查付费条件
     if lottery.entry_fee > 0:
@@ -422,7 +422,7 @@ async def join_lottery(_, call: CallbackQuery):
         # 更新消息，保持按钮可见
         text = format_lottery_message(lottery)
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🎲 参与抽奖", f"lottery_join_{lottery.id}")],
+            [InlineKeyboardButton("🎟️ 参与抽奖", f"lottery_join_{lottery.id}")],
             [InlineKeyboardButton("📊 查看详情", f"lottery_info_{lottery.id}")],
             [InlineKeyboardButton("🎯 开奖", f"lottery_draw_{lottery.id}")]
         ])
@@ -452,14 +452,14 @@ async def lottery_info(_, call: CallbackQuery):
     if not participants_text:
         participants_text = "暂无参与者"
     
-    text = f"""📊 **抽奖详情**
+    text = f"""📊 抽奖详情
 
-🎲 **名称：** {lottery.name}
-👥 **参与者列表：**
+🎟️ 抽奖名称： {lottery.name}
+👥 参与者列表：
 {participants_text}
 
-📈 **当前参与人数：** {len(lottery.participants)}
-🎁 **奖品总数：** {sum(prize.quantity for prize in lottery.prizes)}"""
+📈 当前参与人数： {len(lottery.participants)}
+🎁 奖品总数： {sum(prize.quantity for prize in lottery.prizes)}"""
     
     await callAnswer(call, text, True)
 
@@ -511,7 +511,7 @@ async def draw_lottery(lottery: Lottery, chat_id: int, message_id: int):
             winners[prize.name].append((winner_id, winner_name))
     
     # 生成开奖结果
-    result_text = f"""🎉 **{lottery.name} - 开奖结果**
+    result_text = f"""🎉 {lottery.name} - 开奖结果
 
 🎊 恭喜以下获奖者：
 
@@ -523,10 +523,10 @@ async def draw_lottery(lottery: Lottery, chat_id: int, message_id: int):
             result_text += f"    • {winner_name}\n"
         result_text += "\n"
     
-    result_text += f"📊 **本次抽奖统计：**\n"
-    result_text += f"   参与人数：{len(lottery.participants)}\n"
-    result_text += f"   获奖人数：{sum(len(w) for w in winners.values())}\n"
-    result_text += f"   创建者：{lottery.creator_name}"
+    result_text += f"📊 本次抽奖统计：\n"
+    result_text += f"📈 参与人数：{len(lottery.participants)}\n"
+    result_text += f"🏆 获奖人数：{sum(len(w) for w in winners.values())}\n"
+    result_text += f"👨‍💼 创建者：{lottery.creator_name}"
     
     # 发送私信给中奖者
     for prize_name, winner_list in winners.items():
@@ -534,11 +534,11 @@ async def draw_lottery(lottery: Lottery, chat_id: int, message_id: int):
             try:
                 private_msg = f"""🎉 恭喜中奖！
 
-🎲 **抽奖名称：** {lottery.name}
-🏆 **中奖内容：** {prize_name}"""
+🎟️ 抽奖名称： {lottery.name}
+🏆 中奖内容： {prize_name}"""
                 
                 if lottery.collection_location:
-                    private_msg += f"\n📍 **领奖联系：** {lottery.collection_location}"
+                    private_msg += f"\n📍 领奖联系： {lottery.collection_location}"
                 
                 private_msg += f"\n\n请及时联系管理员领取奖品！"
                 
@@ -596,7 +596,7 @@ async def terminate_lottery_command(_, msg: Message):
     
     keyboard = InlineKeyboardMarkup(keyboard_rows)
     
-    text = f"🎯 **选择要终止的抽奖活动：**\n\n当前活跃抽奖数量：{len(active_lotteries)}"
+    text = f"🎯 选择要终止的抽奖活动：\n\n当前活跃抽奖数量：{len(active_lotteries)}"
     await sendMessage(msg, text, buttons=keyboard)
 
 
@@ -618,13 +618,13 @@ async def handle_terminate_lottery(_, call: CallbackQuery):
         return await callAnswer(call, "❌ 只有创建者或管理员才能终止抽奖", True)
     
     # 生成终止消息
-    termination_text = f"""❌ **抽奖已被终止**
+    termination_text = f"""❌ 抽奖已被终止
 
-🎲 **抽奖名称：** {lottery.name}
-👨‍💼 **创建者：** {lottery.creator_name}
-👥 **参与人数：** {len(lottery.participants)}
-🔚 **终止者：** {call.from_user.first_name or '管理员'}
-📅 **终止时间：** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+🎟️ 抽奖名称： {lottery.name}
+👨‍💼 创建者： {lottery.creator_name}
+👥 参与人数： {len(lottery.participants)}
+🔚 终止者： {call.from_user.first_name or '管理员'}
+📅 终止时间： {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
 此抽奖活动已被管理员终止，所有参与费用将被退还。"""
     
