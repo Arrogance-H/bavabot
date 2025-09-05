@@ -315,14 +315,17 @@ async def join_lottery(_, call: CallbackQuery):
     if user_id in lottery.participants:
         return await callAnswer(call, "❌ 您已经参与过此抽奖了", True)
     
+    # 检查用户等级限制 - 禁止lv为d的用户参与抽奖
+    e = sql_get_emby(tg=user_id)
+    if e and e.lv == 'd':
+        return await callAnswer(call, "❌ 您的账号等级不足，无法参与抽奖", True)
+    
     # 检查参与条件
     if lottery.participation_type == "emby":
-        e = sql_get_emby(tg=user_id)
         if not e:
             return await callAnswer(call, "❌ 您需要有Emby账号才能参与此抽奖", True)
     
     elif lottery.participation_type == "paid":
-        e = sql_get_emby(tg=user_id)
         if not e or e.iv < lottery.entry_fee:
             return await callAnswer(call, f"❌ 余额不足，需要 {lottery.entry_fee} {sakura_b}", True)
         
