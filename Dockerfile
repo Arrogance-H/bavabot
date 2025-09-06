@@ -36,9 +36,8 @@ WORKDIR ${WORKDIR}
 COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# 克隆项目代码
-RUN git clone https://github.com/Arrogance-H/bavabot . && \
-    rm -rf ./image
+# 复制项目代码
+COPY . .
 # 设置启动命令
 ENTRYPOINT [ "python3" ]
 CMD [ "main.py" ]
