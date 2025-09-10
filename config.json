@@ -1,0 +1,117 @@
+{
+    "bot_name": "testbot",
+    "bot_token": "test_token",
+    "owner_api": 12345,
+    "owner_hash": "test_hash",
+    "owner": 123456789,
+    "group": [
+        -100123456
+    ],
+    "main_group": "test_group",
+    "chanel": "test_channel",
+    "bot_photo": "https://example.com/photo.png",
+    "open": {
+        "stat": false,
+        "open_us": 30,
+        "all_user": 1000,
+        "timing": 0,
+        "tem": 0,
+        "checkin": true,
+        "exchange": true,
+        "whitelist": true,
+        "invite": false,
+        "invite_lv": "b",
+        "leave_ban": true,
+        "uplays": true,
+        "checkin_reward": [
+            1,
+            10
+        ],
+        "exchange_cost": 100,
+        "whitelist_cost": 9999,
+        "invite_cost": 1000
+    },
+    "admins": [
+        987654321
+    ],
+    "money": "花币",
+    "emby_api": "test_api",
+    "emby_url": "http://localhost:8096",
+    "emby_block": [],
+    "emby_line": "test.com",
+    "extra_emby_libs": [],
+    "db_host": "localhost",
+    "db_user": "test",
+    "db_pwd": "test",
+    "db_name": "test",
+    "db_port": 3306,
+    "tz_ad": "",
+    "tz_api": "",
+    "tz_id": [],
+    "ranks": {
+        "logo": "TEST",
+        "backdrop": false
+    },
+    "schedall": {
+        "dayrank": true,
+        "weekrank": true,
+        "dayplayrank": false,
+        "weekplayrank": false,
+        "check_ex": true,
+        "low_activity": false,
+        "day_ranks_message_id": 0,
+        "week_ranks_message_id": 0,
+        "restart_chat_id": 0,
+        "restart_msg_id": 0,
+        "backup_db": false
+    },
+    "db_is_docker": false,
+    "db_docker_name": "mysql",
+    "db_backup_dir": "./db_backup",
+    "db_backup_maxcount": 7,
+    "w_anti_channel_ids": [],
+    "proxy": {
+        "scheme": "",
+        "hostname": "",
+        "port": null,
+        "username": "",
+        "password": ""
+    },
+    "kk_gift_days": 30,
+    "fuxx_pitao": true,
+    "activity_check_days": 21,
+    "freeze_days": 5,
+    "emby_whitelist_line": null,
+    "blocked_clients": [],
+    "client_filter_terminate_session": true,
+    "client_filter_block_user": false,
+    "hunt_daily_limit": 5,
+    "moviepilot": {
+        "status": false,
+        "url": "",
+        "username": null,
+        "password": null,
+        "access_token": null,
+        "price": 1,
+        "download_log_chatid": null,
+        "lv": "b"
+    },
+    "auto_update": {
+        "status": false,
+        "git_repo": "",
+        "commit_sha": null,
+        "up_description": null
+    },
+    "red_envelope": {
+        "status": true,
+        "allow_private": true
+    },
+    "api": {
+        "status": false,
+        "http_url": "0.0.0.0",
+        "http_port": 8838,
+        "allow_origins": [
+            "*"
+        ]
+    }
+}
