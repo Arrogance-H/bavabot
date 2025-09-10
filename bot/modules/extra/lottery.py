@@ -179,6 +179,7 @@ async def handle_lottery_setup(_, msg: Message):
         image_status = "已设置" if setup.lottery.image_url else "已跳过"
         await sendMessage(msg, f"✅ 抽奖图片{image_status}\n\n请选择参与条件：", buttons=keyboard)
     
+    elif setup.step == "entry_fee":
         try:
             fee = int(text)
             if fee < 0:
