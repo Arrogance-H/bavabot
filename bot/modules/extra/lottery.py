@@ -117,12 +117,28 @@ async def handle_lottery_setup(_, msg: Message):
     """处理抽奖设置过程中的消息"""
     user_id = msg.from_user.id
     setup = lottery_setup_sessions[user_id]
-    text = msg.text
+    text = msg.text or msg.caption or ""
     
     # 检查是否要取消抽奖设置
     if text in ["/cancel", "/取消", "取消"]:
         del lottery_setup_sessions[user_id]
         return await sendMessage(msg, "❌ 抽奖设置已取消")
+    
+    # 处理图片上传（仅在image步骤）
+    if setup.step == "image" and msg.photo:
+        # 获取最大尺寸的图片
+        photo = msg.photo
+        setup.lottery.image_url = photo.file_id  # 使用 file_id 作为图片标识
+        
+        setup.step = "participation_type"
+        
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🌍 所有人", "lottery_setup_participation_all")],
+            [InlineKeyboardButton("🎬 ME专属", "lottery_setup_participation_emby")],
+            [InlineKeyboardButton("🔰 ME补位", "lottery_setup_participation_d_only")]
+        ])
+        
+        return await sendMessage(msg, "✅ 抽奖图片已设置\n\n请选择参与条件：", buttons=keyboard)
     
     
     if setup.step == "name":
@@ -139,6 +155,19 @@ async def handle_lottery_setup(_, msg: Message):
     elif setup.step == "collection_location":
         if text != "/skip":
             setup.lottery.collection_location = text
+        setup.step = "image"
+        await sendMessage(msg, "✅ 领奖地点已设置\n\n请发送抽奖图片（可发送图片文件或图片URL，发送 /skip 跳过）：")
+    
+    elif setup.step == "image":
+        if text == "/skip":
+            setup.lottery.image_url = None
+        else:
+            # Check if it's a URL
+            if text.startswith(('http://', 'https://')):
+                setup.lottery.image_url = text
+            else:
+                return await sendMessage(msg, "❌ 请发送有效的图片URL（以http://或https://开头）或图片文件，或发送 /skip 跳过：")
+        
         setup.step = "participation_type"
         
         keyboard = InlineKeyboardMarkup([
@@ -147,9 +176,9 @@ async def handle_lottery_setup(_, msg: Message):
             [InlineKeyboardButton("🔰 ME补位", "lottery_setup_participation_d_only")]
         ])
         
-        await sendMessage(msg, "✅ 领奖地点已设置\n\n请选择参与条件：", buttons=keyboard)
+        image_status = "已设置" if setup.lottery.image_url else "已跳过"
+        await sendMessage(msg, f"✅ 抽奖图片{image_status}\n\n请选择参与条件：", buttons=keyboard)
     
-    elif setup.step == "entry_fee":
         try:
             fee = int(text)
             if fee < 0:
@@ -292,7 +321,10 @@ async def finish_lottery_setup(msg: Message, setup: LotterySetup):
     ])
     
     # 发送给创建者确认
-    await sendMessage(msg, f"✅ 抽奖创建成功！\n\n{text}", buttons=keyboard)
+    if lottery.image_url:
+        await sendPhoto(msg, photo=lottery.image_url, caption=f"✅ 抽奖创建成功！\n\n{text}", buttons=keyboard)
+    else:
+        await sendMessage(msg, f"✅ 抽奖创建成功！\n\n{text}", buttons=keyboard)
     
     # 自动转发到所有授权群组
     success_groups = []
@@ -300,7 +332,10 @@ async def finish_lottery_setup(msg: Message, setup: LotterySetup):
     
     for group_id in group:
         try:
-            sent_msg = await sendMessage(msg, text, buttons=keyboard, send=True, chat_id=group_id)
+            if lottery.image_url:
+                sent_msg = await sendPhoto(msg, photo=lottery.image_url, caption=text, buttons=keyboard, send=True, chat_id=group_id)
+            else:
+                sent_msg = await sendMessage(msg, text, buttons=keyboard, send=True, chat_id=group_id)
             if sent_msg and hasattr(sent_msg, 'id'):
                 # 记录消息ID以便后续管理
                 if not hasattr(lottery, 'group_messages'):
@@ -426,7 +461,20 @@ async def join_lottery(_, call: CallbackQuery):
             [InlineKeyboardButton("📊 查看详情", f"lottery_info_{lottery.id}")],
             [InlineKeyboardButton("🎯 开奖", f"lottery_draw_{lottery.id}")]
         ])
-        await editMessage(call, text, buttons=keyboard)
+        
+        if lottery.image_url:
+            # 如果有图片，需要删除原消息并发送新的图片消息
+            try:
+                await bot.delete_messages(call.message.chat.id, call.message.id)
+                if lottery.image_url:
+                    await sendPhoto(call, photo=lottery.image_url, caption=text, buttons=keyboard, send=True, chat_id=call.message.chat.id)
+                else:
+                    await sendMessage(call, text, buttons=keyboard, send=True, chat_id=call.message.chat.id)
+            except Exception:
+                # 如果删除失败，尝试编辑消息
+                await editMessage(call, text, buttons=keyboard)
+        else:
+            await editMessage(call, text, buttons=keyboard)
 
 
 async def delete_message_after_delay(chat_id: int, message_id: int, delay: int):
@@ -551,11 +599,16 @@ async def draw_lottery(lottery: Lottery, chat_id: int, message_id: int):
     if hasattr(lottery, 'group_messages'):
         for group_id, msg_id in lottery.group_messages.items():
             try:
-                await bot.edit_message_text(
-                    chat_id=group_id,
-                    message_id=msg_id,
-                    text=result_text
-                )
+                if lottery.image_url:
+                    # 先删除原消息，再发送新的结果消息
+                    await bot.delete_messages(group_id, msg_id)
+                    await bot.send_message(group_id, result_text)
+                else:
+                    await bot.edit_message_text(
+                        chat_id=group_id,
+                        message_id=msg_id,
+                        text=result_text
+                    )
             except Exception:
                 # 如果无法编辑某个群组的消息，尝试发送新消息
                 try:
@@ -568,11 +621,16 @@ async def draw_lottery(lottery: Lottery, chat_id: int, message_id: int):
     
     # 发送结果到原始消息位置
     try:
-        await bot.edit_message_text(
-            chat_id=chat_id,
-            message_id=message_id,
-            text=result_text
-        )
+        if lottery.image_url:
+            # 先删除原消息，再发送结果
+            await bot.delete_messages(chat_id, message_id)
+            await bot.send_message(chat_id, result_text)
+        else:
+            await bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=result_text
+            )
     except Exception:
         await bot.send_message(chat_id, result_text)
 
@@ -647,11 +705,16 @@ async def handle_terminate_lottery(_, call: CallbackQuery):
     if hasattr(lottery, 'group_messages'):
         for group_id, msg_id in lottery.group_messages.items():
             try:
-                await bot.edit_message_text(
-                    chat_id=group_id,
-                    message_id=msg_id,
-                    text=termination_text
-                )
+                if lottery.image_url:
+                    # 先删除原消息，再发送终止消息
+                    await bot.delete_messages(group_id, msg_id)
+                    await bot.send_message(group_id, termination_text)
+                else:
+                    await bot.edit_message_text(
+                        chat_id=group_id,
+                        message_id=msg_id,
+                        text=termination_text
+                    )
             except Exception:
                 try:
                     await bot.send_message(group_id, termination_text)
