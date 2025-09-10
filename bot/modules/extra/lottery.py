@@ -19,7 +19,7 @@ from pyrogram.types import (
 )
 
 from bot import bot, prefixes, sakura_b, group
-from bot.func_helper.filters import user_in_group_on_filter
+from bot.func_helper.filters import user_in_group_on_filter, admins_on_filter
 from bot.func_helper.msg_utils import sendMessage, sendPhoto, callAnswer, editMessage
 from bot.func_helper.utils import judge_admins, pwd_create
 from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby
@@ -87,7 +87,7 @@ class LotterySetup:
         self.last_message_id = None
 
 
-@bot.on_message(filters.command("lottery", prefixes) & filters.private)
+@bot.on_message(filters.command("lottery", prefixes) & admins_on_filter)
 async def start_lottery_setup(_, msg: Message):
     """开始抽奖设置"""
     if not judge_admins(msg.from_user.id):
@@ -95,6 +95,10 @@ async def start_lottery_setup(_, msg: Message):
     
     user_id = msg.from_user.id
     user_name = msg.from_user.first_name or "管理员"
+    
+    # 在群组中删除命令消息以减少干扰
+    if msg.chat.type != "private":
+        await msg.delete()
     
     # 创建新的设置会话
     setup = LotterySetup(user_id)
@@ -112,12 +116,16 @@ async def start_lottery_setup(_, msg: Message):
         setup.last_message_id = sent_msg.id
 
 
-@bot.on_message(filters.private & lottery_setup_filter)
+@bot.on_message(lottery_setup_filter)
 async def handle_lottery_setup(_, msg: Message):
     """处理抽奖设置过程中的消息"""
     user_id = msg.from_user.id
     setup = lottery_setup_sessions[user_id]
     text = msg.text or msg.caption or ""
+    
+    # 在群组中删除用户的设置消息以减少干扰
+    if msg.chat.type != "private":
+        await msg.delete()
     
     # 检查是否要取消抽奖设置
     if text in ["/cancel", "/取消", "取消"]:
@@ -636,7 +644,7 @@ async def draw_lottery(lottery: Lottery, chat_id: int, message_id: int):
         await bot.send_message(chat_id, result_text)
 
 
-@bot.on_message(filters.command("terminate_lottery", prefixes) & filters.private)
+@bot.on_message(filters.command("terminate_lottery", prefixes) & admins_on_filter)
 async def terminate_lottery_command(_, msg: Message):
     """终止抽奖命令"""
     if not judge_admins(msg.from_user.id):
