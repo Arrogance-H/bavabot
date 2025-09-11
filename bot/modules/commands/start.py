@@ -72,7 +72,7 @@ async def p_start(_, msg):
             sql_add_emby(msg.from_user.id)
             await asyncio.gather(deleteMessage(msg),
                                  sendPhoto(msg, bot_photo,
-                                           f"** BAVA Hi~ **\n\n"
+                                           f"**BAVA Hi~**\n\n"
                                            f"🎉欢迎您 [{msg.from_user.first_name}](tg://user?id={msg.from_user.id}) \n\n"
                                            f"初次使用，录入数据库完成。\n"
                                            f"请点击 /start 重新召唤面板"))
@@ -92,7 +92,7 @@ async def p_start(_, msg):
         else:
             await asyncio.gather(deleteMessage(msg),
                                  sendPhoto(msg, bot_photo,
-                                           f"** BAVA Hi~ **\n\n🎉欢迎您 [{msg.from_user.first_name}](tg://user?id={msg.from_user.id})",
+                                           f"**BAVA Hi~**\n\n🎉欢迎您 [{msg.from_user.first_name}](tg://user?id={msg.from_user.id})",
                                            buttons=judge_start_ikb(is_admin, True)))
 
 
@@ -103,7 +103,7 @@ async def b_start(_, call):
         is_admin = judge_admins(call.from_user.id)
         await asyncio.gather(callAnswer(call, "⭐ 返回start"),
                              editMessage(call,
-                                         text=f"**✨ BAVA Hi~ **\n\n🎉欢迎您 [{call.from_user.first_name}](tg://user?id={call.from_user.id})",
+                                         text=f"**BAVA Hi~**\n\n🎉欢迎您 [{call.from_user.first_name}](tg://user?id={call.from_user.id})",
                                          buttons=judge_start_ikb(is_admin, account=True)))
     elif not await user_in_group_filter(_, call):
         await asyncio.gather(callAnswer(call, "⭐ 返回start"),
