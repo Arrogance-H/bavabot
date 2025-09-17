@@ -66,6 +66,7 @@ class Lottery:
         # 参与条件配置
         self.participation_type = "all"  # "all", "emby", "d_only"
         self.entry_fee = 0  # 付费抽奖费用
+        self.refund_losers = False  # 是否给未中奖者退款50%
         
         # 奖品和参与者
         self.prizes: List[Prize] = []
@@ -185,14 +186,14 @@ async def handle_lottery_setup(_, msg: Message):
             if fee < 0:
                 return await sendMessage(msg, "❌ 费用不能为负数，请重新输入：")
             setup.lottery.entry_fee = fee
-            setup.step = "draw_type"
+            setup.step = "refund_losers"
             
             keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("👤 手动开奖", "lottery_setup_draw_manual")],
-                [InlineKeyboardButton("🤖 自动开奖", "lottery_setup_draw_auto")]
+                [InlineKeyboardButton("✅ 启用退款", "lottery_setup_refund_yes")],
+                [InlineKeyboardButton("❌ 不退款", "lottery_setup_refund_no")]
             ])
             
-            await sendMessage(msg, f"✅ 参与费用已设置为 {fee} {sakura_b}\n\n请选择开奖方式：", buttons=keyboard)
+            await sendMessage(msg, f"✅ 参与费用已设置为 {fee} {sakura_b}\n\n是否给未中奖者退还50%费用？", buttons=keyboard)
         except ValueError:
             await sendMessage(msg, "❌ 请输入有效的数字：")
     
@@ -279,6 +280,7 @@ async def handle_lottery_setup_callback(_, call: CallbackQuery):
     
     elif data == "lottery_setup_fee_no":
         setup.lottery.entry_fee = 0
+        setup.lottery.refund_losers = False  # 免费抽奖不需要退款
         setup.step = "draw_type"
         
         keyboard = InlineKeyboardMarkup([
@@ -287,6 +289,28 @@ async def handle_lottery_setup_callback(_, call: CallbackQuery):
         ])
         
         await editMessage(call, "✅ 已设置为免费参与\n\n请选择开奖方式：", buttons=keyboard)
+    
+    elif data == "lottery_setup_refund_yes":
+        setup.lottery.refund_losers = True
+        setup.step = "draw_type"
+        
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("👤 手动开奖", "lottery_setup_draw_manual")],
+            [InlineKeyboardButton("🤖 自动开奖", "lottery_setup_draw_auto")]
+        ])
+        
+        await editMessage(call, "✅ 已启用未中奖者50%退款\n\n请选择开奖方式：", buttons=keyboard)
+    
+    elif data == "lottery_setup_refund_no":
+        setup.lottery.refund_losers = False
+        setup.step = "draw_type"
+        
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("👤 手动开奖", "lottery_setup_draw_manual")],
+            [InlineKeyboardButton("🤖 自动开奖", "lottery_setup_draw_auto")]
+        ])
+        
+        await editMessage(call, "✅ 已设置为不退款\n\n请选择开奖方式：", buttons=keyboard)
     
     elif data == "lottery_setup_draw_manual":
         setup.lottery.draw_type = "manual"
@@ -375,6 +399,8 @@ def format_lottery_message(lottery: Lottery) -> str:
     participation_text = participation_type_text[lottery.participation_type]
     if lottery.entry_fee > 0:
         participation_text += f"\n💰 支付（{lottery.entry_fee} {sakura_b}）"
+        if lottery.refund_losers:
+            participation_text += f"\n💸 未中奖退还50%（{lottery.entry_fee // 2} {sakura_b}）"
     
     text = f"""🎟️ {lottery.name}
 
@@ -576,6 +602,36 @@ async def draw_lottery(lottery: Lottery, chat_id: int, message_id: int):
     result_text += f"📈 参与人数：{len(lottery.participants)}\n"
     result_text += f"🏆 获奖人数：{sum(len(w) for w in winners.values())}\n"
     result_text += f"👨‍💼 创建者：{lottery.creator_name}"
+    
+    # 处理未中奖者退款
+    if lottery.entry_fee > 0 and lottery.refund_losers:
+        # 获取所有中奖者ID
+        winner_ids = set()
+        for winner_list in winners.values():
+            for winner_id, _ in winner_list:
+                winner_ids.add(winner_id)
+        
+        # 给未中奖者退还50%费用
+        refund_amount = lottery.entry_fee // 2
+        refunded_count = 0
+        
+        for participant_id in lottery.participants.keys():
+            if participant_id not in winner_ids:
+                try:
+                    e = sql_get_emby(tg=participant_id)
+                    if e:
+                        sql_update_emby(Emby.tg == participant_id, iv=e.iv + refund_amount)
+                        # 发送退款通知
+                        await bot.send_message(
+                            participant_id, 
+                            f"💸 抽奖 '{lottery.name}' 很遗憾您未中奖，已退还50%参与费用 {refund_amount} {sakura_b}。"
+                        )
+                        refunded_count += 1
+                except Exception:
+                    pass  # 忽略退款失败的情况
+        
+        if refunded_count > 0:
+            result_text += f"\n💸 已为 {refunded_count} 位未中奖者退还50%费用"
     
     # 发送私信给中奖者
     for prize_name, winner_list in winners.items():
