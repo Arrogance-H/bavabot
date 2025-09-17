@@ -17,7 +17,7 @@ class Uplaysinfo:
     @cache.memoize(ttl=120)
     async def users_playback_list(cls, days):
         try:
-            play_list = await emby.emby_cust_commit(user_id=None, days=days, method='sp')
+            play_list = await emby.emby_cust_commit(emby_id=None, days=days, method='sp')
         except Exception as e:
             print(f"Error fetching playback list: {e}")
             return None, 1, 1
@@ -169,8 +169,9 @@ class Uplaysinfo:
         success, users = await emby.users()
         if not success:
             return await bot.send_message(chat_id=group[0], text='⭕ 调用emby api失败')
-        msg = ''
-        # print(users)
+        from bot import config
+        activity_check_days = config.activity_check_days
+        msg = f'正在执行**{activity_check_days}天活跃检测**...\n'
         for user in users:
             # 数据库先找
             e = sql_get_emby(tg=user["Name"])
@@ -178,14 +179,13 @@ class Uplaysinfo:
                 continue
 
             elif e.lv == 'c':
-                # print(e.tg)
                 try:
                     ac_date = convert_to_beijing_time(user["LastActivityDate"])
                 except KeyError:
                     ac_date = "None"
                 finally:
                     if ac_date == "None" or ac_date + timedelta(days=15) < now:
-                        if await emby.emby_del(id=e.embyid):
+                        if await emby.emby_del(emby_id=e.embyid):
                             sql_update_emby(Emby.embyid == e.embyid, embyid=None, name=None, pwd=None, pwd2=None, lv='d',
                                             cr=None, ex=None)
                             tem_deluser()
@@ -197,11 +197,10 @@ class Uplaysinfo:
             elif e.lv == 'b':
                 try:
                     ac_date = convert_to_beijing_time(user["LastActivityDate"])
-                    from bot import config
-                    activity_check_days = config.activity_check_days
+                    
                     # print(e.name, ac_date, now)
                     if ac_date + timedelta(days=activity_check_days) < now:
-                        if await emby.emby_change_policy(id=user["Id"], method=True):
+                        if await emby.emby_change_policy(emby_id=user["Id"], disable=True):
                             sql_update_emby(Emby.embyid == user["Id"], lv='c')
                             msg += f"**🔋活跃检测** - [{user['Name']}](tg://user?id={e.tg})\n#id{e.tg} {activity_check_days}天未活跃，禁用\n\n"
                             LOGGER.info(f"【活跃检测】- 禁用账户 {user['Name']} #id{e.tg}：{activity_check_days}天未活跃")
@@ -209,13 +208,14 @@ class Uplaysinfo:
                             msg += f"**🎂活跃检测** - [{user['Name']}](tg://user?id={e.tg})\n{activity_check_days}天未活跃，禁用失败啦！检查emby连通性\n\n"
                             LOGGER.info(f"【活跃检测】- 禁用账户 {user['Name']} #id{e.tg}：禁用失败啦！检查emby连通性")
                 except KeyError:
-                    if await emby.emby_change_policy(id=user["Id"], method=True):
+                    if await emby.emby_change_policy(emby_id=user["Id"], disable=True):
                         sql_update_emby(Emby.embyid == user["Id"], lv='c')
                         msg += f"**🔋活跃检测** - [{user['Name']}](tg://user?id={e.tg})\n#id{e.tg} 注册后未活跃，禁用\n\n"
                         LOGGER.info(f"【活跃检测】- 禁用账户 {user['Name']} #id{e.tg}：注册后未活跃禁用")
                     else:
                         msg += f"**🎂活跃检测** - [{user['Name']}](tg://user?id={e.tg})\n#id{e.tg} 注册后未活跃，禁用失败啦！检查emby连通性\n\n"
                         LOGGER.info(f"【活跃检测】- 禁用账户 {user['Name']} #id{e.tg}：禁用失败啦！检查emby连通性")
+        msg += '**活跃检测结束**\n'
         n = 1000
         chunks = [msg[i:i + n] for i in range(0, len(msg), n)]
         for c in chunks:

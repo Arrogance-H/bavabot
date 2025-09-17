@@ -26,6 +26,9 @@ from bot.sql_helper.sql_code import sql_count_c_code
 from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby, sql_delete_emby
 from bot.sql_helper.sql_emby2 import sql_get_emby2, sql_delete_emby2
 
+# 添加全局锁
+_create_user_lock = asyncio.Lock()
+
 # 创号函数
 async def create_user(_, call, us, stats):
     msg = await ask_return(call,
@@ -43,46 +46,57 @@ async def create_user(_, call, us, stats):
     except (IndexError, ValueError):
         await msg.reply(f'⚠️ 输入格式错误\n\n`{msg.text}`\n **会话已结束！**')
     else:
-        if _open.tem >= _open.all_user: return await msg.reply(
-            f'**🚫 很抱歉，注册总数({_open.tem})已达限制({_open.all_user})。**')
-        send = await msg.reply(
-            f'🆗 会话结束，收到设置\n\n用户名：**{emby_name}**  安全码：**{emby_pwd2}** \n\n__正在为您初始化账户，更新用户策略__......')
-        # emby api操作
-        data = await emby.emby_create(emby_name, us)
-        if not data:
-            await editMessage(send,
-                              '**- ❎ 已有此账户名，请重新输入注册\n- ❎ 或检查有无特殊字符\n- ❎ 或emby服务器连接不通，会话已结束！**',
-                              re_create_ikb)
-            LOGGER.error("【创建账户】：重复账户 or 未知错误！")
-        else:
-            tg = call.from_user.id
-            pwd = data[1]
-            eid = data[0]
-            ex = data[2]
-            sql_update_emby(Emby.tg == tg, embyid=eid, name=emby_name, pwd=pwd, pwd2=emby_pwd2, lv='b',
-                            cr=datetime.now(), ex=ex) if stats else sql_update_emby(Emby.tg == tg, embyid=eid,
-                                                                                    name=emby_name, pwd=pwd,
-                                                                                    pwd2=emby_pwd2, lv='b',
-                                                                                    cr=datetime.now(), ex=ex,
-                                                                                    us=0)
-            if schedall.check_ex:
-                ex = ex.strftime("%Y-%m-%d %H:%M:%S")
-            elif schedall.low_activity:
-                ex = f'__若{config.activity_check_days}天无观看将封禁__'
+        # 使用锁保护检查和创建过程
+        async with _create_user_lock:
+            # 再次检查限制（双重检查）
+            if _open.tem >= _open.all_user:
+                return await msg.reply(f'**🚫 很抱歉，注册总数({_open.tem})已达限制({_open.all_user})。**')
+            
+            send = await msg.reply(
+                f'🆗 会话结束，收到设置\n\n用户名：**{emby_name}**  安全码：**{emby_pwd2}** \n\n__正在为您初始化账户，更新用户策略__......')
+            
+            # emby api操作
+            data = await emby.emby_create(name=emby_name, days=us)
+            if not data:
+                await editMessage(send,
+                                  '**- ❎ 已有此账户名，请重新输入注册\n- ❎ 或检查有无特殊字符\n- ❎ 或emby服务器连接不通，会话已结束！**',
+                                  re_create_ikb)
+                LOGGER.error("【创建账户】：重复账户 or 未知错误！")
             else:
-                ex = '__无需保号，放心食用__'
-            await editMessage(send,
-                              f'**▎创建用户成功🎉**\n\n'
-                              f'· 用户名称 | `{emby_name}`\n'
-                              f'· 用户密码 | `{pwd}`\n'
-                              f'· 安全密码 | `{emby_pwd2}`（仅发送一次）\n'
-                              f'· 到期时间 | `{ex}`\n'
-                              f'· 当前线路：\n'
-                              f'{emby_line}\n\n'
-                              f'**·【服务器】 - 查看线路和密码**')
-            LOGGER.info(f"【创建账户】[开注状态]：{call.from_user.id} - 建立了 {emby_name} ") if stats else LOGGER.info(
-                f"【创建账户】：{call.from_user.id} - 建立了 {emby_name} ")
-            tem_adduser()
+                # 创建成功后立即更新计数器
+                tg = call.from_user.id
+                pwd = data[1]
+                eid = data[0]
+                ex = data[2]
+                
+                # 数据库操作
+                if stats:
+                    sql_update_emby(Emby.tg == tg, embyid=eid, name=emby_name, pwd=pwd, pwd2=emby_pwd2, lv='b', cr=datetime.now(), ex=ex) 
+                else:
+                    sql_update_emby(Emby.tg == tg, embyid=eid, name=emby_name, pwd=pwd, pwd2=emby_pwd2, lv='b', cr=datetime.now(), ex=ex, us=0)
+                
+                # 在锁内更新计数器
+                tem_adduser()
+                
+                if schedall.check_ex:
+                    ex = ex.strftime("%Y-%m-%d %H:%M:%S")
+                elif schedall.low_activity:
+                    ex = f'__若{config.activity_check_days}天无观看将封禁__'
+                else:
+                    ex = '__无需保号，放心食用__'
+                    
+                await editMessage(send,
+                                  f'**▎创建用户成功🎉**\n\n'
+                                  f'· 用户名称 | `{emby_name}`\n'
+                                  f'· 用户密码 | `{pwd}`\n'
+                                  f'· 安全密码 | `{emby_pwd2}`（仅发送一次）\n'
+                                  f'· 到期时间 | `{ex}`\n'
+                                  f'· 当前线路：\n'
+                                  f'{emby_line}\n\n'
+                                  f'**·【服务器】 - 查看线路和密码**')
+                
+                LOGGER.info(f"【创建账户】[开注状态]：{call.from_user.id} - 建立了 {emby_name} ") if stats else LOGGER.info(
+                    f"【创建账户】：{call.from_user.id} - 建立了 {emby_name} ")
 
 
 # 键盘中转
@@ -228,7 +242,7 @@ async def change_tg(_, call):
                 return await editMessage(call, f'❓ 未查询到bot数据中名为 {emby_name} 的账户，请使用 **绑定TG** 功能。',
                                          buttons=re_bindtg_ikb)
             if emby_pwd != e2.pwd2:
-                success, embyid = await emby.authority_account(call.from_user.id, emby_name, emby_pwd)
+                success, embyid = await emby.authority_account(tg_id=call.from_user.id, username=emby_name, password=emby_pwd)
                 if not success:
                     return await editMessage(call,
                                              f'💢 安全码or密码验证错误，请检查输入\n{emby_name} {emby_pwd} 是否正确。',
@@ -271,7 +285,7 @@ async def change_tg(_, call):
         else:
             if call.from_user.id == e.tg: return await editMessage(call, '⚠️ 您已经拥有账户。')
             if emby_pwd != e.pwd2:
-                success, embyid = await emby.authority_account(call.from_user.id, emby_name, emby_pwd)
+                success, embyid = await emby.authority_account(tg_id=call.from_user.id, username=emby_name, password=emby_pwd)
                 if not success:
                     return await editMessage(call,
                                              f'💢 安全码or密码验证错误，请检查输入\n{emby_name} {emby_pwd} 是否正确。',
@@ -325,7 +339,7 @@ async def bind_tg(_, call):
         if e is None:
             e2 = sql_get_emby2(name=emby_name)
             if e2 is None:
-                success, embyid = await emby.authority_account(call.from_user.id, emby_name, emby_pwd)
+                success, embyid = await emby.authority_account(tg_id=call.from_user.id, username=emby_name, password=emby_pwd)
                 if not success:
                     return await editMessage(call,
                                              f'🍥 很遗憾绑定失败，您输入的账户密码不符（{emby_name} - {emby_pwd}），请仔细确认后再次尝试',
@@ -395,7 +409,7 @@ async def del_emby(_, call):
         return
 
     embyid = call.data.split('-')[1]
-    if await emby.emby_del(embyid):
+    if await emby.emby_del(emby_id=embyid):
         sql_update_emby(Emby.embyid == embyid, embyid=None, name=None, pwd=None, pwd2=None, lv='d', cr=None, ex=None)
         tem_deluser()
         send1 = await editMessage(call, '🗑️ 好了，已经为您删除...\n愿来日各自安好，山高水长，我们有缘再见！',
@@ -446,7 +460,7 @@ async def reset(_, call):
                 elif mima.text == '/cancel':
                     await mima.delete()
                     await editMessage(call, '**🎯 收到，正在重置ing。。。**')
-                    if await emby.emby_reset(id=e.embyid) is True:
+                    if await emby.emby_reset(emby_id=e.embyid) is True:
                         await editMessage(call, '🕶️ 操作完成！已为您重置密码为 空。', buttons=back_members_ikb)
                         LOGGER.info(f"【重置密码】：{call.from_user.id} 成功重置了空密码！")
                     else:
@@ -456,7 +470,7 @@ async def reset(_, call):
                 else:
                     await mima.delete()
                     await editMessage(call, '**🎯 收到，正在重置ing。。。**')
-                    if await emby.emby_reset(id=e.embyid, new=mima.text) is True:
+                    if await emby.emby_reset(emby_id=e.embyid, new_password=mima.text) is True:
                         await editMessage(call, f'🕶️ 操作完成！已为您重置密码为 `{mima.text}`。',
                                           buttons=back_members_ikb)
                         LOGGER.info(f"【重置密码】：{call.from_user.id} 成功重置了密码为 {mima.text} ！")
@@ -480,7 +494,7 @@ async def embyblocks(_, call):
         if send is False:
             return
     else:
-        success, rep = emby.user(embyid=data.embyid)
+        success, rep = await emby.user(emby_id=data.embyid)
         try:
             if success is False:
                 stat = '💨 未知'
@@ -506,14 +520,14 @@ async def user_emby_block(_, call):
     send = await callAnswer(call, f'🎬 正在为您关闭显示ing')
     if send is False:
         return
-    success, rep = emby.user(embyid=embyid)
+    success, rep = await emby.user(emby_id=embyid)
     currentblock = []
     if success:
         try:
             currentblock = list(set(rep["Policy"]["BlockedMediaFolders"] + config.emby_block + ['播放列表']))
         except KeyError:
             currentblock = ['播放列表'] + extra_emby_libs + config.emby_block
-        re = await emby.emby_block(embyid, 0, block=currentblock)
+        re = await emby.emby_block(emby_id=embyid, stats=0, block=currentblock)
         if re is True:
             send1 = await editMessage(call, f'🕶️ ο(=•ω＜=)ρ⌒☆\n 小尾巴隐藏好了！ ', buttons=user_emby_block_ikb)
             if send1 is False:
@@ -529,7 +543,7 @@ async def user_emby_unblock(_, call):
     send = await callAnswer(call, f'🎬 正在为您开启显示ing')
     if send is False:
         return
-    success, rep = emby.user(embyid=embyid)
+    success, rep = await emby.user(emby_id=embyid)
     currentblock = []
     if success:
         try:
@@ -539,7 +553,7 @@ async def user_emby_unblock(_, call):
                                                                                       x not in currentblock]
         except KeyError:
             currentblock = ['播放列表'] + extra_emby_libs
-        re = await emby.emby_block(embyid, 0, block=currentblock)
+        re = await emby.emby_block(emby_id=embyid, stats=0, block=currentblock)
         if re is True:
             # await embyblock(_, call)
             send1 = await editMessage(call, f'🕶️ ┭┮﹏┭┮\n 小尾巴被抓住辽！ ', buttons=user_emby_unblock_ikb)
@@ -592,7 +606,7 @@ async def do_store_reborn(_, call):
             await asyncio.gather(m.delete(), do_store(_, call))
         else:
             sql_update_emby(Emby.tg == call.from_user.id, iv=e.iv - _open.exchange_cost, lv='b')
-            await emby.emby_change_policy(e.embyid)
+            await emby.emby_change_policy(emby_id=e.embyid)
             LOGGER.info(f'【兑换解封】- {call.from_user.id} 已花费 {_open.exchange_cost}{sakura_b},解除封禁')
             await asyncio.gather(m.delete(), do_store(_, call),
                                  sendMessage(call, '解封成功<(￣︶￣)↗[GO!]\n此消息将在20s后自焚', timer=20))
@@ -710,7 +724,7 @@ async def my_favorite(_, call):
         return await callAnswer(call, '您还没有Emby账户', True)
     limit = 10
     start_index = (page - 1) * limit
-    favorites = await emby.get_favorite_items(get_emby.embyid, start_index=start_index, limit=limit)
+    favorites = await emby.get_favorite_items(emby_id=get_emby.embyid, start_index=start_index, limit=limit)
     text = "**我的收藏**\n\n"
     for item in favorites.get("Items", []):
         item_id = item.get("Id")
@@ -740,7 +754,7 @@ async def my_devices(_, call):
     get_emby = sql_get_emby(tg=call.from_user.id)
     if get_emby is None:
         return await callAnswer(call, '您还没有Emby账户', True)
-    success, result = await emby.get_emby_userip(get_emby.embyid)
+    success, result = await emby.get_emby_userip(emby_id=get_emby.embyid)
     if not success or len(result) == 0:
         return await callAnswer(call, '您好像没播放信息吖')
     else:
