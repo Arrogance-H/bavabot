@@ -18,7 +18,7 @@ from pyrogram.types import (
     Message
 )
 
-from bot import bot, prefixes, sakura_b, group
+from bot import bot, prefixes, sakura_b, group, _open
 from bot.func_helper.filters import user_in_group_on_filter
 from bot.func_helper.msg_utils import sendMessage, sendPhoto, callAnswer, editMessage
 from bot.func_helper.utils import judge_admins, pwd_create
@@ -677,6 +677,9 @@ async def handle_terminate_lottery(_, call: CallbackQuery):
         return await callAnswer(call, "❌ 只有创建者或管理员才能终止抽奖", True)
     
     # 生成终止消息
+    refund_rate = _open.lottery_refund_rate
+    refund_text = "所有参与费用将被全额退还。" if refund_rate == 1.0 else f"参与费用将按 {int(refund_rate * 100)}% 退还。"
+    
     termination_text = f"""❌ 抽奖已被终止
 
 🎟️ 抽奖名称： {lottery.name}
@@ -685,20 +688,26 @@ async def handle_terminate_lottery(_, call: CallbackQuery):
 🔚 终止者： {call.from_user.first_name or '管理员'}
 📅 终止时间： {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
-此抽奖活动已被管理员终止，所有参与费用将被退还。"""
+此抽奖活动已被管理员终止，{refund_text}"""
     
     # 退还参与费用
     if lottery.entry_fee > 0:
+        refund_rate = _open.lottery_refund_rate
+        refund_amount = int(lottery.entry_fee * refund_rate)
+        
         for participant_id in lottery.participants.keys():
             try:
                 e = sql_get_emby(tg=participant_id)
                 if e:
-                    sql_update_emby(Emby.tg == participant_id, iv=e.iv + lottery.entry_fee)
+                    sql_update_emby(Emby.tg == participant_id, iv=e.iv + refund_amount)
                     # 发送退款通知
-                    await bot.send_message(
-                        participant_id, 
-                        f"💰 抽奖 '{lottery.name}' 已被终止，您的参与费用 {lottery.entry_fee} {sakura_b} 已退还。"
-                    )
+                    if refund_rate == 1.0:
+                        refund_msg = f"💰 抽奖 '{lottery.name}' 已被终止，您的参与费用 {refund_amount} {sakura_b} 已全额退还。"
+                    else:
+                        refund_percentage = int(refund_rate * 100)
+                        refund_msg = f"💰 抽奖 '{lottery.name}' 已被终止，您的参与费用已按 {refund_percentage}% 退还 {refund_amount} {sakura_b}。"
+                    
+                    await bot.send_message(participant_id, refund_msg)
             except Exception:
                 pass  # 忽略退款失败的情况
     

@@ -57,7 +57,8 @@
     "uplays": true,
     "exchange_cost": 100,
     "whitelist_cost": 9999,
-    "invite_cost": 1000
+    "invite_cost": 1000,
+    "lottery_refund_rate": 1.0
   },
   "tz_ad": "",
   "tz_api": "",

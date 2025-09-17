@@ -382,6 +382,30 @@ async def set_renew(_, call):
     finally:
         await editMessage(call, text='⭕ **关于用户组的续期功能**\n\n选择点击下方按钮开关任意兑换功能',
                           buttons=cr_renew_ikb())
+@bot.on_callback_query(filters.regex('set_lottery_refund'))
+async def set_lottery_refund(_, call):
+    """设置抽奖退款比例"""
+    try:
+        await callAnswer(call, '🎲 切换抽奖退款比例')
+        # 在50%和100%之间切换
+        if _open.lottery_refund_rate == 1.0:
+            _open.lottery_refund_rate = 0.5
+            rate_text = "50%"
+        else:
+            _open.lottery_refund_rate = 1.0
+            rate_text = "100%"
+        
+        save_config()
+        
+        await editMessage(call, 
+            f"✅ 抽奖退款比例已设置为 {rate_text}\n\n"
+            f"当管理员终止付费抽奖时，将退还参与者 {rate_text} 的费用。",
+            buttons=cr_renew_ikb())
+        
+    except Exception as e:
+        await callAnswer(call, f'❌ 设置失败: {str(e)}', True)
+
+
 @bot.on_callback_query(filters.regex('set_freeze_days') & admins_on_filter)
 async def set_freeze_days(_, call):
     await callAnswer(call, '⭕ 设置封存天数')

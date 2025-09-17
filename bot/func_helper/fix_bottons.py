@@ -311,12 +311,15 @@ def cr_renew_ikb():
         'c': '已禁用用户',
         'd': '无账号用户'
     }.get(_open.invite_lv, '未知')
+    # 添加抽奖退款比例显示
+    refund_rate_text = f"{int(_open.lottery_refund_rate * 100)}%"
     keyboard = InlineKeyboard(row_width=2)
     keyboard.add(InlineButton(f'{checkin} 每日签到', f'set_renew-checkin'),
                  InlineButton(f'{exchange} 自动{sakura_b}续期', f'set_renew-exchange'),
                  InlineButton(f'{whitelist} 兑换白名单', f'set_renew-whitelist'),
                  InlineButton(f'{invite} 兑换邀请码', f'set_renew-invite'),
-                 InlineButton(f'邀请等级: {invite_lv_text}', f'set_invite_lv')
+                 InlineButton(f'邀请等级: {invite_lv_text}', f'set_invite_lv'),
+                 InlineButton(f'🎲 抽奖退款: {refund_rate_text}', f'set_lottery_refund')
                  )
     keyboard.row(InlineButton(f'◀ 返回', 'manage'))
     return keyboard

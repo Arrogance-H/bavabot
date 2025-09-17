@@ -57,6 +57,7 @@ class Open(BaseModel):
     exchange_cost: int = 300
     whitelist_cost: int = 9999
     invite_cost: int = 1000
+    lottery_refund_rate: float = 1.0  # 抽奖退款比例：1.0=100%, 0.5=50%
 
     # 每次创建 Open 对象时被重置为 0
     def __init__(self, **data):
