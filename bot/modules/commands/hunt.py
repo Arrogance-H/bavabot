@@ -259,7 +259,7 @@ async def start_hunt(_, msg):
     
     user = sql_get_emby(msg.from_user.id)
     if not user:
-        return await sendMessage(msg, "❌ 您还未在bot处登记，请先运行 /start 后再参与车库游戏")
+        return await sendMessage(msg, "❌ 您还未在bot处登记，请先运行 /start 后再参与寻宝游戏")
     
     # 检查今日游戏次数
     today_count = sql_get_today_hunt_count(msg.from_user.id)
