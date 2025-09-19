@@ -340,9 +340,7 @@ async def finish_lottery_setup(msg: Message, setup: LotterySetup):
     
     # 生成参与按钮
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🎟️ 参与抽奖", f"lottery_join_{lottery.id}")],
-        [InlineKeyboardButton("📊 查看详情", f"lottery_info_{lottery.id}")],
-        [InlineKeyboardButton("🎯 开奖", f"lottery_draw_{lottery.id}")]
+        [InlineKeyboardButton("🎯 开奖", f"lottery_draw_{lottery.id}"), InlineKeyboardButton("🎟️ 参与抽奖", f"lottery_join_{lottery.id}")]
     ])
     
     # 发送给创建者确认
@@ -484,9 +482,7 @@ async def join_lottery(_, call: CallbackQuery):
         # 更新消息，保持按钮可见
         text = format_lottery_message(lottery)
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🎟️ 参与抽奖", f"lottery_join_{lottery.id}")],
-            [InlineKeyboardButton("📊 查看详情", f"lottery_info_{lottery.id}")],
-            [InlineKeyboardButton("🎯 开奖", f"lottery_draw_{lottery.id}")]
+            [InlineKeyboardButton("🎯 开奖", f"lottery_draw_{lottery.id}"), InlineKeyboardButton("🎟️ 参与抽奖", f"lottery_join_{lottery.id}")]
         ])
         
         if lottery.image_url:
@@ -512,31 +508,6 @@ async def delete_message_after_delay(chat_id: int, message_id: int, delay: int):
     except Exception:
         pass  # 忽略删除失败的情况
 
-
-@bot.on_callback_query(filters.regex("lottery_info_"))
-async def lottery_info(_, call: CallbackQuery):
-    """查看抽奖详情"""
-    lottery_id = call.data.split("_")[-1]
-    
-    if lottery_id not in active_lotteries:
-        return await callAnswer(call, "❌ 抽奖不存在或已结束", True)
-    
-    lottery = active_lotteries[lottery_id]
-    
-    participants_text = "\n".join([f"• {name}" for name in lottery.participants.values()])
-    if not participants_text:
-        participants_text = "暂无参与者"
-    
-    text = f"""📊 抽奖详情
-
-🎟️ 抽奖名称： {lottery.name}
-👥 参与者列表：
-{participants_text}
-
-📈 当前参与人数： {len(lottery.participants)}
-🎁 奖品总数： {sum(prize.quantity for prize in lottery.prizes)}"""
-    
-    await callAnswer(call, text, True)
 
 
 @bot.on_callback_query(filters.regex("lottery_draw_"))
@@ -594,8 +565,8 @@ async def draw_lottery(lottery: Lottery, chat_id: int, message_id: int):
     
     for prize_name, winner_list in winners.items():
         result_text += f"🏆 **{prize_name}**\n"
-        for _, winner_name in winner_list:
-            result_text += f"    • {winner_name}\n"
+        for winner_id, winner_name in winner_list:
+            result_text += f"    • {winner_name} (ID: {winner_id})\n"
         result_text += "\n"
     
     result_text += f"📊 本次抽奖统计：\n"
