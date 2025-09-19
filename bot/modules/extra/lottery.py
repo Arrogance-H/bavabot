@@ -340,8 +340,7 @@ async def finish_lottery_setup(msg: Message, setup: LotterySetup):
     
     # 生成参与按钮
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🎟️ 参与抽奖", f"lottery_join_{lottery.id}")],
-        [InlineKeyboardButton("🎯 开奖", f"lottery_draw_{lottery.id}")]
+        [InlineKeyboardButton("🎯 开奖", f"lottery_draw_{lottery.id}"), InlineKeyboardButton("🎟️ 参与抽奖", f"lottery_join_{lottery.id}")]
     ])
     
     # 发送给创建者确认
@@ -483,8 +482,7 @@ async def join_lottery(_, call: CallbackQuery):
         # 更新消息，保持按钮可见
         text = format_lottery_message(lottery)
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🎟️ 参与抽奖", f"lottery_join_{lottery.id}")],
-            [InlineKeyboardButton("🎯 开奖", f"lottery_draw_{lottery.id}")]
+            [InlineKeyboardButton("🎯 开奖", f"lottery_draw_{lottery.id}"), InlineKeyboardButton("🎟️ 参与抽奖", f"lottery_join_{lottery.id}")]
         ])
         
         if lottery.image_url:
