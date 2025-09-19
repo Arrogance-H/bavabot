@@ -28,7 +28,7 @@ async def user_spin_wheel(_, call):
     today = now.strftime("%Y-%m-%d")
     user_id = call.from_user.id
     
-    if not _open.checkin:  # 使用checkin开关来控制转盘功能
+    if not _open.spin_wheel:  # 使用独立的spin_wheel开关来控制转盘功能
         await callAnswer(call, '❌ 转盘功能暂未开启！', True)
         return
         
@@ -46,21 +46,21 @@ async def user_spin_wheel(_, call):
         return
 
     # 转盘奖励概率设置
-    # 空气: 99.8%，1币: 0.1%，19币: 0.1%
+    # 1币: 99.8%，空气: 0.1%，19币: 0.1%
     rand_num = random.random() * 100  # 0-100的随机数
     
-    if rand_num < 0.1:  # 0.1% 概率获得19币
-        reward = 19
-        reward_text = f"🎊 **恭喜中大奖！** 获得 {reward} {sakura_b}！"
-        emoji = "🎊"
-    elif rand_num < 0.2:  # 0.1% 概率获得1币  
-        reward = 1
-        reward_text = f"🎉 **小有所获！** 获得 {reward} {sakura_b}！"
-        emoji = "🎉"
-    else:  # 99.8% 概率获得空气
+    if rand_num < 0.1:  # 0.1% 概率获得空气
         reward = 0
         reward_text = "💨 **很遗憾，获得了空气**"
         emoji = "💨"
+    elif rand_num < 0.2:  # 0.1% 概率获得19币  
+        reward = 19
+        reward_text = f"🎊 **恭喜中大奖！** 获得 {reward} {sakura_b}！"
+        emoji = "🎊"
+    else:  # 99.8% 概率获得1币
+        reward = 1
+        reward_text = f"🎉 **获得奖励！** 获得 {reward} {sakura_b}！"
+        emoji = "🎉"
 
     # 更新用户积分和记录转盘使用
     new_iv = e.iv + reward

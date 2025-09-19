@@ -47,6 +47,7 @@ class Open(BaseModel):
     #     return v
 
     checkin: bool
+    spin_wheel: bool = True
     exchange: bool
     whitelist: bool
     invite: bool

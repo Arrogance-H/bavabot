@@ -50,6 +50,7 @@
     "tem": 0,
     "allow_code": true,
     "checkin": true,
+    "spin_wheel": true,
     "exchange": true,
     "whitelist": true,
     "invite": false,
