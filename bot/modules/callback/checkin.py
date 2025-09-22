@@ -270,11 +270,24 @@ async def end_punch_game(call, user_id):
     
     result_text = f"🎮 **F1结果**\n\n📊 **点击次数**: {clicks}\n{reward_text}{remaining_text}"
     
+    # 根据剩余次数添加相应按钮
+    buttons = None
+    if remaining > 0:
+        # 还有游戏次数，显示"继续冲刺"按钮
+        buttons = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🏁 继续冲刺", "punch_in")]
+        ])
+    else:
+        # 没有游戏次数，显示"返回主页"按钮
+        buttons = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🏠 返回主页", "back_start")]
+        ])
+    
     # 清理会话数据
     del punch_in_sessions[user_id]
     
     try:
-        await editMessage(call, result_text)
+        await editMessage(call, result_text, buttons=buttons)
     except Exception:
         # 如果编辑失败，发送新消息
-        await sendMessage(call, text=result_text)
+        await sendMessage(call, text=result_text, buttons=buttons)
