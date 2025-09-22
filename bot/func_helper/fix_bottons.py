@@ -30,7 +30,7 @@ def judge_start_ikb(is_admin: bool, account: bool) -> InlineKeyboardMarkup:
         d = [['️👥 用户功能', 'members'], ['🌐 服务器', 'server']]
         if schedall.check_ex: d.append(['🎟️ 使用续期码', 'exchange'])
     if _open.checkin: d.append([f'🎯 签到', 'checkin'])
-    if _open.punch_in: d.append([f'🎮 打卡', 'punch_in'])
+    if _open.punch_in: d.append([f'🎮 F1', 'punch_in'])
     lines = array_chunk(d, 2)
     if is_admin: lines.append([['👮🏻‍♂️ admin', 'manage']])
     keyword = ikb(lines)
