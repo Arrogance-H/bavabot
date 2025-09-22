@@ -13,6 +13,83 @@ from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby
 # 存储用户打卡游戏状态的临时数据
 punch_in_sessions = {}
 
+# 存储用户每日F1游戏次数的内存数据 {user_id: {'count': int, 'date': 'YYYY-MM-DD'}}
+daily_punch_limits = {}
+
+# F1游戏每日限制次数
+DAILY_PUNCH_LIMIT = 3
+
+
+def get_punch_count(user_id: int) -> tuple[int, int]:
+    """
+    获取用户今日F1游戏次数和剩余次数
+    返回: (今日已玩次数, 剩余次数)
+    """
+    # 定期清理过期数据
+    if len(daily_punch_limits) > 100:  # 当数据量较大时才清理，避免频繁操作
+        cleanup_old_punch_data()
+    
+    now = datetime.now(timezone(timedelta(hours=8)))
+    today = now.strftime("%Y-%m-%d")
+    
+    if user_id not in daily_punch_limits:
+        daily_punch_limits[user_id] = {'count': 0, 'date': today}
+        return 0, DAILY_PUNCH_LIMIT
+    
+    user_data = daily_punch_limits[user_id]
+    
+    # 如果日期变了，重置计数
+    if user_data['date'] != today:
+        daily_punch_limits[user_id] = {'count': 0, 'date': today}
+        return 0, DAILY_PUNCH_LIMIT
+    
+    current_count = user_data['count']
+    remaining = max(0, DAILY_PUNCH_LIMIT - current_count)
+    return current_count, remaining
+
+
+def increment_punch_count(user_id: int) -> tuple[int, int]:
+    """
+    增加用户今日F1游戏次数
+    返回: (今日已玩次数, 剩余次数)
+    """
+    now = datetime.now(timezone(timedelta(hours=8)))
+    today = now.strftime("%Y-%m-%d")
+    
+    if user_id not in daily_punch_limits:
+        daily_punch_limits[user_id] = {'count': 1, 'date': today}
+        return 1, DAILY_PUNCH_LIMIT - 1
+    
+    user_data = daily_punch_limits[user_id]
+    
+    # 如果日期变了，重置为1
+    if user_data['date'] != today:
+        daily_punch_limits[user_id] = {'count': 1, 'date': today}
+        return 1, DAILY_PUNCH_LIMIT - 1
+    
+    # 增加计数
+    new_count = user_data['count'] + 1
+    daily_punch_limits[user_id]['count'] = new_count
+    remaining = max(0, DAILY_PUNCH_LIMIT - new_count)
+    return new_count, remaining
+
+
+def cleanup_old_punch_data():
+    """
+    清理过期的F1游戏限制数据（保留最近2天的数据）
+    """
+    now = datetime.now(timezone(timedelta(hours=8)))
+    today = now.strftime("%Y-%m-%d")
+    yesterday = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+    
+    users_to_remove = []
+    for user_id, data in daily_punch_limits.items():
+        if data['date'] not in [today, yesterday]:
+            users_to_remove.append(user_id)
+    
+    for user_id in users_to_remove:
+        del daily_punch_limits[user_id]
+
 
 @bot.on_callback_query(filters.regex('checkin') & user_in_group_on_filter)
 async def user_in_checkin(_, call):
@@ -55,23 +132,13 @@ async def start_punch_in_game(_, call):
         await callAnswer(call, '🎮 您已经在游戏中了！', True)
         return
     
-    # 检查今日游戏次数限制
-    now = datetime.now(timezone(timedelta(hours=8)))
-    today = now.strftime("%Y-%m-%d")
+    # 检查今日游戏次数限制（使用内存跟踪）
+    current_count, remaining = get_punch_count(user_id)
     
-    # 如果不是今天或者punch_date为空，重置计数
-    if not e.punch_date or e.punch_date.strftime("%Y-%m-%d") < today:
-        sql_update_emby(Emby.tg == user_id, punch_count=0, punch_date=now)
-        punch_count = 0
-    else:
-        punch_count = e.punch_count or 0
-    
-    # 检查是否已达到每日限制（3次）
-    if punch_count >= 3:
-        await callAnswer(call, f'🎮 今日F1游戏次数已用完！每日限制3次，明天再来吧！', True)
+    # 检查是否已达到每日限制
+    if current_count >= DAILY_PUNCH_LIMIT:
+        await callAnswer(call, f'🎮 今日F1游戏次数已用完！每日限制{DAILY_PUNCH_LIMIT}次，明天再来吧！', True)
         return
-    
-    remaining = 3 - punch_count
     
     # 初始化用户游戏会话（预占位）
     punch_in_sessions[user_id] = {
@@ -85,7 +152,7 @@ async def start_punch_in_game(_, call):
         [InlineKeyboardButton("✅ 准备好了", f"punch_ready_{user_id}")]
     ])
     
-    await editMessage(call, f"🎮 **F1**\n\n准备好开始了吗？\n\n🎯 今日剩余次数: {remaining}/3", buttons=ready_button)
+    await editMessage(call, f"🎮 **F1**\n\n准备好开始了吗？\n\n🎯 今日剩余次数: {remaining}/{DAILY_PUNCH_LIMIT}", buttons=ready_button)
 
 
 @bot.on_callback_query(filters.regex(r'punch_ready_(\d+)'))
@@ -171,22 +238,8 @@ async def end_punch_game(call, user_id):
     clicks = punch_in_sessions[user_id]['clicks']
     punch_in_sessions[user_id]['game_active'] = False
     
-    # 增加今日游戏次数
-    e = sql_get_emby(user_id)
-    if e:
-        now = datetime.now(timezone(timedelta(hours=8)))
-        today = now.strftime("%Y-%m-%d")
-        
-        # 如果不是今天或者punch_date为空，重置计数为1
-        if not e.punch_date or e.punch_date.strftime("%Y-%m-%d") < today:
-            new_punch_count = 1
-        else:
-            new_punch_count = (e.punch_count or 0) + 1
-        
-        sql_update_emby(Emby.tg == user_id, punch_count=new_punch_count, punch_date=now)
-        remaining = 3 - new_punch_count
-    else:
-        remaining = 2  # 默认值，以防出错
+    # 增加今日游戏次数（使用内存跟踪）
+    new_punch_count, remaining = increment_punch_count(user_id)
     
     # 计算奖励
     reward = 0
@@ -211,7 +264,7 @@ async def end_punch_game(call, user_id):
     
     # 添加剩余次数提示
     if remaining > 0:
-        remaining_text = f"\n\n🎯 今日剩余次数: {remaining}/3"
+        remaining_text = f"\n\n🎯 今日剩余次数: {remaining}/{DAILY_PUNCH_LIMIT}"
     else:
         remaining_text = f"\n\n🎯 今日游戏次数已用完，明天再来！"
     

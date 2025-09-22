@@ -2,21 +2,22 @@
 
 ## Changes Made
 
-### Database Schema Changes (sql_emby.py)
-- Added `punch_count` column (Integer, default=0): Tracks daily F1 game plays
-- Added `punch_date` column (DateTime, nullable=True): Tracks the date of the last play
+### Memory-Based Tracking Implementation (checkin.py)
+- Replaced database columns with in-memory storage: `daily_punch_limits` dictionary
+- Added `get_punch_count()` function: Gets user's current daily game count and remaining attempts
+- Added `increment_punch_count()` function: Increments user's daily game count
+- Added `cleanup_old_punch_data()` function: Automatically cleans up old tracking data
 
 ### Game Logic Changes (checkin.py)
 
 #### start_punch_in_game function:
-- Added daily limit check (3 games per day)
+- Added daily limit check (3 games per day) using memory tracking
 - Added automatic reset of count when date changes
 - Shows remaining attempts to users
 - Prevents game start if daily limit is reached
 
 #### end_punch_game function:
-- Increments daily play count after each completed game
-- Updates punch_date to current date
+- Increments daily play count using memory tracking after each completed game
 - Shows remaining attempts in game result message
 - Handles date rollover automatically
 
@@ -24,12 +25,11 @@
 1. **Daily Limit**: Users can play F1 game maximum 3 times per day
 2. **Automatic Reset**: Count resets at midnight (China timezone UTC+8)
 3. **User Feedback**: Shows remaining attempts to users
-4. **Persistent Tracking**: Uses database to track across bot restarts
+4. **Memory-Based Tracking**: Uses in-memory storage for better performance
+5. **Automatic Cleanup**: Removes old tracking data to prevent memory leaks
 
-## Database Migration
-The new columns will be automatically created when the bot starts due to SQLAlchemy's `checkfirst=True` setting in the table creation.
-
-## Backward Compatibility
-- Existing users will have `punch_count=0` and `punch_date=NULL` by default
-- First game play will initialize these values properly
-- No data migration required
+## Memory Management
+- Data is stored in `daily_punch_limits` dictionary in memory
+- Automatic cleanup removes data older than 2 days when storage exceeds 100 users
+- No database dependency for daily limit tracking
+- Survives across user sessions but resets on bot restart (by design)
