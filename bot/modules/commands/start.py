@@ -1,8 +1,25 @@
 """
 启动面板start命令 返回面ban
 
-+ myinfo 个人数据
-+ count  服务器媒体数
+命令说明:
++ myinfo 个人数据查询命令 - 用户可以查看自己的详细信息
+  - 显示Telegram用户信息（ID、用户名）
+  - 显示Emby账户状态（账户名、等级、到期时间）
+  - 显示用户积分和权限信息
+  - 显示播放统计（最近活动、30天播放时长）
+  - 管理员查看时提供额外的管理操作按钮
+  
++ count  服务器媒体数统计命令
+  - 显示Emby服务器上的媒体库统计信息
+
+myinfo命令工作原理:
+1. 接收用户命令 -> my_info()函数处理
+2. 权限验证 -> 确保用户在群组中且有权限
+3. 数据获取 -> cr_kk_ikb()构建信息文本和按钮
+4. 信息查询 -> members_info()从数据库获取用户信息
+5. 外部查询 -> 从Emby服务器获取播放统计
+6. 格式化显示 -> 生成用户友好的信息文本
+7. 发送消息 -> 60秒后自动删除保护隐私
 """
 import asyncio
 from pyrogram import filters
@@ -28,12 +45,35 @@ async def ui_g_command(_, msg):
 
 
 # 查看自己的信息
+# myinfo命令的入口点 - 用户信息查询命令
 @bot.on_message(filters.command('myinfo', prefixes) & user_in_group_on_filter)
 async def my_info(_, msg):
+    """
+    myinfo命令处理函数 - 获取并显示用户个人信息
+    
+    工作流程：
+    1. 删除用户发送的命令消息（保持聊天整洁）
+    2. 检查消息是否来自频道（频道消息不处理）
+    3. 调用cr_kk_ikb函数获取用户详细信息和操作按钮
+    4. 发送格式化的用户信息，60秒后自动删除
+    
+    参数:
+    - _: Pyrogram客户端实例（未使用）
+    - msg: 用户发送的消息对象，包含用户ID和其他信息
+    """
+    # 删除用户的原始命令消息，保持群聊整洁
     await msg.delete()
+    
+    # 如果消息来自频道而非个人用户，直接返回不处理
     if msg.sender_chat:
         return
+    
+    # 核心信息获取：调用cr_kk_ikb函数构建用户信息文本和键盘按钮
+    # uid: 用户的Telegram ID，用于数据库查询
+    # first: 用户的名字，用于显示
     text, keyboard = await cr_kk_ikb(uid=msg.from_user.id, first=msg.from_user.first_name)
+    
+    # 发送格式化的用户信息，设置60秒自动删除保护隐私
     await sendMessage(msg, text, timer=60)
 
 

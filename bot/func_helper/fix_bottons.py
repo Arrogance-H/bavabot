@@ -371,48 +371,94 @@ dp_g_ikb = ikb([[("🈺 ╰(￣ω￣ｏ)", "t.me/Aaaaa_su", "url")]])
 
 
 async def cr_kk_ikb(uid, first):
-    text = ''
-    text1 = ''
-    keyboard = []
+    """
+    创建用户信息显示文本和键盘按钮 (Create Keyboard & Info Button)
+    
+    这是myinfo命令的核心函数，负责：
+    1. 从数据库获取用户基础信息
+    2. 从Emby服务器获取播放统计信息
+    3. 构建格式化的显示文本
+    4. 生成相应的操作按钮（管理员功能）
+    
+    参数:
+    - uid: 用户的Telegram ID
+    - first: 用户的名字
+    
+    返回:
+    - text: 格式化的用户信息文本
+    - keyboard: 操作按钮键盘（如果是管理员查看会有更多选项）
+    """
+    # 初始化显示文本和键盘变量
+    text = ''           # 主要信息文本
+    text1 = ''          # 播放统计信息文本
+    keyboard = []       # 操作按钮列表
+    
+    # 核心数据获取：从数据库查询用户信息
     data = await members_info(uid)
+    
+    # 处理用户不存在的情况
     if data is None:
         text += f'**· 🆔 TG** ：[{first}](tg://user?id={uid}) [`{uid}`]\n数据库中没有此ID。ta 还没有私聊过我'
     else:
+        # 解析用户数据元组：姓名、等级、到期时间、积分、EmbyID、密码
         name, lv, ex, iv, embyid, pwd2 = data
+        
+        # 检查用户是否有Emby账户
         if name != '无账户信息':
+            # 为有账户的用户创建管理按钮
             ban = "🌟 解除禁用" if lv == "**已禁用**" else '💢 禁用账户'
             keyboard = [[ban, f'user_ban-{uid}'], ['⚠️ 删除账户', f'closeemby-{uid}']]
+            
+            # 如果配置了额外媒体库，添加媒体库权限控制按钮
             if len(extra_emby_libs) > 0:
                 success, rep = await emby.user(emby_id=embyid)
                 if success:
                     try:
+                        # 获取用户当前被阻止的媒体库列表
                         currentblock = rep["Policy"]["BlockedMediaFolders"]
                     except KeyError:
                         currentblock = []
-                    # 此处符号用于展示是否开启的状态
+                    
+                    # 检查额外媒体库是否被阻止，创建相应的控制按钮
+                    # 如果额外媒体库都被阻止，显示"解除阻止"按钮
+                    # 如果没有被阻止，显示"阻止"按钮
                     libs, embyextralib = ['✖️', f'embyextralib_unblock-{uid}'] if set(extra_emby_libs).issubset(
                         set(currentblock)) else ['✔️', f'embyextralib_block-{uid}']
                     keyboard.append([f'{libs} 额外媒体库', embyextralib])
+            
+            # 获取用户播放统计信息
             try:
+                # 查询用户过去30天的播放记录
                 rst = await emby.emby_cust_commit(emby_id=embyid, days=30)
-                last_time = rst[0][0]
-                toltime = rst[0][1]
+                last_time = rst[0][0]   # 最后播放时间
+                toltime = rst[0][1]     # 总播放时长
                 text1 = f"**· 🔋 上次活动** | {last_time.split('.')[0]}\n" \
                         f"**· 📅 过去30天** | {toltime} 分钟"
             except (TypeError, IndexError, ValueError):
+                # 如果没有播放记录或获取失败，显示默认信息
                 text1 = f"**· 📅 过去30天未有记录**"
         else:
+            # 对于没有账户的用户，添加"赠送资格"按钮
             keyboard.append(['✨ 赠送资格', f'gift-{uid}'])
+        
+        # 构建主要信息显示文本
         text += f"**· 🍉 TG&名称** | [{first}](tg://user?id={uid})\n" \
                 f"**· 🍒 识别のID** | `{uid}`\n" \
                 f"**· 🍓 当前状态** | {lv}\n" \
                 f"**· 🍥 持有{sakura_b}** | {iv}\n" \
                 f"**· 💠 账号名称** | {name}\n" \
                 f"**· 🚨 到期时间** | **{ex}**\n"
+        
+        # 添加播放统计信息
         text += text1
+        
+        # 添加管理员专用按钮：踢出封禁和删除消息
         keyboard.extend([['🚫 踢出并封禁', f'fuckoff-{uid}'], ['❌ 删除消息', f'closeit']])
+        
+        # 将按钮列表转换为键盘格式，每行最多2个按钮
         lines = array_chunk(keyboard, 2)
         keyboard = ikb(lines)
+    
     return text, keyboard
 
 

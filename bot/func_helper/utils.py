@@ -23,31 +23,69 @@ def judge_admins(uid):
 # @cache.memoize(ttl=60)
 async def members_info(tg=None, name=None):
     """
-    基础资料 - 可传递 tg,emby_name
-    :param tg: tg_id
-    :param name: emby_name
-    :return: name, lv, ex, us, embyid, pwd2
+    获取用户基础信息的核心函数
+    
+    这个函数是myinfo命令数据获取的关键环节，负责：
+    1. 从数据库查询用户记录
+    2. 处理和转换用户状态信息
+    3. 计算到期时间显示逻辑
+    4. 返回格式化的用户信息元组
+    
+    参数:
+    - tg: Telegram用户ID（主要查询参数）
+    - name: 用户名（备用查询参数，如果tg为None时使用）
+    
+    返回:
+    - None: 如果用户不存在
+    - tuple: (name, lv, ex, iv, embyid, pwd2) 用户信息元组
+      - name: Emby账户名称
+      - lv: 用户等级显示文本
+      - ex: 到期时间显示文本
+      - iv: 用户积分
+      - embyid: Emby服务器用户ID
+      - pwd2: 用户密码
     """
+    # 参数处理：如果没有传入tg，使用name作为查询参数
     if tg is None:
         tg = name
+    
+    # 核心数据查询：从数据库获取用户记录
     data = sql_get_emby(tg)
+    
+    # 处理用户不存在的情况
     if data is None:
         return None
     else:
-        name = data.name or '无账户信息'
-        pwd2 = data.pwd2
-        embyid = data.embyid
-        iv = data.iv
-        lv_dict = {'a': '白名单', 'b': '**正常**', 'c': '**已禁用**', 'd': '未注册'}  # , 'e': '**21天未活跃/无信息**'
-        lv = lv_dict.get(data.lv, '未知')
+        # 提取和处理用户基础信息
+        name = data.name or '无账户信息'  # Emby账户名，如果为空显示默认文本
+        pwd2 = data.pwd2                   # 用户密码
+        embyid = data.embyid              # Emby服务器中的用户ID
+        iv = data.iv                      # 用户积分
+        
+        # 用户等级转换：将数据库中的字母代码转换为用户友好的显示文本
+        lv_dict = {
+            'a': '白名单',          # 白名单用户，通常有特殊权限
+            'b': '**正常**',        # 正常用户
+            'c': '**已禁用**',      # 被禁用的用户
+            'd': '未注册'           # 未注册用户
+        }
+        lv = lv_dict.get(data.lv, '未知')  # 获取等级显示文本，未知状态显示"未知"
+        
+        # 到期时间处理逻辑
         if lv == '白名单':
+            # 白名单用户永不过期
             ex = '+ ∞'
         elif data.name is not None and schedall.low_activity and not schedall.check_ex:
+            # 有账户 + 启用低活跃检查 + 未启用到期检查：显示活跃要求
             ex = f'__若{config.activity_check_days}天无观看将封禁__'
         elif data.name is not None and not schedall.low_activity and not schedall.check_ex:
+            # 有账户 + 未启用低活跃检查 + 未启用到期检查：无需保号
             ex = ' __无需保号，放心食用__'
         else:
+            # 其他情况：显示数据库中的到期时间或默认信息
             ex = data.ex or '无账户信息'
+        
+        # 返回处理后的用户信息元组
         return name, lv, ex, iv, embyid, pwd2
 
 
