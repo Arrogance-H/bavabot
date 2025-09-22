@@ -47,6 +47,7 @@ class Open(BaseModel):
     #     return v
 
     checkin: bool
+    punch_in: bool = False
     exchange: bool
     whitelist: bool
     invite: bool
