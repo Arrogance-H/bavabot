@@ -39,8 +39,8 @@ async def user_in_checkin(_, call):
 @bot.on_callback_query(filters.regex('punch_in') & user_in_group_on_filter)
 async def start_punch_in_game(_, call):
     """开始打卡游戏"""
-    if not _open.checkin:
-        await callAnswer(call, '❌ 未开启签到功能，等待！', True)
+    if not _open.punch_in:
+        await callAnswer(call, '❌ 未开启打卡游戏功能，等待！', True)
         return
     
     e = sql_get_emby(call.from_user.id)

@@ -30,7 +30,7 @@ def judge_start_ikb(is_admin: bool, account: bool) -> InlineKeyboardMarkup:
         d = [['️👥 用户功能', 'members'], ['🌐 服务器', 'server']]
         if schedall.check_ex: d.append(['🎟️ 使用续期码', 'exchange'])
     if _open.checkin: d.append([f'🎯 签到', 'checkin'])
-    if _open.checkin: d.append([f'🎮 打卡', 'punch_in'])
+    if _open.punch_in: d.append([f'🎮 打卡', 'punch_in'])
     lines = array_chunk(d, 2)
     if is_admin: lines.append([['👮🏻‍♂️ admin', 'manage']])
     keyword = ikb(lines)
@@ -302,6 +302,7 @@ async def favorites_page_ikb(total_page: int, current_page: int) -> InlineKeyboa
     return keyboard
 def cr_renew_ikb():
     checkin = '✔️' if _open.checkin else '❌'
+    punch_in = '✔️' if _open.punch_in else '❌'
     exchange = '✔️' if _open.exchange else '❌'
     whitelist = '✔️' if _open.whitelist else '❌'
     invite = '✔️' if _open.invite else '❌'
@@ -314,6 +315,7 @@ def cr_renew_ikb():
     }.get(_open.invite_lv, '未知')
     keyboard = InlineKeyboard(row_width=2)
     keyboard.add(InlineButton(f'{checkin} 每日签到', f'set_renew-checkin'),
+                 InlineButton(f'{punch_in} 打卡游戏', f'set_renew-punch_in'),
                  InlineButton(f'{exchange} 自动{sakura_b}续期', f'set_renew-exchange'),
                  InlineButton(f'{whitelist} 兑换白名单', f'set_renew-whitelist'),
                  InlineButton(f'{invite} 兑换邀请码', f'set_renew-invite'),
