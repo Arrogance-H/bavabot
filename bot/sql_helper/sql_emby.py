@@ -25,6 +25,8 @@ class Emby(Base):
     us = Column(Integer, default=0)
     iv = Column(Integer, default=0)
     ch = Column(DateTime, nullable=True)
+    punch_count = Column(Integer, default=0)
+    punch_date = Column(DateTime, nullable=True)
 
 
 Emby.__table__.create(bind=engine, checkfirst=True)
