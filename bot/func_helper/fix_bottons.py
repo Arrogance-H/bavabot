@@ -3,7 +3,7 @@ from pykeyboard import InlineKeyboard, InlineButton
 from pyrogram.types import InlineKeyboardMarkup
 from pyromod.helpers import ikb, array_chunk
 from bot import chanel, main_group, bot_name, extra_emby_libs, tz_id, tz_ad, tz_api, _open, sakura_b, \
-    schedall, auto_update, fuxx_pitao, moviepilot, red_envelope, config
+    schedall, auto_update, fuxx_pitao, moviepilot, red_envelope, config, tmdb
 from bot.func_helper import nezha_res
 from bot.func_helper.emby import emby
 from bot.func_helper.utils import members_info, convert_to_beijing_time
@@ -58,6 +58,9 @@ def members_ikb(is_admin: bool = False, account: bool = False) -> InlineKeyboard
                     ]
         if moviepilot.status:
             normal.append([('🍿 点播中心', 'download_center')])
+        # Add independent TMDB search if API key is configured
+        if tmdb.api_key:
+            normal.append([('🎬 TMDB影视搜索', 'tmdb_main')])
         normal.append([('♻️ 主界面', 'back_start')])
         return ikb(normal)
     else:
@@ -490,7 +493,6 @@ def get_resource_ikb(download_name: str):
                 [('❌ 关闭', 'closeit')]])
 re_download_center_ikb = ikb([
     [('🍿 点播', 'get_resource'), ('📶 下载进度', 'download_rate')], 
-    [('🎬 TMDB搜索', 'tmdb_search')],
     [('🔙 返回', 'members')]])
 continue_search_ikb = ikb([
     [('🔄 继续搜索', 'continue_search'), ('❌ 取消搜索', 'cancel_search')],
@@ -533,11 +535,17 @@ def tmdb_search_page_ikb(has_prev: bool, has_next: bool, page: int):
         buttons.append(('< 上一页', 'tmdb_search_prev_page'))
     if has_next:
         buttons.append(('下一页 >', 'tmdb_search_next_page'))
-    return ikb([buttons, [('✅ 选择影片', 'tmdb_select_item')], [('🔙 返回', 'download_center')]])
+    return ikb([buttons, [('✅ 选择影片', 'tmdb_select_item')], [('🔙 返回', 'tmdb_main')]])
+
+# Independent TMDB search buttons (not connected to download center)
+tmdb_main_ikb = ikb([
+    [('🔍 开始搜索', 'tmdb_search')],
+    [('🔙 返回', 'members')]
+])
 
 tmdb_search_result_ikb = ikb([
-    [('🔍 搜索资源', 'tmdb_search_resources'), ('❌ 取消', 'cancel_tmdb_search')],
-    [('🔙 返回', 'download_center')]
+    [('📖 查看详情', 'tmdb_view_details'), ('❌ 取消', 'cancel_tmdb_search')],
+    [('🔙 返回', 'tmdb_main')]
 ])
 
 # 添加 MoviePilot 设置按钮
