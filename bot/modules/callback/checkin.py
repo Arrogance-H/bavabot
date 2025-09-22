@@ -123,7 +123,7 @@ async def punch_ready(_, call):
         [InlineKeyboardButton("⚡ 加速吧！", f"punch_click_{user_id}")]
     ])
     
-    await editMessage(call, "🎮 **F1**\n\n⚡ 加速吧！\n\n📊 点击次数: 0\n⏰ 剩余时间: 3秒", buttons=speed_button)
+    await editMessage(call, "🎮 **F1**\n\n⚡ 加速吧！\n\n⏰ 剩余时间: 3秒", buttons=speed_button)
     
     # 3秒后结束游戏
     await asyncio.sleep(3)
@@ -194,7 +194,7 @@ async def end_punch_game(call, user_id):
     
     if clicks <= 3:
         reward_text = "💔 **没有奖励**\n\n爆胎咯，需要更努力哦！"
-    elif clicks <= 12:
+    elif clicks <= 9:
         reward = random.randint(1, 3)
         reward_text = f"🎉 **获得奖励**: {reward} {sakura_b}\n\n不错的手速！"
     else:
