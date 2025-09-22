@@ -193,13 +193,13 @@ async def end_punch_game(call, user_id):
     reward_text = ""
     
     if clicks <= 3:
-        reward_text = "💔 **没有奖励**\n\n爆胎咯，需要更努力哦！"
+        reward_text = "💔 **爆胎咯，需要更努力哦!**"
     elif clicks <= 9:
         reward = random.randint(1, 3)
-        reward_text = f"🎉 **获得奖励**: {reward} {sakura_b}\n\n不错的手速！"
+        reward_text = f"🎉 **获得奖励**: {reward} {sakura_b}"
     else:
         reward = 19
-        reward_text = f"🏆 **超级奖励**: {reward} {sakura_b}\n\n手速惊人！"
+        reward_text = f"🏆 **超级奖励**: {reward} {sakura_b}"
     
     # 发放奖励
     if reward > 0:
