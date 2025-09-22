@@ -50,6 +50,18 @@ async def start_punch_in_game(_, call):
     
     user_id = call.from_user.id
     
+    # 检查用户是否已经在游戏中
+    if user_id in punch_in_sessions:
+        await callAnswer(call, '🎮 您已经在游戏中了！', True)
+        return
+    
+    # 初始化用户游戏会话（预占位）
+    punch_in_sessions[user_id] = {
+        'clicks': 0,
+        'game_active': False,
+        'stage': 'waiting'
+    }
+    
     # 创建准备按钮
     ready_button = InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ 准备好了", f"punch_ready_{user_id}")]
@@ -68,11 +80,13 @@ async def punch_ready(_, call):
         await callAnswer(call, '❌ 这不是你的游戏！', True)
         return
     
-    # 初始化用户游戏会话
-    punch_in_sessions[user_id] = {
-        'clicks': 0,
-        'game_active': False
-    }
+    # 检查会话是否存在
+    if user_id not in punch_in_sessions:
+        await callAnswer(call, '❌ 游戏会话已过期！', True)
+        return
+    
+    # 更新游戏状态
+    punch_in_sessions[user_id]['stage'] = 'preparing'
     
     await editMessage(call, "🎮 **打卡游戏**\n\n⏳ 准备中...\n\n3秒后开始，请疯狂点击加速按钮！")
     
@@ -85,6 +99,7 @@ async def punch_ready(_, call):
     
     # 激活游戏并显示加速按钮
     punch_in_sessions[user_id]['game_active'] = True
+    punch_in_sessions[user_id]['stage'] = 'playing'
     
     speed_button = InlineKeyboardMarkup([
         [InlineKeyboardButton("⚡ 加速吧！", f"punch_click_{user_id}")]
