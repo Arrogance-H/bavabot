@@ -185,8 +185,6 @@ class Config(BaseModel):
     client_filter_terminate_session: bool = True
     # 是否在检测到可疑客户端时封禁用户
     client_filter_block_user: bool = False
-    # 车库游戏每日限制次数
-    hunt_daily_limit: int = 50
     moviepilot: MP = Field(default_factory=MP)
     auto_update: AutoUpdate = Field(default_factory=AutoUpdate)
     red_envelope: RedEnvelope = Field(default_factory=RedEnvelope)

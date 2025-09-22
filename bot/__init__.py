@@ -59,7 +59,7 @@ kk_gift_days = config.kk_gift_days
 fuxx_pitao = config.fuxx_pitao
 activity_check_days = config.activity_check_days
 red_envelope = config.red_envelope
-hunt_daily_limit = config.hunt_daily_limit
+# hunt_daily_limit removed
 
 moviepilot = config.moviepilot
 auto_update = config.auto_update
@@ -75,10 +75,8 @@ user_p = [
     BotCommand("myinfo", "[用户] 查看状态"),
     BotCommand("count", "[用户] 媒体库数量"),
     BotCommand("red", "[用户/禁言] 发红包"),
-    BotCommand("srank", "[用户/禁言] 查看计分"),
-    # 车库游戏用户命令 (Hunt Game User Commands)
-    BotCommand("hunt", "[用户] 开始寻宝游戏"),
-    BotCommand("hunt_stats", "[用户] 查看寻宝游戏统计信息")]
+    BotCommand("srank", "[用户/禁言] 查看计分")]
+    # Hunt game commands removed
 
 # 取消 BotCommand("exchange", "[私聊] 使用注册码")
 admin_p = user_p + [
@@ -117,10 +115,7 @@ admin_p = user_p + [
     BotCommand("only_rm_record", "删除指定的tgid数据库记录 [管理]"),
     BotCommand("restart", "重启bot [管理]"),
     BotCommand("update_bot", "更新bot [管理]"),
-    # 车库游戏管理员命令 (Hunt Game Admin Commands)
-    BotCommand("hunt_config_reward", "配置寻宝游戏奖励 [管理]"),
-    BotCommand("hunt_list_rewards", "查看寻宝游戏奖励配置 [管理]"),
-    BotCommand("hunt_config_button", "配置寻宝游戏领奖配置 [管理]"),
+    # Hunt game admin commands removed
     # 结算系统管理员命令 (Settlement System Admin Commands)
     BotCommand("force_settlement", "紧急手动结算执行 [管理]"),
     BotCommand("settlement_status", "查看结算系统状态和配置 [管理]"),
