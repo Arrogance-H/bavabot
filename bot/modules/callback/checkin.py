@@ -40,7 +40,7 @@ async def user_in_checkin(_, call):
 async def start_punch_in_game(_, call):
     """开始打卡游戏"""
     if not _open.punch_in:
-        await callAnswer(call, '❌ 未开启打卡游戏功能，等待！', True)
+        await callAnswer(call, '❌ 未开启F1功能，等待！', True)
         return
     
     e = sql_get_emby(call.from_user.id)
@@ -67,7 +67,7 @@ async def start_punch_in_game(_, call):
         [InlineKeyboardButton("✅ 准备好了", f"punch_ready_{user_id}")]
     ])
     
-    await editMessage(call, "🎮 **打卡游戏**\n\n准备好开始了吗？", buttons=ready_button)
+    await editMessage(call, "🎮 **F1**\n\n准备好开始了吗？", buttons=ready_button)
 
 
 @bot.on_callback_query(filters.regex(r'punch_ready_(\d+)'))
@@ -77,18 +77,18 @@ async def punch_ready(_, call):
     
     # 验证用户身份
     if call.from_user.id != user_id:
-        await callAnswer(call, '❌ 这不是你的游戏！', True)
+        await callAnswer(call, '❌ 请您开自己的车！', True)
         return
     
     # 检查会话是否存在
     if user_id not in punch_in_sessions:
-        await callAnswer(call, '❌ 游戏会话已过期！', True)
+        await callAnswer(call, '❌ 比赛已结束！', True)
         return
     
     # 更新游戏状态
     punch_in_sessions[user_id]['stage'] = 'preparing'
     
-    await editMessage(call, "🎮 **打卡游戏**\n\n⏳ 准备中...\n\n3秒后开始，请疯狂点击加速按钮！")
+    await editMessage(call, "🎮 **F1**\n\n⏳ 准备中...\n\n3秒后开始，请疯狂点击加速按钮！")
     
     # 等待3秒
     await asyncio.sleep(3)
@@ -105,7 +105,7 @@ async def punch_ready(_, call):
         [InlineKeyboardButton("⚡ 加速吧！", f"punch_click_{user_id}")]
     ])
     
-    await editMessage(call, "🎮 **打卡游戏**\n\n⚡ 加速吧！\n\n📊 点击次数: 0\n⏰ 剩余时间: 3秒", buttons=speed_button)
+    await editMessage(call, "🎮 **F1**\n\n⚡ 加速吧！\n\n📊 点击次数: 0\n⏰ 剩余时间: 3秒", buttons=speed_button)
     
     # 3秒后结束游戏
     await asyncio.sleep(3)
@@ -119,12 +119,12 @@ async def handle_punch_click(_, call):
     
     # 验证用户身份
     if call.from_user.id != user_id:
-        await callAnswer(call, '❌ 这不是你的游戏！', True)
+        await callAnswer(call, '❌ 请开自己的车！', True)
         return
     
     # 检查游戏是否活跃
     if user_id not in punch_in_sessions or not punch_in_sessions[user_id]['game_active']:
-        await callAnswer(call, '⏰ 游戏已结束！', True)
+        await callAnswer(call, '⏰ 比赛已结束！', True)
         return
     
     # 增加点击次数
@@ -137,7 +137,7 @@ async def handle_punch_click(_, call):
             [InlineKeyboardButton("⚡ 加速吧！", f"punch_click_{user_id}")]
         ])
         
-        await editMessage(call, f"🎮 **打卡游戏**\n\n⚡ 加速吧！\n\n📊 点击次数: {clicks}", buttons=speed_button)
+        await editMessage(call, f"🎮 **F1**\n\n⚡ 加速吧！\n\n📊 点击次数: {clicks}", buttons=speed_button)
     except Exception:
         # 忽略编辑消息的错误，因为可能点击太快
         pass
@@ -158,7 +158,7 @@ async def end_punch_game(call, user_id):
     reward_text = ""
     
     if clicks <= 3:
-        reward_text = "💔 **没有奖励**\n\n点击次数太少了，需要更努力哦！"
+        reward_text = "💔 **没有奖励**\n\n爆胎咯，需要更努力哦！"
     elif clicks <= 12:
         reward = random.randint(1, 3)
         reward_text = f"🎉 **获得奖励**: {reward} {sakura_b}\n\n不错的手速！"
@@ -174,7 +174,7 @@ async def end_punch_game(call, user_id):
             sql_update_emby(Emby.tg == user_id, iv=new_total)
             reward_text += f"\n💰 **当前持有**: {new_total} {sakura_b}"
     
-    result_text = f"🎮 **打卡游戏结果**\n\n📊 **点击次数**: {clicks}\n{reward_text}"
+    result_text = f"🎮 **F1结果**\n\n📊 **点击次数**: {clicks}\n{reward_text}"
     
     # 清理会话数据
     del punch_in_sessions[user_id]
