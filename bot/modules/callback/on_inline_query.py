@@ -22,13 +22,16 @@ async def find_sth_media(_, inline_query: InlineQuery):
     try:
         if not inline_query.query or len(inline_query.query) < 2:
             results = [InlineQueryResultArticle(
-                title=f"请输入输入请至少两位字符！",
-                description=f"本功能只提供于{ranks.logo}用户搜索收藏Emby资源库中的电影，电视剧，采用原生emby搜索，不一定准确，一切以Emby内容为准",
+                title=f"请输入至少两位字符进行搜索！",
+                description=f"本功能只提供于{ranks.logo}用户搜索收藏Emby资源库中的电影，电视剧。支持标题搜索和TMDB ID搜索（输入纯数字即可按TMDB ID搜索），采用原生emby搜索，不一定准确，一切以Emby内容为准",
                 input_message_content=InputTextMessageContent(
-                    f"本功能只提供于{ranks.logo}用户搜索/收藏Emby资源库中的电影，电视剧，采用原生emby搜索，不一定准确，一切以Emby内容为准"),
+                    f"本功能只提供于{ranks.logo}用户搜索/收藏Emby资源库中的电影，电视剧。支持两种搜索方式：\\n\\n"
+                    f"1. **标题搜索**：输入电影或剧集的中文/英文标题\\n"
+                    f"2. **TMDB ID搜索**：输入纯数字TMDB ID（如：27205）\\n\\n"
+                    f"采用原生emby搜索，不一定准确，一切以Emby内容为准"),
                 # ﹒
                 reply_markup=InlineKeyboardMarkup(
-                    [[InlineKeyboardButton(text='🔍 已阅，开始查询', switch_inline_query_current_chat=' ')]]),
+                    [[InlineKeyboardButton(text='🔍 已阅读，开始查询', switch_inline_query_current_chat=' ')]]),
                 thumb_url=bot_photo, thumb_height=300, thumb_width=180)]
             return await inline_query.answer(results=results, cache_time=1, switch_pm_text=f'{ranks.logo} 搜索指南',
                                              is_personal=True,
@@ -49,14 +52,22 @@ async def find_sth_media(_, inline_query: InlineQuery):
                                              switch_pm_parameter='start')
         else:
             # print(inline_query)
-            Name = inline_query.query
+            Name = inline_query.query.strip()
             inline_count = 0 if not inline_query.offset else int(inline_query.offset)
-            ret_movies = await emby.get_movies(title=Name, start=inline_count)
+            
+            # 检测是否为TMDB ID（纯数字）
+            if Name.isdigit() and len(Name) >= 4:
+                # 按TMDB ID搜索
+                ret_movies = await emby.get_movies_by_tmdb_id(tmdb_id=Name, start=inline_count)
+            else:
+                # 按标题搜索
+                ret_movies = await emby.get_movies(title=Name, start=inline_count)
             if not ret_movies:
+                search_type = "TMDB ID" if Name.isdigit() and len(Name) >= 4 else "标题"
                 results = [InlineQueryResultArticle(
                     title=f"{ranks.logo}",
-                    description=f"没有更多信息 {Name}",
-                    input_message_content=InputTextMessageContent(f"没有更多信息 {Name}"),
+                    description=f"没有找到匹配的内容: {Name}",
+                    input_message_content=InputTextMessageContent(f"**搜索结果为空**\\n\\n🔍 **搜索方式**: {search_type}搜索\\n📝 **搜索内容**: {Name}\\n\\n没有在Emby资源库中找到匹配的电影或剧集。\\n\\n💡 **提示**:\\n• 标题搜索：尝试使用不同的关键词\\n• TMDB ID搜索：确认ID是否正确"),
                     reply_markup=InlineKeyboardMarkup(
                         [[InlineKeyboardButton(text='✔️ 重新搜索', switch_inline_query_current_chat=' ')]]),
                     thumb_url=bot_photo, thumb_width=220, thumb_height=330)]
@@ -65,10 +76,11 @@ async def find_sth_media(_, inline_query: InlineQuery):
                                           switch_pm_parameter='start')
             else:
                 results = []
+                search_method = "🔢 TMDB ID" if Name.isdigit() and len(Name) >= 4 else "📝 标题"
                 for i in ret_movies:
                     typer = ['movie', '🎬'] if i['item_type'] == 'Movie' else ['tv', '📺']
                     result = InlineQueryResultArticle(
-                        title=f"{typer[1]} {i['title']} ({i['year']})",
+                        title=f"{typer[1]} {i['title']} ({i['year']}) - {search_method}",
                         # id=str(uuid.uuid4()),
                         description=f"{i['taglines']}-{i['overview']}",
                         input_message_content=InputTextMessageContent(

@@ -933,38 +933,7 @@ class Embyservice(metaclass=Singleton):
             
             if result.success and result.data:
                 items = result.data.get("Items", [])
-                ret_movies = []
-                
-                for item in items:
-                    # 处理标题
-                    name = item.get("Name", "")
-                    original_title = item.get("OriginalTitle", "")
-                    display_title = name if name == original_title else f'{name} - {original_title}'
-                    
-                    # 处理其他字段
-                    production_locations = ", ".join(item.get("ProductionLocations", ["普遍"]))
-                    genres = ", ".join(item.get("Genres", ["未知"]))
-                    runtime = convert_runtime(item.get("RunTimeTicks")) if item.get("RunTimeTicks") else '数据缺失'
-                    tmdb_id = item.get("ProviderIds", {}).get("Tmdb")
-                    
-                    movie_item = {
-                        'item_type': item.get("Type"),
-                        'item_id': item.get("Id"),
-                        'title': display_title,
-                        'year': item.get("ProductionYear", '缺失'),
-                        'od': production_locations,
-                        'genres': genres,
-                        'photo': f'{self.url}/emby/Items/{item.get("Id")}/Images/Primary?maxHeight=400&maxWidth=600&quality=90',
-                        'runtime': runtime,
-                        'overview': item.get("Overview", "暂无更多信息"),
-                        'taglines': '简介：' if not item.get("Taglines") else item.get("Taglines")[0],
-                        'tmdbid': tmdb_id,
-                        'add': item.get("DateCreated", "None.").split('.')[0],
-                    }
-                    ret_movies.append(movie_item)
-                
-                LOGGER.debug(f"搜索电影成功: {title} - 找到 {len(ret_movies)} 个结果")
-                return ret_movies
+                return self._process_movie_items(items, title)
             else:
                 LOGGER.error(f"搜索电影失败: {title} - {result.error}")
                 return []
@@ -972,6 +941,80 @@ class Embyservice(metaclass=Singleton):
         except Exception as e:
             LOGGER.error(f"搜索电影异常: {title} - {str(e)}")
             return []
+
+    async def get_movies_by_tmdb_id(self, tmdb_id: str, start: int = 0, limit: int = 5) -> List[Dict]:
+        """
+        根据TMDB ID搜索电影/剧集
+        :param tmdb_id: TMDB ID
+        :param start: 开始索引
+        :param limit: 限制数量
+        :return: 电影/剧集列表
+        """
+        try:
+            # 通过 AnyMetadataProvider 搜索TMDB ID
+            url = (f"/emby/Items?IncludeItemTypes=Movie,Series"
+                   f"&Fields=ProductionYear,Overview,OriginalTitle,Taglines,ProviderIds,Genres,RunTimeTicks,ProductionLocations,DateCreated,Studios"
+                   f"&StartIndex={int(start)}&Recursive=true&AnyProviderIdEquals=tmdb.{tmdb_id}&Limit={int(limit)}")
+            
+            # 使用较短的超时时间
+            old_timeout = self.timeout
+            self.timeout = aiohttp.ClientTimeout(total=3)
+            
+            try:
+                result = await self._request('GET', url)
+            finally:
+                self.timeout = old_timeout
+            
+            if result.success and result.data:
+                items = result.data.get("Items", [])
+                return self._process_movie_items(items, f"TMDB ID: {tmdb_id}")
+            else:
+                LOGGER.error(f"根据TMDB ID搜索电影失败: {tmdb_id} - {result.error}")
+                return []
+                
+        except Exception as e:
+            LOGGER.error(f"根据TMDB ID搜索电影异常: {tmdb_id} - {str(e)}")
+            return []
+
+    def _process_movie_items(self, items: List[Dict], search_term: str) -> List[Dict]:
+        """
+        处理电影/剧集项目列表
+        :param items: 原始项目列表
+        :param search_term: 搜索关键字（用于日志）
+        :return: 处理后的电影/剧集列表
+        """
+        ret_movies = []
+        
+        for item in items:
+            # 处理标题
+            name = item.get("Name", "")
+            original_title = item.get("OriginalTitle", "")
+            display_title = name if name == original_title else f'{name} - {original_title}'
+            
+            # 处理其他字段
+            production_locations = ", ".join(item.get("ProductionLocations", ["普遍"]))
+            genres = ", ".join(item.get("Genres", ["未知"]))
+            runtime = convert_runtime(item.get("RunTimeTicks")) if item.get("RunTimeTicks") else '数据缺失'
+            tmdb_id = item.get("ProviderIds", {}).get("Tmdb")
+            
+            movie_item = {
+                'item_type': item.get("Type"),
+                'item_id': item.get("Id"),
+                'title': display_title,
+                'year': item.get("ProductionYear", '缺失'),
+                'od': production_locations,
+                'genres': genres,
+                'photo': f'{self.url}/emby/Items/{item.get("Id")}/Images/Primary?maxHeight=400&maxWidth=600&quality=90',
+                'runtime': runtime,
+                'overview': item.get("Overview", "暂无更多信息"),
+                'taglines': '简介：' if not item.get("Taglines") else item.get("Taglines")[0],
+                'tmdbid': tmdb_id,
+                'add': item.get("DateCreated", "None.").split('.')[0],
+            }
+            ret_movies.append(movie_item)
+        
+        LOGGER.debug(f"搜索电影成功: {search_term} - 找到 {len(ret_movies)} 个结果")
+        return ret_movies
 
     def __del__(self):
         """析构函数，确保资源清理"""
