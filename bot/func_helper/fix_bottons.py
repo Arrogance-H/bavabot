@@ -6,7 +6,7 @@ from bot import chanel, main_group, bot_name, extra_emby_libs, tz_id, tz_ad, tz_
     schedall, auto_update, fuxx_pitao, moviepilot, red_envelope, config
 from bot.func_helper import nezha_res
 from bot.func_helper.emby import emby
-from bot.func_helper.utils import members_info
+from bot.func_helper.utils import members_info, convert_to_beijing_time
 
 cache = Cache()
 
@@ -397,8 +397,19 @@ async def cr_kk_ikb(uid, first):
                 rst = await emby.emby_cust_commit(emby_id=embyid, days=30)
                 last_time = rst[0][0]
                 toltime = rst[0][1]
-                text1 = f"**· 🔋 上次活动** | {last_time.split('.')[0]}\n" \
-                        f"**· 📅 过去30天** | {toltime} 分钟"
+                if last_time:
+                    try:
+                        # Convert to Beijing time
+                        beijing_time = convert_to_beijing_time(last_time)
+                        formatted_time = beijing_time.strftime("%Y-%m-%d %H:%M:%S")
+                        text1 = f"**· 🔋 上次活动** | {formatted_time}\n" \
+                                f"**· 📅 过去30天** | {toltime} 分钟"
+                    except Exception:
+                        # Fallback to original format if conversion fails
+                        text1 = f"**· 🔋 上次活动** | {last_time.split('.')[0]}\n" \
+                                f"**· 📅 过去30天** | {toltime} 分钟"
+                else:
+                    text1 = f"**· 📅 过去30天未有记录**"
             except (TypeError, IndexError, ValueError):
                 text1 = f"**· 📅 过去30天未有记录**"
         else:
