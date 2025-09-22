@@ -490,6 +490,7 @@ def get_resource_ikb(download_name: str):
                 [('❌ 关闭', 'closeit')]])
 re_download_center_ikb = ikb([
     [('🍿 点播', 'get_resource'), ('📶 下载进度', 'download_rate')], 
+    [('🎬 TMDB搜索', 'tmdb_search')],
     [('🔙 返回', 'members')]])
 continue_search_ikb = ikb([
     [('🔄 继续搜索', 'continue_search'), ('❌ 取消搜索', 'cancel_search')],
@@ -524,6 +525,20 @@ def mp_search_page_ikb(has_prev: bool, has_next: bool, page: int):
     if has_next:
         buttons.append(('下一页 >', 'mp_search_next_page'))
     return ikb([buttons, [('💾 选择下载', 'mp_search_select_download'), ('❌ 取消搜索', 'cancel_search')]])
+
+def tmdb_search_page_ikb(has_prev: bool, has_next: bool, page: int):
+    """TMDB搜索结果分页按钮"""
+    buttons = []
+    if has_prev:
+        buttons.append(('< 上一页', 'tmdb_search_prev_page'))
+    if has_next:
+        buttons.append(('下一页 >', 'tmdb_search_next_page'))
+    return ikb([buttons, [('✅ 选择影片', 'tmdb_select_item')], [('🔙 返回', 'download_center')]])
+
+tmdb_search_result_ikb = ikb([
+    [('🔍 搜索资源', 'tmdb_search_resources'), ('❌ 取消', 'cancel_tmdb_search')],
+    [('🔙 返回', 'download_center')]
+])
 
 # 添加 MoviePilot 设置按钮
 def mp_config_ikb():

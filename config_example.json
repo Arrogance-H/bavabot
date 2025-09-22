@@ -95,6 +95,11 @@
     "access_token": null,
     "price": 1
   },
+  "tmdb": {
+    "api_key": "",
+    "base_url": "https://api.themoviedb.org/3",
+    "image_base_url": "https://image.tmdb.org/t/p/w500"
+  },
   "auto_update": {
     "status": true,
     "git_repo": "berry8838/Sakura_embyboss",

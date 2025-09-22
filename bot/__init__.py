@@ -62,6 +62,7 @@ red_envelope = config.red_envelope
 # hunt_daily_limit removed
 
 moviepilot = config.moviepilot
+tmdb = config.tmdb
 auto_update = config.auto_update
 api = config.api
 save_config()
