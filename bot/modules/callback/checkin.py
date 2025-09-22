@@ -55,6 +55,24 @@ async def start_punch_in_game(_, call):
         await callAnswer(call, '🎮 您已经在游戏中了！', True)
         return
     
+    # 检查今日游戏次数限制
+    now = datetime.now(timezone(timedelta(hours=8)))
+    today = now.strftime("%Y-%m-%d")
+    
+    # 如果不是今天或者punch_date为空，重置计数
+    if not e.punch_date or e.punch_date.strftime("%Y-%m-%d") < today:
+        sql_update_emby(Emby.tg == user_id, punch_count=0, punch_date=now)
+        punch_count = 0
+    else:
+        punch_count = e.punch_count or 0
+    
+    # 检查是否已达到每日限制（3次）
+    if punch_count >= 3:
+        await callAnswer(call, f'🎮 今日F1游戏次数已用完！每日限制3次，明天再来吧！', True)
+        return
+    
+    remaining = 3 - punch_count
+    
     # 初始化用户游戏会话（预占位）
     punch_in_sessions[user_id] = {
         'clicks': 0,
@@ -67,7 +85,7 @@ async def start_punch_in_game(_, call):
         [InlineKeyboardButton("✅ 准备好了", f"punch_ready_{user_id}")]
     ])
     
-    await editMessage(call, "🎮 **F1**\n\n准备好开始了吗？", buttons=ready_button)
+    await editMessage(call, f"🎮 **F1**\n\n准备好开始了吗？\n\n🎯 今日剩余次数: {remaining}/3", buttons=ready_button)
 
 
 @bot.on_callback_query(filters.regex(r'punch_ready_(\d+)'))
@@ -153,6 +171,23 @@ async def end_punch_game(call, user_id):
     clicks = punch_in_sessions[user_id]['clicks']
     punch_in_sessions[user_id]['game_active'] = False
     
+    # 增加今日游戏次数
+    e = sql_get_emby(user_id)
+    if e:
+        now = datetime.now(timezone(timedelta(hours=8)))
+        today = now.strftime("%Y-%m-%d")
+        
+        # 如果不是今天或者punch_date为空，重置计数为1
+        if not e.punch_date or e.punch_date.strftime("%Y-%m-%d") < today:
+            new_punch_count = 1
+        else:
+            new_punch_count = (e.punch_count or 0) + 1
+        
+        sql_update_emby(Emby.tg == user_id, punch_count=new_punch_count, punch_date=now)
+        remaining = 3 - new_punch_count
+    else:
+        remaining = 2  # 默认值，以防出错
+    
     # 计算奖励
     reward = 0
     reward_text = ""
@@ -174,7 +209,13 @@ async def end_punch_game(call, user_id):
             sql_update_emby(Emby.tg == user_id, iv=new_total)
             reward_text += f"\n💰 **当前持有**: {new_total} {sakura_b}"
     
-    result_text = f"🎮 **F1结果**\n\n📊 **点击次数**: {clicks}\n{reward_text}"
+    # 添加剩余次数提示
+    if remaining > 0:
+        remaining_text = f"\n\n🎯 今日剩余次数: {remaining}/3"
+    else:
+        remaining_text = f"\n\n🎯 今日游戏次数已用完，明天再来！"
+    
+    result_text = f"🎮 **F1结果**\n\n📊 **点击次数**: {clicks}\n{reward_text}{remaining_text}"
     
     # 清理会话数据
     del punch_in_sessions[user_id]
