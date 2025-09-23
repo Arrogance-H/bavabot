@@ -582,3 +582,27 @@ def mp_config_ikb():
         [('🔙 返回', 'back_config')]
     ])
     return keyboard
+
+def tmdb_season_selection_ikb(seasons: list):
+    """TMDB电视剧季数选择按钮"""
+    buttons = []
+    
+    # 每行最多2个季数按钮
+    season_buttons = []
+    for season in seasons:
+        season_num = season.get('season_number', 0)
+        episode_count = season.get('episode_count', 0)
+        button_text = f"第{season_num}季"
+        if episode_count > 0:
+            button_text += f" ({episode_count}集)"
+        season_buttons.append((button_text, f'select_season_{season_num}'))
+    
+    # 按每行2个按钮分组
+    for i in range(0, len(season_buttons), 2):
+        row = season_buttons[i:i+2]
+        buttons.append(row)
+    
+    # 添加返回按钮
+    buttons.append([('🔙 返回', 'return_to_search_results')])
+    
+    return ikb(buttons)

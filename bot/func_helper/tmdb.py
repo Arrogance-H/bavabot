@@ -140,6 +140,49 @@ class TMDBService:
         data = await self._make_request(f"tv/{tv_id}")
         return data
 
+    async def get_tv_seasons(self, tv_id: int) -> Tuple[bool, List[Dict]]:
+        """
+        Get all seasons for a TV series
+        Args:
+            tv_id: TMDB TV series ID
+        Returns:
+            (success, seasons_list)
+        """
+        data = await self._make_request(f"tv/{tv_id}")
+        if not data:
+            return False, []
+        
+        seasons = []
+        for season in data.get("seasons", []):
+            # Skip special seasons (season 0 usually contains specials)
+            season_number = season.get("season_number", 0)
+            if season_number == 0:
+                continue
+                
+            season_info = {
+                "id": season.get("id"),
+                "season_number": season_number,
+                "name": season.get("name", f"第 {season_number} 季"),
+                "overview": season.get("overview", ""),
+                "poster_path": season.get("poster_path", ""),
+                "air_date": season.get("air_date", ""),
+                "episode_count": season.get("episode_count", 0)
+            }
+            
+            # Add full poster URL if available
+            if season_info["poster_path"]:
+                season_info["poster_url"] = f"{self.image_base_url}{season_info['poster_path']}"
+            else:
+                season_info["poster_url"] = ""
+                
+            seasons.append(season_info)
+        
+        # Sort by season number
+        seasons.sort(key=lambda x: x["season_number"])
+        
+        LOGGER.info(f"Found {len(seasons)} seasons for TV series {tv_id}")
+        return True, seasons
+
     def format_search_result_text(self, item: Dict, index: int) -> str:
         """Format TMDB search result for display"""
         title = item.get("title", "未知标题")
