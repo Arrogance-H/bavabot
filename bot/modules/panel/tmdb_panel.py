@@ -195,10 +195,13 @@ async def tmdb_id_search_results(call, tmdb_id: int):
                 call, 
                 f'🤷‍♂️ **TMDB ID {tmdb_id} 未找到对应的影视作品**\n\n'
                 f'💡 **可能原因:**\n'
-                f'• TMDB ID 不存在\n'
-                f'• 该内容已被删除\n'
-                f'• 输入的ID格式错误\n\n'
-                f'🔍 请检查TMDB ID是否正确，或尝试名称搜索', 
+                f'• TMDB ID 不存在或已被删除\n'
+                f'• 该内容可能为成人内容（已过滤）\n'
+                f'• TMDB API 临时不可用\n\n'
+                f'🔍 **建议操作:**\n'
+                f'• 检查TMDB ID是否正确\n'
+                f'• 尝试使用影片名称搜索\n'
+                f'• 访问 themoviedb.org 确认ID有效性', 
                 buttons=tmdb_main_ikb,
                 parse_mode=enums.ParseMode.MARKDOWN
             )
@@ -238,7 +241,7 @@ async def tmdb_id_search_results(call, tmdb_id: int):
             overview = result.get('overview', '').strip()
             if overview:
                 if len(overview) > 200:
-                    overview = overview[:200] + "..."
+                    overview = overview[:197] + "..."
                 result_text += f"\n📝 **简介**: {overview}\n"
             
             result_text += "\n💡 这是TMDB数据库中的影视信息\n"
@@ -249,7 +252,7 @@ async def tmdb_id_search_results(call, tmdb_id: int):
             result_text += f"🎬 **影片**: {result.get('title', '未知')}\n"
             result_text += f"📅 **年份**: {result.get('year', '未知')}\n"
             result_text += f"📺 **类型**: {result.get('media_type_cn', '未知')}\n"
-            result_text += f"⚠️ 详细信息格式化异常\n"
+            result_text += f"⚠️ 详细信息格式化异常，但影片已找到\n"
 
         # 使用特殊的单结果按钮布局
         from bot.func_helper.fix_bottons import ikb
@@ -269,7 +272,7 @@ async def tmdb_id_search_results(call, tmdb_id: int):
         except Exception as edit_error:
             LOGGER.error(f"TMDB ID编辑消息失败: 用户{call.from_user.id}, 错误={str(edit_error)}")
             # 如果编辑消息失败，尝试发送一个简化的消息
-            simple_text = f"🆔 TMDB ID {tmdb_id} 查找成功\n⚠️ 内容显示异常，请重试"
+            simple_text = f"🆔 TMDB ID {tmdb_id} 查找成功\n📺 {result.get('title', '未知')}\n⚠️ 内容显示异常，请重试"
             await editMessage(call, simple_text, buttons=tmdb_main_ikb)
 
     except Exception as e:
@@ -277,9 +280,13 @@ async def tmdb_id_search_results(call, tmdb_id: int):
         await editMessage(call, 
             f'❌ **TMDB ID搜索过程中出错**\n\n'
             f'TMDB ID: {tmdb_id}\n'
-            f'错误信息: {str(e)[:100]}\n\n'
-            f'请稍后再试或尝试名称搜索', 
-            buttons=tmdb_main_ikb
+            f'错误类型: 系统异常\n\n'
+            f'🔧 **解决方案:**\n'
+            f'• 稍后重试此TMDB ID\n'
+            f'• 尝试使用影片名称搜索\n'
+            f'• 联系管理员检查系统状态', 
+            buttons=tmdb_main_ikb,
+            parse_mode=enums.ParseMode.MARKDOWN
         )
 
 

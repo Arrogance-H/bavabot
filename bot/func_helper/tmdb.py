@@ -149,36 +149,48 @@ class TMDBService:
         Returns:
             (success, formatted_result)
         """
-        if not tmdb_id or tmdb_id <= 0:
+        if not tmdb_id or not (0 < tmdb_id < 10000000):
+            LOGGER.warning(f"Invalid TMDB ID: {tmdb_id}")
             return False, None
         
-        # If media_type is specified, try that specific type
-        if media_type:
-            if media_type == "movie":
-                data = await self.get_movie_details(tmdb_id)
-            elif media_type == "tv":
-                data = await self.get_tv_details(tmdb_id)
-            else:
-                return False, None
-                
-            if data:
-                return True, self._format_tmdb_detail_result(data, media_type)
-            else:
-                return False, None
-        
-        # If no media_type specified, try movie first, then TV
-        # Try movie first
-        movie_data = await self.get_movie_details(tmdb_id)
-        if movie_data:
-            return True, self._format_tmdb_detail_result(movie_data, "movie")
-        
-        # Try TV show
-        tv_data = await self.get_tv_details(tmdb_id)
-        if tv_data:
-            return True, self._format_tmdb_detail_result(tv_data, "tv")
-        
-        # Not found in either
-        return False, None
+        try:
+            # If media_type is specified, try that specific type
+            if media_type:
+                if media_type == "movie":
+                    data = await self.get_movie_details(tmdb_id)
+                elif media_type == "tv":
+                    data = await self.get_tv_details(tmdb_id)
+                else:
+                    LOGGER.error(f"Invalid media_type: {media_type}")
+                    return False, None
+                    
+                if data:
+                    LOGGER.info(f"TMDB ID {tmdb_id} found as {media_type}: {data.get('title' if media_type == 'movie' else 'name', 'Unknown')}")
+                    return True, self._format_tmdb_detail_result(data, media_type)
+                else:
+                    LOGGER.info(f"TMDB ID {tmdb_id} not found as {media_type}")
+                    return False, None
+            
+            # If no media_type specified, try movie first, then TV
+            # Try movie first
+            movie_data = await self.get_movie_details(tmdb_id)
+            if movie_data:
+                LOGGER.info(f"TMDB ID {tmdb_id} found as movie: {movie_data.get('title', 'Unknown')}")
+                return True, self._format_tmdb_detail_result(movie_data, "movie")
+            
+            # Try TV show
+            tv_data = await self.get_tv_details(tmdb_id)
+            if tv_data:
+                LOGGER.info(f"TMDB ID {tmdb_id} found as TV show: {tv_data.get('name', 'Unknown')}")
+                return True, self._format_tmdb_detail_result(tv_data, "tv")
+            
+            # Not found in either
+            LOGGER.info(f"TMDB ID {tmdb_id} not found in either movies or TV shows")
+            return False, None
+            
+        except Exception as e:
+            LOGGER.error(f"Error searching TMDB ID {tmdb_id}: {str(e)}")
+            return False, None
     
     def _format_tmdb_detail_result(self, data: Dict, media_type: str) -> Dict:
         """Format TMDB detail API response to match search result format"""
@@ -283,7 +295,8 @@ class TMDBService:
         """Check if the query is a TMDB ID (numeric)"""
         try:
             tmdb_id = int(query.strip())
-            return tmdb_id > 0
+            # TMDB IDs should be positive and reasonable (< 10 million for safety)
+            return 0 < tmdb_id < 10000000
         except (ValueError, TypeError):
             return False
     
@@ -291,7 +304,11 @@ class TMDBService:
     def extract_tmdb_id(query: str) -> Optional[int]:
         """Extract TMDB ID from query string"""
         try:
-            return int(query.strip())
+            tmdb_id = int(query.strip())
+            # Validate range
+            if 0 < tmdb_id < 10000000:
+                return tmdb_id
+            return None
         except (ValueError, TypeError):
             return None
 
