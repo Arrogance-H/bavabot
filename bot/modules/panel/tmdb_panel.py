@@ -53,7 +53,7 @@ async def tmdb_main_handler(_, call):
     await callAnswer(call, '🍿 ME点播')
     welcome_text = (
         "🎬 **ME点播**\n\n"
-        "🎞️使用JOY币点播 10JOY币点播一部电影或电视剧（一季）"
+        "🎞️使用JOY币点播 10JOY币点播一部电影或电视剧（一季）\n"
         "点击下方\"🔍 开始搜索\"按钮开始使用"
     )
     
