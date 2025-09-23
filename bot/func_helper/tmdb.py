@@ -38,17 +38,17 @@ class TMDBService:
             LOGGER.error(f"TMDB API request error: {str(e)}")
             return None
 
-    async def search_multi(self, query: str, page: int = 1) -> Tuple[bool, List[Dict]]:
+    async def search_multi(self, query: str, page: int = 1) -> Tuple[bool, List[Dict], Dict]:
         """
         Search for movies and TV shows
         Args:
             query: Search query
             page: Page number (default: 1)
         Returns:
-            (success, results_list)
+            (success, results_list, pagination_info)
         """
         if not query or len(query.strip()) < 2:
-            return False, []
+            return False, [], {}
             
         params = {
             "query": query.strip(),
@@ -58,7 +58,14 @@ class TMDBService:
         
         data = await self._make_request("search/multi", params)
         if not data:
-            return False, []
+            return False, [], {}
+        
+        # Extract pagination info from TMDB response
+        pagination_info = {
+            "page": data.get("page", 1),
+            "total_pages": data.get("total_pages", 1),
+            "total_results": data.get("total_results", 0)
+        }
         
         results = []
         for item in data.get("results", []):
@@ -120,8 +127,8 @@ class TMDBService:
         # Sort by popularity (descending)
         results.sort(key=lambda x: x["popularity"], reverse=True)
         
-        LOGGER.info(f"TMDB search successful for '{query}': found {len(results)} results")
-        return True, results
+        LOGGER.info(f"TMDB search successful for '{query}': found {len(results)} results on page {page}")
+        return True, results, pagination_info
 
     async def get_movie_details(self, movie_id: int) -> Optional[Dict]:
         """Get detailed movie information"""

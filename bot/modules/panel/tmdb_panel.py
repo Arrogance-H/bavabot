@@ -170,7 +170,7 @@ async def tmdb_search_results(call, query: str, page: int = 1):
     try:
         await editMessage(call, '🔍 正在TMDB搜索中，请稍后...', buttons=tmdb_main_ikb)
         
-        success, results = await tmdb_service.search_multi(query, page)
+        success, results, pagination_info = await tmdb_service.search_multi(query, page)
         if not success or not results:
             await editMessage(
                 call, 
@@ -184,24 +184,28 @@ async def tmdb_search_results(call, query: str, page: int = 1):
             )
             return
 
-        # 计算分页信息 - 每页3个结果
+        # 计算分页信息 - 基于TMDB API返回的分页信息
         has_prev = page > 1
-        # 只有当前页恰好有3个结果时才显示下一页按钮，因为少于3个意味着已到末页
-        has_next = len(results) == 3
+        has_next = page < pagination_info.get("total_pages", 1)
+        
+        # 我们只显示前3个结果
+        display_results = results[:3]
         
         # 保存搜索结果
         user_tmdb_data[call.from_user.id] = {
             'query': query,
             'results': results,
-            'current_page': page
+            'current_page': page,
+            'pagination_info': pagination_info
         }
 
         # 显示结果
         result_text = f"🎬 **ME点播 - TMDB搜索结果**\n"
         result_text += f"🔍 搜索词: `{query}`\n"
-        result_text += f"📄 第 {page} 页 | 共找到 {len(results)} 个结果\n\n"
+        result_text += f"📄 第 {page} 页 / 共 {pagination_info.get('total_pages', 1)} 页\n"
+        result_text += f"📊 本页显示 {len(display_results)} 个结果 | 总共 {pagination_info.get('total_results', 0)} 个结果\n\n"
         
-        for index, item in enumerate(results[:3], start=1):  # 只显示前3个结果
+        for index, item in enumerate(display_results, start=1):
             result_text += tmdb_service.format_search_result_text(item, index)
             result_text += "\n" + "─" * 10 + "\n\n"
 
@@ -212,7 +216,7 @@ async def tmdb_search_results(call, query: str, page: int = 1):
         await editMessage(
             call, 
             result_text, 
-            buttons=tmdb_search_page_ikb(has_prev, has_next, page, min(len(results), 3)),
+            buttons=tmdb_search_page_ikb(has_prev, has_next, page, len(display_results)),
             parse_mode=enums.ParseMode.MARKDOWN
         )
 
@@ -261,12 +265,15 @@ async def tmdb_select_numbered_item(_, call):
     await callAnswer(call, f'✅ 选择影片 {selected_index}')
     results = user_data['results']
     
-    if not results or selected_index > min(len(results), 3):
+    # 只显示前3个结果，所以直接使用索引
+    display_results = results[:3]
+    
+    if not display_results or selected_index > len(display_results):
         await editMessage(call, '❌ 选择的影片不存在', buttons=tmdb_main_ikb)
         return
 
     try:
-        selected_item = results[selected_index - 1]
+        selected_item = display_results[selected_index - 1]
         
         # 显示选中的影片详情
         await show_tmdb_item_details(call, selected_item)
@@ -607,6 +614,21 @@ async def confirm_me_request(_, call):
         # 清理用户数据
         user_tmdb_data.pop(call.from_user.id, None)
 
+
+@bot.on_callback_query(filters.regex('^tmdb_view_details$') & user_in_group_on_filter)
+async def tmdb_view_details(_, call):
+    """查看更多详情（扩展功能预留）"""
+    await callAnswer(call, '📖 查看详情')
+    from bot.func_helper.fix_bottons import ikb
+    back_buttons = ikb([[('🔙 返回', 'tmdb_main')]])
+    await editMessage(call, 
+        '📖 **功能说明**\n\n'
+        '当前显示的已经是该影片的详细信息\n'
+        '包含了标题、年份、评分、简介等内容\n\n'
+        '🔄 你可以返回继续搜索其他影片',
+        buttons=back_buttons,
+        parse_mode=enums.ParseMode.MARKDOWN
+    )
 
 
 @bot.on_callback_query(filters.regex('^cancel_tmdb_search$') & user_in_group_on_filter)
