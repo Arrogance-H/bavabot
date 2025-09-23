@@ -269,7 +269,7 @@ async def tmdb_id_search_results_with_context(call, tmdb_id: int, result: dict, 
         # 构建详情文本 - 以影片详情页的格式显示
         detail_text = f"🎬 **影片详情**\n"
         if checked_emby:
-            detail_text += f"🆔 **TMDB ID**: `{tmdb_id}` (已检查Emby库)\n\n"
+            detail_text += f"🆔 **TMDB ID**: `{tmdb_id}` \n\n"
         else:
             detail_text += f"🆔 **TMDB ID**: `{tmdb_id}`\n\n"
         
