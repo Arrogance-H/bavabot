@@ -544,8 +544,8 @@ tmdb_main_ikb = ikb([
 ])
 
 tmdb_search_result_ikb = ikb([
-    [('📖 查看详情', 'tmdb_view_details'), ('❌ 取消', 'cancel_tmdb_search')],
-    [('🔙 返回', 'tmdb_main')]
+    [('📖 查看详情', 'tmdb_view_details'), ('🎬 点播此片', 'tmdb_request_movie')],
+    [('❌ 取消', 'cancel_tmdb_search'), ('🔙 返回', 'tmdb_main')]
 ])
 
 # 添加 MoviePilot 设置按钮
