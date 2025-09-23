@@ -84,6 +84,7 @@ admin_p = user_p + [
     BotCommand("kk", "管理用户 [管理]"),
     BotCommand("score", "加/减积分 [管理]"),
     BotCommand("coins", f"加/减{sakura_b} [管理]"),
+    BotCommand("demand", "查看和管理影视请求 [管理]"),
     BotCommand("lottery", "创建抽奖活动 [管理]"),
     BotCommand("terminate_lottery", "终止抽奖活动 [管理]"),
     BotCommand("deleted", f"清理死号 [管理]"),
