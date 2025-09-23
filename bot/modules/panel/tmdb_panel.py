@@ -413,7 +413,7 @@ async def me_request_movie(_, call):
     
     # 显示请求确认信息（包含费用）
     await editMessage(call,
-        f"🎬 **确认点播请求**\n\n"
+        f"🎬 **确认点播**\n\n"
         f"影片：{selected_item.get('title', '未知')}\n"
         f"年份：{selected_item.get('year', '未知')}\n"
         f"类型：{selected_item.get('media_type_cn', '未知')}\n\n"
@@ -421,12 +421,7 @@ async def me_request_movie(_, call):
         f"• 点播费用: {cost} {sakura_b}\n"
         f"• 当前余额: {emby_user.iv} {sakura_b}\n"
         f"• 扣费后余额: {emby_user.iv - cost} {sakura_b}\n\n"
-        f"📝 **请求说明**:\n"
-        f"• 此请求将发送给管理员处理\n"
-        f"• 管理员会根据情况决定是否添加到媒体库\n"
-        f"• 费用将在确认请求时立即扣除\n"
-        f"• 请耐心等待处理结果\n\n"
-        f"确认发起此点播请求吗？",
+        f"确认点播吗？",
         parse_mode=enums.ParseMode.MARKDOWN
     )
     
@@ -480,7 +475,7 @@ async def confirm_me_request(_, call):
         request_title = f"{selected_item.get('title', '未知')} ({selected_item.get('year', '未知')})"
         
         request_detail = (
-            f"【ME点播请求】\n"
+            f"【ME点播】\n"
             f"用户: [{call.from_user.first_name}](tg://user?id={call.from_user.id})\n"
             f"TG ID: {call.from_user.id}\n"
             f"影片: {request_title}\n"
@@ -509,15 +504,12 @@ async def confirm_me_request(_, call):
         if success:
             # 发送成功消息给用户
             await editMessage(call,
-                f"✅ **点播请求已提交！**\n\n"
+                f"✅ **点播已提交！**\n\n"
                 f"影片: {request_title}\n"
                 f"类型: {selected_item.get('media_type_cn', '未知')}\n"
                 f"请求ID: `{request_id}`\n"
                 f"费用: {cost} {sakura_b}\n"
-                f"余额: {emby_user.iv - cost} {sakura_b}\n"
-                f"状态: 等待管理员处理\n\n"
-                f"📝 您的请求已发送给管理员\n"
-                f"费用已扣除，请耐心等待处理结果",
+                f"余额: {emby_user.iv - cost} {sakura_b}\n",
                 buttons=tmdb_main_ikb,
                 parse_mode=enums.ParseMode.MARKDOWN
             )
