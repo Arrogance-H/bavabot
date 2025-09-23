@@ -1,19 +1,22 @@
 """
 ME点播 Panel - TMDB Search with Emby Library Check
 First checks Emby library, then provides TMDB search if not found
-Independent system without MoviePilot integration
+Independent system with own request recording and admin notifications
 """
 
 from pyrogram import filters, enums
-from bot import bot, tmdb, bot_photo, LOGGER
+from bot import bot, tmdb, bot_photo, LOGGER, owner, admins
 from bot.func_helper.msg_utils import callAnswer, editMessage, sendMessage, sendPhoto, callListen
 from bot.func_helper.filters import user_in_group_on_filter
 from bot.func_helper.fix_bottons import tmdb_main_ikb, tmdb_search_page_ikb, tmdb_search_result_ikb, back_members_ikb
 from bot.sql_helper.sql_emby import sql_get_emby
+from bot.sql_helper.sql_request_record import sql_add_request_record
 from bot.func_helper.tmdb import tmdb_service
 from bot.func_helper.emby import emby
 from bot.func_helper.utils import judge_admins
 import asyncio
+import uuid
+import datetime
 
 # 存储TMDB搜索结果的全局字典
 user_tmdb_data = {}
@@ -299,6 +302,12 @@ async def show_tmdb_item_details(call, item: dict):
     vote_count = item.get("vote_count", 0)
     poster_url = item.get("poster_url", "")
     
+    # 保存选中的影片信息到用户数据中，用于潜在的点播请求
+    user_tmdb_data[call.from_user.id] = {
+        'selected_item': item,
+        'search_title': f"{title} {year}" if year and year != "未知" else title
+    }
+    
     # 构建详情文本
     detail_text = f"🎬 **影片详情**\n\n"
     detail_text += f"📺 **类型**: {media_type}\n"
@@ -317,15 +326,7 @@ async def show_tmdb_item_details(call, item: dict):
         
     detail_text += f"\n📝 **剧情简介**:\n{overview}\n\n"
     detail_text += "💡 这是TMDB数据库中的影视信息\n"
-    detail_text += "如需观看，请查看Emby媒体库或其他观看渠道"
-    
-    # 创建简化的按钮，移除点播功能
-    simple_result_ikb = [
-        [('📖 查看详情', 'tmdb_view_details'), ('❌ 取消', 'cancel_tmdb_search')],
-        [('🔙 返回', 'tmdb_main')]
-    ]
-    from bot.func_helper.fix_bottons import ikb
-    simple_buttons = ikb(simple_result_ikb)
+    detail_text += "如需观看但Emby中没有，可点击\"🎬 点播此片\"发起请求"
     
     if poster_url:
         # 如果有海报，显示海报
@@ -334,7 +335,7 @@ async def show_tmdb_item_details(call, item: dict):
                 call,
                 photo=poster_url,
                 caption=detail_text,
-                buttons=simple_buttons,
+                buttons=tmdb_search_result_ikb,
                 send=True,
                 chat_id=call.from_user.id,
                 parse_mode=enums.ParseMode.MARKDOWN
@@ -345,7 +346,7 @@ async def show_tmdb_item_details(call, item: dict):
                 call,
                 photo=bot_photo,
                 caption=detail_text,
-                buttons=simple_buttons,
+                buttons=tmdb_search_result_ikb,
                 send=True,
                 chat_id=call.from_user.id,
                 parse_mode=enums.ParseMode.MARKDOWN
@@ -355,11 +356,159 @@ async def show_tmdb_item_details(call, item: dict):
             call,
             photo=bot_photo,
             caption=detail_text,
-            buttons=simple_buttons,
+            buttons=tmdb_search_result_ikb,
             send=True,
             chat_id=call.from_user.id,
             parse_mode=enums.ParseMode.MARKDOWN
         )
+
+
+@bot.on_callback_query(filters.regex('^me_request_movie$') & user_in_group_on_filter)
+async def me_request_movie(_, call):
+    """ME点播独立请求功能"""
+    # 检查用户权限
+    emby_user = sql_get_emby(tg=call.from_user.id)
+    if not emby_user:
+        return await editMessage(call, '⚠️ 数据库没有你，请重新 /start录入')
+    if emby_user.lv is None or emby_user.lv not in ['a', 'b']:
+        return await editMessage(call, '🫡 您没有权限使用此功能', buttons=tmdb_main_ikb)
+
+    user_data = user_tmdb_data.get(call.from_user.id)
+    if not user_data or 'selected_item' not in user_data:
+        return await callAnswer(call, '❌ 未找到选中的影片信息，请重新搜索', True)
+    
+    await callAnswer(call, '🎬 发起点播请求')
+    
+    selected_item = user_data['selected_item']
+    search_title = user_data['search_title']
+    
+    # 显示请求确认信息
+    await editMessage(call,
+        f"🎬 **确认点播请求**\n\n"
+        f"影片：{selected_item.get('title', '未知')}\n"
+        f"年份：{selected_item.get('year', '未知')}\n"
+        f"类型：{selected_item.get('media_type_cn', '未知')}\n\n"
+        f"📝 **请求说明**:\n"
+        f"• 此请求将发送给管理员处理\n"
+        f"• 管理员会根据情况决定是否添加到媒体库\n"
+        f"• 请耐心等待处理结果\n\n"
+        f"确认发起此点播请求吗？",
+        parse_mode=enums.ParseMode.MARKDOWN
+    )
+    
+    # 创建确认按钮
+    from bot.func_helper.fix_bottons import ikb
+    confirm_buttons = ikb([
+        [('✅ 确认请求', 'confirm_me_request'), ('❌ 取消', 'cancel_tmdb_search')],
+        [('🔙 返回', 'tmdb_main')]
+    ])
+    
+    await editMessage(call, call.message.text, buttons=confirm_buttons, parse_mode=enums.ParseMode.MARKDOWN)
+
+
+@bot.on_callback_query(filters.regex('^confirm_me_request$') & user_in_group_on_filter)
+async def confirm_me_request(_, call):
+    """确认ME点播请求"""
+    user_data = user_tmdb_data.get(call.from_user.id)
+    if not user_data or 'selected_item' not in user_data:
+        return await callAnswer(call, '❌ 未找到选中的影片信息，请重新搜索', True)
+    
+    await callAnswer(call, '📝 正在处理请求...')
+    
+    selected_item = user_data['selected_item']
+    search_title = user_data['search_title']
+    
+    try:
+        # 生成唯一的请求ID
+        request_id = f"ME{datetime.datetime.now().strftime('%Y%m%d')}{str(uuid.uuid4())[:8]}"
+        
+        # 创建请求记录
+        request_title = f"{selected_item.get('title', '未知')} ({selected_item.get('year', '未知')})"
+        
+        request_detail = (
+            f"【ME点播请求】\n"
+            f"用户: [{call.from_user.first_name}](tg://user?id={call.from_user.id})\n"
+            f"TG ID: {call.from_user.id}\n"
+            f"影片: {request_title}\n"
+            f"原名: {selected_item.get('original_title', '未知')}\n"
+            f"类型: {selected_item.get('media_type_cn', '未知')}\n"
+            f"年份: {selected_item.get('year', '未知')}\n"
+            f"TMDB评分: {selected_item.get('vote_average', 0)}/10\n"
+            f"请求时间: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"搜索词: {search_title}\n"
+            f"TMDB ID: {selected_item.get('id', '未知')}"
+        )
+        
+        # 记录请求到数据库 (使用独立的成本标识)
+        success = sql_add_request_record(call.from_user.id, request_id, request_title, request_detail, "ME请求")
+        
+        if success:
+            # 发送成功消息给用户
+            await editMessage(call,
+                f"✅ **点播请求已提交！**\n\n"
+                f"影片: {request_title}\n"
+                f"请求ID: `{request_id}`\n"
+                f"状态: 等待管理员处理\n\n"
+                f"📝 您的请求已发送给管理员\n"
+                f"请耐心等待处理结果",
+                buttons=tmdb_main_ikb,
+                parse_mode=enums.ParseMode.MARKDOWN
+            )
+            
+            # 发送通知给管理员和owner
+            admin_notification = (
+                f"🎬 **ME点播新请求**\n\n"
+                f"**用户**: [{call.from_user.first_name}](tg://user?id={call.from_user.id})\n"
+                f"**TG ID**: `{call.from_user.id}`\n"
+                f"**影片**: {request_title}\n"
+                f"**原名**: {selected_item.get('original_title', '未知')}\n"
+                f"**类型**: {selected_item.get('media_type_cn', '未知')}\n"
+                f"**年份**: {selected_item.get('year', '未知')}\n"
+                f"**TMDB评分**: {selected_item.get('vote_average', 0):.1f}/10\n"
+                f"**请求ID**: `{request_id}`\n"
+                f"**搜索词**: {search_title}\n"
+                f"**TMDB ID**: {selected_item.get('id', '未知')}\n\n"
+                f"⏰ **请求时间**: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                f"📝 **简介**: {selected_item.get('overview', '暂无简介')[:200]}{'...' if len(selected_item.get('overview', '')) > 200 else ''}"
+            )
+            
+            # 发送给owner
+            try:
+                await sendMessage(call, admin_notification, send=True, chat_id=owner, parse_mode=enums.ParseMode.MARKDOWN)
+                LOGGER.info(f"ME点播通知已发送给owner: {request_title}")
+            except Exception as e:
+                LOGGER.error(f"发送ME点播通知给owner失败: {str(e)}")
+            
+            # 发送给所有管理员
+            for admin_id in admins:
+                try:
+                    await sendMessage(call, admin_notification, send=True, chat_id=admin_id, parse_mode=enums.ParseMode.MARKDOWN)
+                    LOGGER.info(f"ME点播通知已发送给管理员 {admin_id}: {request_title}")
+                except Exception as e:
+                    LOGGER.error(f"发送ME点播通知给管理员 {admin_id} 失败: {str(e)}")
+            
+            LOGGER.info(f"ME点播请求成功: 用户{call.from_user.id} 请求 {request_title}, 请求ID: {request_id}")
+            
+        else:
+            # 记录请求失败
+            await editMessage(call,
+                f"❌ **请求提交失败**\n\n"
+                f"数据库记录失败，请稍后重试或联系管理员",
+                buttons=tmdb_main_ikb
+            )
+            LOGGER.error(f"ME点播请求失败: 用户{call.from_user.id} 数据库记录失败 {request_title}")
+    
+    except Exception as e:
+        LOGGER.error(f"ME点播处理出错: {str(e)}")
+        await editMessage(call,
+            f"❌ **处理请求时出错**\n\n"
+            f"请稍后重试或联系管理员\n"
+            f"错误信息: {str(e)[:100]}",
+            buttons=tmdb_main_ikb
+        )
+    finally:
+        # 清理用户数据
+        user_tmdb_data.pop(call.from_user.id, None)
 
 
 @bot.on_callback_query(filters.regex('^tmdb_view_details$') & user_in_group_on_filter)
