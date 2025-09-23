@@ -428,8 +428,11 @@ async def me_request_movie(_, call):
     await process_movie_request(call, selected_item)
 
 
-async def show_season_selection(call, tv_series: dict, seasons: list):
-    """显示电视剧季数选择界面"""
+async def show_season_selection(call, tv_series: dict, seasons: list, selected_seasons: list = None):
+    """显示电视剧季数选择界面 - 支持多选"""
+    if selected_seasons is None:
+        selected_seasons = []
+        
     title = tv_series.get("title", "未知电视剧")
     year = tv_series.get("year", "未知")
     
@@ -438,24 +441,38 @@ async def show_season_selection(call, tv_series: dict, seasons: list):
     if year:
         selection_text += f"📅 **年份**: {year}\n"
     selection_text += f"🎬 **总季数**: {len(seasons)} 季\n\n"
-    selection_text += "💰 **点播说明**: 每季需要 10 币\n"
-    selection_text += "📝 请选择要点播的季数:\n\n"
     
-    for season in seasons[:5]:  # 只显示前5季的详细信息
+    if selected_seasons:
+        total_cost = len(selected_seasons) * calculate_me_request_cost('tv')
+        selection_text += f"✅ **已选择**: {len(selected_seasons)} 季\n"
+        selection_text += f"💰 **总费用**: {total_cost} 币\n\n"
+    else:
+        selection_text += "💰 **点播说明**: 每季需要 10 币，可多选\n\n"
+    
+    selection_text += "📝 **可选季数** (点击切换选择):\n\n"
+    
+    for season in seasons[:8]:  # 显示前8季的详细信息
         season_num = season.get('season_number', 0)
         episode_count = season.get('episode_count', 0)
         air_date = season.get('air_date', '')
         year_info = f" ({air_date[:4]})" if air_date else ""
         
-        selection_text += f"🎬 **第{season_num}季**: {episode_count}集{year_info}\n"
+        # 标记已选择的季数
+        status_icon = "✅" if season_num in selected_seasons else "⭕"
+        selection_text += f"{status_icon} **第{season_num}季**: {episode_count}集{year_info}\n"
     
-    if len(seasons) > 5:
-        selection_text += f"... 还有 {len(seasons) - 5} 季\n"
+    if len(seasons) > 8:
+        selection_text += f"... 还有 {len(seasons) - 8} 季\n"
+    
+    if selected_seasons:
+        selection_text += f"\n💡 **提示**: 点击 '✅ 确认选择' 继续，或继续选择其他季数"
+    else:
+        selection_text += f"\n💡 **提示**: 点击季数按钮进行选择，支持多选"
     
     await editMessage(
         call,
         selection_text,
-        buttons=tmdb_season_selection_ikb(seasons),
+        buttons=tmdb_season_selection_ikb(seasons, selected_seasons),
         parse_mode=enums.ParseMode.MARKDOWN
     )
 
@@ -542,9 +559,9 @@ async def process_movie_request(call, selected_item: dict):
     )
 
 
-@bot.on_callback_query(filters.regex('^select_season_[0-9]+$') & user_in_group_on_filter)
-async def select_season(_, call):
-    """选择电视剧季数"""
+@bot.on_callback_query(filters.regex('^toggle_season_[0-9]+$') & user_in_group_on_filter)
+async def toggle_season_selection(_, call):
+    """切换电视剧季数选择状态（多选）"""
     user_data = user_tmdb_data.get(call.from_user.id)
     if not user_data or 'selected_item' not in user_data or 'seasons' not in user_data:
         return await callAnswer(call, '❌ 搜索会话已过期，请重新搜索', True)
@@ -552,24 +569,361 @@ async def select_season(_, call):
     # 提取季数编号
     season_number = int(call.data.split('_')[-1])
     
-    await callAnswer(call, f'✅ 选择第{season_number}季')
+    # 初始化或获取已选择的季数列表
+    if 'selected_seasons' not in user_data:
+        user_data['selected_seasons'] = []
     
-    # 找到对应的季数信息
-    selected_season = None
-    for season in user_data['seasons']:
-        if season.get('season_number') == season_number:
-            selected_season = season
-            break
+    selected_seasons = user_data['selected_seasons']
     
-    if not selected_season:
-        await editMessage(call, '❌ 选择的季数不存在', buttons=tmdb_main_ikb)
+    # 切换选择状态
+    if season_number in selected_seasons:
+        selected_seasons.remove(season_number)
+        await callAnswer(call, f'❌ 取消选择第{season_number}季')
+    else:
+        selected_seasons.append(season_number)
+        await callAnswer(call, f'✅ 选择第{season_number}季')
+    
+    # 更新用户数据
+    user_tmdb_data[call.from_user.id]['selected_seasons'] = selected_seasons
+    
+    # 刷新季数选择界面
+    await show_season_selection(call, user_data['selected_item'], user_data['seasons'], selected_seasons)
+
+
+@bot.on_callback_query(filters.regex('^clear_season_selection$') & user_in_group_on_filter)
+async def clear_season_selection(_, call):
+    """清空季数选择"""
+    user_data = user_tmdb_data.get(call.from_user.id)
+    if not user_data:
+        return await callAnswer(call, '❌ 搜索会话已过期，请重新搜索', True)
+    
+    await callAnswer(call, '🗑️ 已清空选择')
+    
+    # 清空选择
+    user_tmdb_data[call.from_user.id]['selected_seasons'] = []
+    
+    # 刷新界面
+    await show_season_selection(call, user_data['selected_item'], user_data['seasons'], [])
+
+
+@bot.on_callback_query(filters.regex('^confirm_multi_seasons$') & user_in_group_on_filter)
+async def confirm_multi_seasons(_, call):
+    """确认多季选择"""
+    user_data = user_tmdb_data.get(call.from_user.id)
+    if not user_data or 'selected_seasons' not in user_data or not user_data['selected_seasons']:
+        return await callAnswer(call, '❌ 请先选择要点播的季数', True)
+    
+    await callAnswer(call, '✅ 进入确认页面')
+    
+    selected_seasons = user_data['selected_seasons']
+    tv_series = user_data['selected_item']
+    seasons_data = user_data['seasons']
+    
+    # 获取选中季数的详细信息
+    selected_seasons_info = []
+    for season in seasons_data:
+        if season.get('season_number') in selected_seasons:
+            selected_seasons_info.append(season)
+    
+    # 显示多季确认页面
+    await show_multi_season_confirmation(call, tv_series, selected_seasons_info)
+
+
+async def show_multi_season_confirmation(call, tv_series: dict, selected_seasons: list):
+    """显示多季确认页面"""
+    emby_user = sql_get_emby(tg=call.from_user.id)
+    if not emby_user:
+        await editMessage(call, '❌ 用户信息获取失败，请重试', buttons=tmdb_main_ikb)
         return
     
-    # 保存选中的季数信息
-    user_tmdb_data[call.from_user.id]['selected_season'] = selected_season
+    season_count = len(selected_seasons)
+    cost_per_season = calculate_me_request_cost('tv')
+    total_cost = season_count * cost_per_season
     
-    # 显示季数确认页面
-    await show_season_confirmation(call, user_data['selected_item'], selected_season)
+    # 检查用户余额
+    if total_cost > emby_user.iv:
+        await editMessage(call,
+            f"❌ **余额不足**\n\n"
+            f"电视剧：{tv_series.get('title', '未知')}\n"
+            f"选择季数：{season_count} 季\n"
+            f"需要费用：{total_cost} {sakura_b}\n"
+            f"当前拥有：{emby_user.iv} {sakura_b}",
+            buttons=tmdb_main_ikb,
+            parse_mode=enums.ParseMode.MARKDOWN
+        )
+        return
+    
+    # 创建确认按钮
+    from bot.func_helper.fix_bottons import ikb
+    confirm_buttons = ikb([
+        [('✅ 确认', 'confirm_multi_season_request'), ('❌ 取消', 'cancel_tmdb_search')],
+        [('🔙 返回选择', 'return_to_season_selection')]
+    ])
+    
+    confirmation_text = f"📺 **确认点播多季电视剧**\n\n"
+    confirmation_text += f"🎭 **剧名**: {tv_series.get('title', '未知')}\n"
+    confirmation_text += f"📅 **年份**: {tv_series.get('year', '未知')}\n"
+    confirmation_text += f"🎬 **选择季数**: {season_count} 季\n\n"
+    
+    confirmation_text += "📋 **季数详情**:\n"
+    for season in sorted(selected_seasons, key=lambda x: x.get('season_number', 0)):
+        season_num = season.get('season_number', 0)
+        episode_count = season.get('episode_count', 0)
+        air_date = season.get('air_date', '')
+        year_info = f" ({air_date[:4]})" if air_date else ""
+        
+        confirmation_text += f"• 第{season_num}季: {episode_count}集{year_info}\n"
+    
+    confirmation_text += f"\n💰 **费用明细**:\n"
+    confirmation_text += f"• 单季费用: {cost_per_season} {sakura_b}\n"
+    confirmation_text += f"• 季数数量: {season_count} 季\n"
+    confirmation_text += f"• **总费用**: {total_cost} {sakura_b}\n"
+    confirmation_text += f"💳 **当前余额**: {emby_user.iv} {sakura_b}\n\n"
+    confirmation_text += "确认点播这些季数吗？"
+
+    await editMessage(call,
+        confirmation_text,
+        buttons=confirm_buttons,
+        parse_mode=enums.ParseMode.MARKDOWN
+    )
+
+
+@bot.on_callback_query(filters.regex('^return_to_season_selection$') & user_in_group_on_filter)
+async def return_to_season_selection(_, call):
+    """返回季数选择页面"""
+    user_data = user_tmdb_data.get(call.from_user.id)
+    if not user_data or 'selected_item' not in user_data or 'seasons' not in user_data:
+        return await callAnswer(call, '❌ 搜索会话已过期，请重新搜索', True)
+    
+    await callAnswer(call, '🔙 返回季数选择')
+    
+    selected_seasons = user_data.get('selected_seasons', [])
+    await show_season_selection(call, user_data['selected_item'], user_data['seasons'], selected_seasons)
+
+
+@bot.on_callback_query(filters.regex('^confirm_multi_season_request$') & user_in_group_on_filter)
+async def confirm_multi_season_request(_, call):
+    """确认多季点播请求"""
+    user_data = user_tmdb_data.get(call.from_user.id)
+    if not user_data or 'selected_seasons' not in user_data or not user_data['selected_seasons']:
+        return await callAnswer(call, '❌ 未找到选中的季数信息，请重新搜索', True)
+    
+    await callAnswer(call, '📝 正在处理多季点播请求...')
+    
+    selected_item = user_data['selected_item']
+    selected_seasons_nums = user_data['selected_seasons']
+    seasons_data = user_data['seasons']
+    
+    # 获取选中季数的详细信息
+    selected_seasons_info = []
+    for season in seasons_data:
+        if season.get('season_number') in selected_seasons_nums:
+            selected_seasons_info.append(season)
+    
+    try:
+        # 重新获取用户信息以确保余额准确
+        emby_user = sql_get_emby(tg=call.from_user.id)
+        if not emby_user:
+            await editMessage(call, '❌ 用户信息获取失败，请重试', buttons=tmdb_main_ikb)
+            return
+            
+        # 计算总费用
+        cost_per_season = calculate_me_request_cost('tv')
+        total_cost = len(selected_seasons_info) * cost_per_season
+        
+        # 再次检查余额（防止并发问题）
+        if total_cost > emby_user.iv:
+            await editMessage(call,
+                f"❌ **余额不足**\n\n"
+                f"当前余额：{emby_user.iv} {sakura_b}\n"
+                f"需要费用：{total_cost} {sakura_b}",
+                buttons=tmdb_main_ikb
+            )
+            return
+        
+        # 扣除费用
+        success_deduct = sql_update_emby(Emby.tg == call.from_user.id, iv=emby_user.iv - total_cost)
+        
+        if not success_deduct:
+            await editMessage(call,
+                f"❌ **扣费失败**\n\n"
+                f"请稍后重试或联系管理员",
+                buttons=tmdb_main_ikb
+            )
+            return
+        
+        # 为每一季创建单独的请求记录
+        successful_requests = []
+        failed_requests = []
+        
+        for season_info in selected_seasons_info:
+            season_number = season_info.get('season_number', 0)
+            
+            # 生成唯一的请求ID
+            request_id = f"ME{datetime.datetime.now().strftime('%Y%m%d')}{str(uuid.uuid4())[:8]}"
+            
+            # 创建请求标题 - 包含季数信息
+            tv_title = selected_item.get('title', '未知')
+            tv_year = selected_item.get('year', '未知')
+            request_title = f"{tv_title} 第{season_number}季 ({tv_year})"
+            
+            # 检查该季是否已经被点播
+            existing_request = sql_check_existing_request_by_title(request_title)
+            if existing_request:
+                failed_requests.append(f"第{season_number}季 (已存在)")
+                continue
+            
+            request_detail = (
+                f"【ME点播 - 电视剧多季】\n"
+                f"用户: [{call.from_user.first_name}](tg://user?id={call.from_user.id})\n"
+                f"TG ID: {call.from_user.id}\n"
+                f"剧集: {request_title}\n"
+                f"原名: {selected_item.get('original_title', '未知')}\n"
+                f"类型: 电视剧\n"
+                f"季数: 第{season_number}季\n"
+                f"集数: {season_info.get('episode_count', '未知')}集\n"
+                f"年份: {selected_item.get('year', '未知')}\n"
+                f"TMDB评分: {selected_item.get('vote_average', 0)}/10\n"
+                f"请求时间: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+                f"TMDB ID: {selected_item.get('id', '未知')}"
+            )
+            
+            # 记录请求到数据库
+            success = sql_add_request_record(call.from_user.id, request_id, request_title, request_detail, str(cost_per_season))
+            
+            if success:
+                successful_requests.append((season_number, request_id))
+            else:
+                failed_requests.append(f"第{season_number}季 (数据库错误)")
+        
+        # 处理结果
+        if successful_requests and not failed_requests:
+            # 全部成功
+            season_list = ", ".join([f"第{s[0]}季" for s in successful_requests])
+            
+            await editMessage(call,
+                f"✅ **多季点播全部提交成功！**\n\n"
+                f"剧集: {tv_title}\n"
+                f"季数: {season_list}\n"
+                f"总共: {len(successful_requests)} 季\n"
+                f"类型: 电视剧\n"
+                f"总费用: {total_cost} {sakura_b}\n"
+                f"余额: {emby_user.iv - total_cost} {sakura_b}\n",
+                buttons=tmdb_main_ikb,
+                parse_mode=enums.ParseMode.MARKDOWN
+            )
+            
+            # 发送通知给管理员和owner  
+            season_details = "\n".join([f"• 第{s[0]}季 (ID: `{s[1]}`)" for s in successful_requests])
+            admin_notification = (
+                f"📺 **ME点播新请求 - 电视剧多季**\n\n"
+                f"**用户**: [{call.from_user.first_name}](tg://user?id={call.from_user.id})\n"
+                f"**TG ID**: `{call.from_user.id}`\n"
+                f"**剧集**: {tv_title}\n"
+                f"**年份**: {selected_item.get('year', '未知')}\n"
+                f"**原名**: {selected_item.get('original_title', '未知')}\n"
+                f"**TMDB评分**: {selected_item.get('vote_average', 0):.1f}/10\n"
+                f"**选择季数**: {len(successful_requests)} 季\n"
+                f"**总费用**: {total_cost} {sakura_b}\n\n"
+                f"**季数详情**:\n{season_details}\n\n"
+                f"**TMDB ID**: {selected_item.get('id', '未知')}\n"
+                f"⏰ **请求时间**: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+            
+        elif successful_requests and failed_requests:
+            # 部分成功 - 计算退款
+            success_list = ", ".join([f"第{s[0]}季" for s in successful_requests])
+            failed_list = ", ".join(failed_requests)
+            
+            # 部分退款
+            failed_count = len(failed_requests)
+            refund_amount = failed_count * cost_per_season
+            sql_update_emby(Emby.tg == call.from_user.id, iv=emby_user.iv - total_cost + refund_amount)
+            
+            await editMessage(call,
+                f"⚠️ **多季点播部分成功**\n\n"
+                f"剧集: {tv_title}\n"
+                f"✅ 成功: {success_list}\n"
+                f"❌ 失败: {failed_list}\n"
+                f"实际费用: {total_cost - refund_amount} {sakura_b}\n"
+                f"余额: {emby_user.iv - total_cost + refund_amount} {sakura_b}\n",
+                buttons=tmdb_main_ikb,
+                parse_mode=enums.ParseMode.MARKDOWN
+            )
+            
+            # 发送通知（仅成功的季数）
+            if successful_requests:
+                season_details = "\n".join([f"• 第{s[0]}季 (ID: `{s[1]}`)" for s in successful_requests])
+                admin_notification = (
+                    f"📺 **ME点播新请求 - 电视剧多季 (部分成功)**\n\n"
+                    f"**用户**: [{call.from_user.first_name}](tg://user?id={call.from_user.id})\n"
+                    f"**TG ID**: `{call.from_user.id}`\n"
+                    f"**剧集**: {tv_title}\n"
+                    f"**成功季数**: {len(successful_requests)} 季\n"
+                    f"**失败季数**: {failed_list}\n\n"
+                    f"**成功季数详情**:\n{season_details}\n\n"
+                    f"**TMDB ID**: {selected_item.get('id', '未知')}\n"
+                    f"⏰ **请求时间**: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                )
+            else:
+                admin_notification = None
+        
+        else:
+            # 全部失败
+            failed_list = ", ".join(failed_requests)
+            
+            # 全额退款
+            sql_update_emby(Emby.tg == call.from_user.id, iv=emby_user.iv)
+            
+            await editMessage(call,
+                f"❌ **多季点播全部失败**\n\n"
+                f"剧集: {tv_title}\n"
+                f"失败季数: {failed_list}\n"
+                f"费用已全额退还\n"
+                f"余额: {emby_user.iv} {sakura_b}\n",
+                buttons=tmdb_main_ikb,
+                parse_mode=enums.ParseMode.MARKDOWN
+            )
+            admin_notification = None
+        
+        # 发送管理员通知
+        if admin_notification:
+            # 发送给owner
+            try:
+                await sendMessage(call, admin_notification, send=True, chat_id=owner, parse_mode=enums.ParseMode.MARKDOWN)
+                LOGGER.info(f"ME点播多季通知已发送给owner: {tv_title}")
+            except Exception as e:
+                LOGGER.error(f"发送ME点播多季通知给owner失败: {str(e)}")
+            
+            # 发送给所有管理员
+            for admin_id in admins:
+                try:
+                    await sendMessage(call, admin_notification, send=True, chat_id=admin_id, parse_mode=enums.ParseMode.MARKDOWN)
+                    LOGGER.info(f"ME点播多季通知已发送给管理员 {admin_id}: {tv_title}")
+                except Exception as e:
+                    LOGGER.error(f"发送ME点播多季通知给管理员 {admin_id} 失败: {str(e)}")
+        
+        LOGGER.info(f"ME点播多季请求处理完成: 用户{call.from_user.id} 请求 {tv_title}, 成功{len(successful_requests)}季, 失败{len(failed_requests)}季")
+            
+    except Exception as e:
+        LOGGER.error(f"ME点播多季处理出错: {str(e)}")
+        # 尝试退还费用（如果已扣除）
+        try:
+            emby_user = sql_get_emby(tg=call.from_user.id)
+            if emby_user:
+                sql_update_emby(Emby.tg == call.from_user.id, iv=emby_user.iv + total_cost)
+        except:
+            pass
+        await editMessage(call,
+            f"❌ **处理请求时出错**\n\n"
+            f"请稍后重试或联系管理员\n"
+            f"如有费用扣除，系统已尝试退还\n"
+            f"错误信息: {str(e)[:100]}",
+            buttons=tmdb_main_ikb
+        )
+    finally:
+        # 清理用户数据
+        user_tmdb_data.pop(call.from_user.id, None)
 
 
 async def show_season_confirmation(call, tv_series: dict, season: dict):

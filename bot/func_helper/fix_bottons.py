@@ -583,8 +583,11 @@ def mp_config_ikb():
     ])
     return keyboard
 
-def tmdb_season_selection_ikb(seasons: list):
-    """TMDB电视剧季数选择按钮"""
+def tmdb_season_selection_ikb(seasons: list, selected_seasons: list = None):
+    """TMDB电视剧季数选择按钮 - 支持多选"""
+    if selected_seasons is None:
+        selected_seasons = []
+    
     buttons = []
     
     # 每行最多2个季数按钮
@@ -592,15 +595,35 @@ def tmdb_season_selection_ikb(seasons: list):
     for season in seasons:
         season_num = season.get('season_number', 0)
         episode_count = season.get('episode_count', 0)
-        button_text = f"第{season_num}季"
+        
+        # 根据是否已选择添加不同的图标
+        if season_num in selected_seasons:
+            button_text = f"✅ 第{season_num}季"
+        else:
+            button_text = f"第{season_num}季"
+            
         if episode_count > 0:
             button_text += f" ({episode_count}集)"
-        season_buttons.append((button_text, f'select_season_{season_num}'))
+        season_buttons.append((button_text, f'toggle_season_{season_num}'))
     
     # 按每行2个按钮分组
     for i in range(0, len(season_buttons), 2):
         row = season_buttons[i:i+2]
         buttons.append(row)
+    
+    # 添加操作按钮
+    action_buttons = []
+    if selected_seasons:
+        action_buttons.append(('✅ 确认选择', 'confirm_multi_seasons'))
+        action_buttons.append(('🗑️ 清空选择', 'clear_season_selection'))
+    
+    if action_buttons:
+        # 如果操作按钮超过2个，分成两行
+        if len(action_buttons) > 2:
+            buttons.append(action_buttons[:2])
+            buttons.append(action_buttons[2:])
+        else:
+            buttons.append(action_buttons)
     
     # 添加返回按钮
     buttons.append([('🔙 返回', 'return_to_search_results')])
