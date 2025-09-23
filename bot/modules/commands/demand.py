@@ -292,3 +292,9 @@ async def handle_demand_edit_status(_, call):
     except Exception as e:
         LOGGER.error(f"处理状态编辑失败: {str(e)}")
         await callAnswer(call, "❌ 编辑状态失败", True)
+
+
+# Aliases for backward compatibility with imports
+demand_page_callback = handle_demand_page
+demand_filter_callback = handle_demand_filter
+demand_refresh_callback = handle_demand_refresh
