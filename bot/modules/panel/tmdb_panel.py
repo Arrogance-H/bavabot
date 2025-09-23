@@ -184,9 +184,9 @@ async def tmdb_search_results(call, query: str, page: int = 1):
             )
             return
 
-        # 计算分页信息
+        # 计算分页信息 - 每页3个结果
         has_prev = page > 1
-        has_next = len(results) >= 20  # 如果当前页有20个结果，可能还有下一页
+        has_next = len(results) >= 3  # 如果当前页有3个或更多结果，可能还有下一页
         
         # 保存搜索结果
         user_tmdb_data[call.from_user.id] = {
@@ -200,7 +200,7 @@ async def tmdb_search_results(call, query: str, page: int = 1):
         result_text += f"🔍 搜索词: `{query}`\n"
         result_text += f"📄 第 {page} 页 | 共找到 {len(results)} 个结果\n\n"
         
-        for index, item in enumerate(results[:10], start=1):  # 只显示前10个结果
+        for index, item in enumerate(results[:3], start=1):  # 只显示前3个结果
             result_text += tmdb_service.format_search_result_text(item, index)
             result_text += "\n" + "─" * 30 + "\n\n"
 
@@ -211,7 +211,7 @@ async def tmdb_search_results(call, query: str, page: int = 1):
         await editMessage(
             call, 
             result_text, 
-            buttons=tmdb_search_page_ikb(has_prev, has_next, page),
+            buttons=tmdb_search_page_ikb(has_prev, has_next, page, min(len(results), 3)),
             parse_mode=enums.ParseMode.MARKDOWN
         )
 
@@ -247,9 +247,37 @@ async def tmdb_search_next_page(_, call):
     await tmdb_search_results(call, user_data['query'], new_page)
 
 
+@bot.on_callback_query(filters.regex('^tmdb_select_[123]$') & user_in_group_on_filter)
+async def tmdb_select_numbered_item(_, call):
+    """选择编号对应的TMDB影片查看详情"""
+    user_data = user_tmdb_data.get(call.from_user.id)
+    if not user_data:
+        return await callAnswer(call, '❌ 搜索会话已过期，请重新搜索', True)
+    
+    # 从callback data中提取编号
+    selected_index = int(call.data.split('_')[-1])
+    
+    await callAnswer(call, f'✅ 选择影片 {selected_index}')
+    results = user_data['results']
+    
+    if not results or selected_index > min(len(results), 3):
+        await editMessage(call, '❌ 选择的影片不存在', buttons=tmdb_main_ikb)
+        return
+
+    try:
+        selected_item = results[selected_index - 1]
+        
+        # 显示选中的影片详情
+        await show_tmdb_item_details(call, selected_item)
+        
+    except Exception as e:
+        LOGGER.error(f"选择TMDB影片出错: {str(e)}")
+        await editMessage(call, '❌ 选择过程中出错', buttons=tmdb_main_ikb)
+
+
 @bot.on_callback_query(filters.regex('^tmdb_select_item$') & user_in_group_on_filter)
 async def tmdb_select_item(_, call):
-    """选择TMDB影片查看详情"""
+    """选择TMDB影片查看详情（保留旧的文字输入方式作为备用）"""
     user_data = user_tmdb_data.get(call.from_user.id)
     if not user_data:
         return await callAnswer(call, '❌ 搜索会话已过期，请重新搜索', True)
@@ -263,7 +291,7 @@ async def tmdb_select_item(_, call):
 
     await editMessage(call, 
         '🎬 **选择影片**\n\n'
-        '请在120秒内发送你要查看的影片编号（1-10）\n'
+        f'请在120秒内发送你要查看的影片编号（1-{min(len(results), 3)}）\n'
         '输入 /cancel 取消操作',
         parse_mode=enums.ParseMode.MARKDOWN
     )
@@ -277,9 +305,9 @@ async def tmdb_select_item(_, call):
 
     try:
         index = int(txt.text.strip())
-        if index < 1 or index > min(10, len(results)):
+        if index < 1 or index > min(3, len(results)):
             await editMessage(call, 
-                f'❌ 编号无效，请输入1-{min(10, len(results))}之间的数字', 
+                f'❌ 编号无效，请输入1-{min(3, len(results))}之间的数字', 
                 buttons=tmdb_main_ikb
             )
             return
