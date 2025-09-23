@@ -73,7 +73,7 @@ async def tmdb_search_handler(_, call):
 
     await callAnswer(call, '🔍 开始搜索')
     await editMessage(call, 
-        '🎬 **ME点播搜索**\n\n'
+        '🎬 **ME点播**\n\n'
         '请在120秒内发送你想搜索的电影或电视剧名称\n'
         '支持中文和外文名称搜索\n\n'
         '输入 /cancel 取消操作',
@@ -360,7 +360,7 @@ async def show_tmdb_item_details(call, item: dict):
 
     detail_text += f"\n📝 **剧情简介**:\n{overview}\n\n"
     detail_text += "💡 这是TMDB数据库中的影视信息\n"
-    detail_text += "如需观看但Emby中没有，可点击\"🎬 点播此片\"发起请求"
+    detail_text += "如需观看但Emby中没有，可点击\"🎬 点播\"发起请求"
 
     # 只发送文本，无图片
     await editMessage(
@@ -385,7 +385,7 @@ async def me_request_movie(_, call):
     if not user_data or 'selected_item' not in user_data:
         return await callAnswer(call, '❌ 未找到选中的影片信息，请重新搜索', True)
     
-    await callAnswer(call, '🎬 发起点播请求')
+    await callAnswer(call, '🎬 点播')
     
     selected_item = user_data['selected_item']
     search_title = user_data['search_title']
