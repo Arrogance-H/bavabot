@@ -60,7 +60,7 @@ def members_ikb(is_admin: bool = False, account: bool = False) -> InlineKeyboard
             normal.append([('🍿 点播中心', 'download_center')])
         # Add independent TMDB search if API key is configured
         if tmdb.api_key:
-            normal.append([('🎬 TMDB影视搜索', 'tmdb_main')])
+            normal.append([('ME点播', 'tmdb_main')])
         normal.append([('♻️ 主界面', 'back_start')])
         return ikb(normal)
     else:
