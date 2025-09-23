@@ -1,15 +1,15 @@
 """
 ME点播 Panel - TMDB Search with Emby Library Check
 First checks Emby library, then provides TMDB search if not found
-Independent system with own request recording and admin notifications
+Independent system with own request recording, admin notifications, and cost management
 """
 
 from pyrogram import filters, enums
-from bot import bot, tmdb, bot_photo, LOGGER, owner, admins
+from bot import bot, tmdb, bot_photo, LOGGER, owner, admins, sakura_b
 from bot.func_helper.msg_utils import callAnswer, editMessage, sendMessage, sendPhoto, callListen
 from bot.func_helper.filters import user_in_group_on_filter
 from bot.func_helper.fix_bottons import tmdb_main_ikb, tmdb_search_page_ikb, tmdb_search_result_ikb, back_members_ikb
-from bot.sql_helper.sql_emby import sql_get_emby
+from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby
 from bot.sql_helper.sql_request_record import sql_add_request_record
 from bot.func_helper.tmdb import tmdb_service
 from bot.func_helper.emby import emby
@@ -20,6 +20,22 @@ import datetime
 
 # 存储TMDB搜索结果的全局字典
 user_tmdb_data = {}
+
+# ME点播费用配置
+ME_REQUEST_COSTS = {
+    'movie': 10,  # 电影10币
+    'tv': 10      # 电视剧10币(每季)
+}
+
+def calculate_me_request_cost(media_type: str) -> int:
+    """计算ME点播请求费用"""
+    if media_type.lower() in ['movie', '电影']:
+        return ME_REQUEST_COSTS['movie']
+    elif media_type.lower() in ['tv', 'series', '电视剧', '剧集']:
+        return ME_REQUEST_COSTS['tv']
+    else:
+        # 默认按电影收费
+        return ME_REQUEST_COSTS['movie']
 
 
 @bot.on_callback_query(filters.regex('tmdb_main') & user_in_group_on_filter)
@@ -382,15 +398,39 @@ async def me_request_movie(_, call):
     selected_item = user_data['selected_item']
     search_title = user_data['search_title']
     
-    # 显示请求确认信息
+    # 计算费用
+    media_type = selected_item.get('media_type', 'movie')
+    cost = calculate_me_request_cost(media_type)
+    
+    # 检查用户余额
+    if cost > emby_user.iv:
+        await editMessage(call,
+            f"❌ **余额不足**\n\n"
+            f"影片：{selected_item.get('title', '未知')}\n"
+            f"类型：{selected_item.get('media_type_cn', '未知')}\n"
+            f"需要费用：{cost} {sakura_b}\n"
+            f"当前拥有：{emby_user.iv} {sakura_b}\n"
+            f"还需要：{cost - emby_user.iv} {sakura_b}\n\n"
+            f"请联系管理员充值后再试",
+            buttons=tmdb_main_ikb,
+            parse_mode=enums.ParseMode.MARKDOWN
+        )
+        return
+    
+    # 显示请求确认信息（包含费用）
     await editMessage(call,
         f"🎬 **确认点播请求**\n\n"
         f"影片：{selected_item.get('title', '未知')}\n"
         f"年份：{selected_item.get('year', '未知')}\n"
         f"类型：{selected_item.get('media_type_cn', '未知')}\n\n"
+        f"💰 **费用信息**:\n"
+        f"• 点播费用: {cost} {sakura_b}\n"
+        f"• 当前余额: {emby_user.iv} {sakura_b}\n"
+        f"• 扣费后余额: {emby_user.iv - cost} {sakura_b}\n\n"
         f"📝 **请求说明**:\n"
         f"• 此请求将发送给管理员处理\n"
         f"• 管理员会根据情况决定是否添加到媒体库\n"
+        f"• 费用将在确认请求时立即扣除\n"
         f"• 请耐心等待处理结果\n\n"
         f"确认发起此点播请求吗？",
         parse_mode=enums.ParseMode.MARKDOWN
@@ -419,6 +459,27 @@ async def confirm_me_request(_, call):
     search_title = user_data['search_title']
     
     try:
+        # 重新获取用户信息以确保余额准确
+        emby_user = sql_get_emby(tg=call.from_user.id)
+        if not emby_user:
+            await editMessage(call, '❌ 用户信息获取失败，请重试', buttons=tmdb_main_ikb)
+            return
+            
+        # 计算费用
+        media_type = selected_item.get('media_type', 'movie')
+        cost = calculate_me_request_cost(media_type)
+        
+        # 再次检查余额（防止并发问题）
+        if cost > emby_user.iv:
+            await editMessage(call,
+                f"❌ **余额不足**\n\n"
+                f"当前余额：{emby_user.iv} {sakura_b}\n"
+                f"需要费用：{cost} {sakura_b}\n"
+                f"请联系管理员充值后再试",
+                buttons=tmdb_main_ikb
+            )
+            return
+        
         # 生成唯一的请求ID
         request_id = f"ME{datetime.datetime.now().strftime('%Y%m%d')}{str(uuid.uuid4())[:8]}"
         
@@ -434,23 +495,38 @@ async def confirm_me_request(_, call):
             f"类型: {selected_item.get('media_type_cn', '未知')}\n"
             f"年份: {selected_item.get('year', '未知')}\n"
             f"TMDB评分: {selected_item.get('vote_average', 0)}/10\n"
+            f"费用: {cost} {sakura_b}\n"
             f"请求时间: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
             f"搜索词: {search_title}\n"
             f"TMDB ID: {selected_item.get('id', '未知')}"
         )
         
-        # 记录请求到数据库 (使用独立的成本标识)
-        success = sql_add_request_record(call.from_user.id, request_id, request_title, request_detail, "ME请求")
+        # 扣除费用
+        success_deduct = sql_update_emby(Emby.tg == call.from_user.id, iv=emby_user.iv - cost)
+        
+        if not success_deduct:
+            await editMessage(call,
+                f"❌ **扣费失败**\n\n"
+                f"请稍后重试或联系管理员",
+                buttons=tmdb_main_ikb
+            )
+            return
+        
+        # 记录请求到数据库 (使用实际费用作为成本)
+        success = sql_add_request_record(call.from_user.id, request_id, request_title, request_detail, str(cost))
         
         if success:
             # 发送成功消息给用户
             await editMessage(call,
                 f"✅ **点播请求已提交！**\n\n"
                 f"影片: {request_title}\n"
+                f"类型: {selected_item.get('media_type_cn', '未知')}\n"
                 f"请求ID: `{request_id}`\n"
+                f"费用: {cost} {sakura_b}\n"
+                f"余额: {emby_user.iv - cost} {sakura_b}\n"
                 f"状态: 等待管理员处理\n\n"
                 f"📝 您的请求已发送给管理员\n"
-                f"请耐心等待处理结果",
+                f"费用已扣除，请耐心等待处理结果",
                 buttons=tmdb_main_ikb,
                 parse_mode=enums.ParseMode.MARKDOWN
             )
@@ -466,9 +542,11 @@ async def confirm_me_request(_, call):
                 f"**年份**: {selected_item.get('year', '未知')}\n"
                 f"**TMDB评分**: {selected_item.get('vote_average', 0):.1f}/10\n"
                 f"**请求ID**: `{request_id}`\n"
+                f"**费用**: {cost} {sakura_b}\n"
                 f"**搜索词**: {search_title}\n"
                 f"**TMDB ID**: {selected_item.get('id', '未知')}\n\n"
                 f"⏰ **请求时间**: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                f"💰 **用户余额**: {emby_user.iv - cost} {sakura_b} (已扣费)\n\n"
                 f"📝 **简介**: {selected_item.get('overview', '暂无简介')[:200]}{'...' if len(selected_item.get('overview', '')) > 200 else ''}"
             )
             
@@ -487,22 +565,32 @@ async def confirm_me_request(_, call):
                 except Exception as e:
                     LOGGER.error(f"发送ME点播通知给管理员 {admin_id} 失败: {str(e)}")
             
-            LOGGER.info(f"ME点播请求成功: 用户{call.from_user.id} 请求 {request_title}, 请求ID: {request_id}")
+            LOGGER.info(f"ME点播请求成功: 用户{call.from_user.id} 请求 {request_title}, 费用{cost}{sakura_b}, 请求ID: {request_id}")
             
         else:
-            # 记录请求失败
+            # 记录请求失败，需要退还费用
+            sql_update_emby(Emby.tg == call.from_user.id, iv=emby_user.iv)
             await editMessage(call,
                 f"❌ **请求提交失败**\n\n"
-                f"数据库记录失败，请稍后重试或联系管理员",
+                f"数据库记录失败，费用已退还\n"
+                f"请稍后重试或联系管理员",
                 buttons=tmdb_main_ikb
             )
-            LOGGER.error(f"ME点播请求失败: 用户{call.from_user.id} 数据库记录失败 {request_title}")
+            LOGGER.error(f"ME点播请求失败: 用户{call.from_user.id} 数据库记录失败 {request_title}，费用已退还")
     
     except Exception as e:
         LOGGER.error(f"ME点播处理出错: {str(e)}")
+        # 尝试退还费用（如果已扣除）
+        try:
+            emby_user = sql_get_emby(tg=call.from_user.id)
+            if emby_user:
+                sql_update_emby(Emby.tg == call.from_user.id, iv=emby_user.iv + cost)
+        except:
+            pass
         await editMessage(call,
             f"❌ **处理请求时出错**\n\n"
             f"请稍后重试或联系管理员\n"
+            f"如有费用扣除，系统已尝试退还\n"
             f"错误信息: {str(e)[:100]}",
             buttons=tmdb_main_ikb
         )
