@@ -139,13 +139,8 @@ class TMDBService:
         original_title = item.get("original_title", "")
         year = item.get("year", "未知")
         media_type = item.get("media_type_cn", "未知")
-        overview = item.get("overview", "暂无简介")
         vote_average = item.get("vote_average", 0)
         vote_count = item.get("vote_count", 0)
-        
-        # Truncate long overview
-        if len(overview) > 150:
-            overview = overview[:147] + "..."
         
         text = f"🎬 **编号**: `{index}`\n"
         text += f"📺 **类型**: {media_type}\n"
@@ -160,8 +155,6 @@ class TMDBService:
         if vote_average > 0:
             stars = "⭐" * min(int(vote_average/2), 5)
             text += f"⭐ **评分**: {vote_average:.1f}/10 {stars} ({vote_count}票)\n"
-            
-        text += f"📝 **简介**: {overview}\n"
         
         return text
 

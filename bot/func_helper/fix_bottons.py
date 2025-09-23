@@ -528,14 +528,32 @@ def mp_search_page_ikb(has_prev: bool, has_next: bool, page: int):
         buttons.append(('下一页 >', 'mp_search_next_page'))
     return ikb([buttons, [('💾 选择下载', 'mp_search_select_download'), ('❌ 取消搜索', 'cancel_search')]])
 
-def tmdb_search_page_ikb(has_prev: bool, has_next: bool, page: int):
+def tmdb_search_page_ikb(has_prev: bool, has_next: bool, page: int, results_count: int = 0):
     """TMDB搜索结果分页按钮"""
     buttons = []
+    
+    # 添加选择按钮行
+    select_buttons = []
+    for i in range(1, min(results_count + 1, 4)):  # 最多3个结果
+        select_buttons.append((f'{i}', f'tmdb_select_{i}'))
+    
+    result_buttons = []
+    if select_buttons:
+        result_buttons.append(select_buttons)
+    
+    # 添加分页按钮
+    nav_buttons = []
     if has_prev:
-        buttons.append(('< 上一页', 'tmdb_search_prev_page'))
+        nav_buttons.append(('< 上一页', 'tmdb_search_prev_page'))
     if has_next:
-        buttons.append(('下一页 >', 'tmdb_search_next_page'))
-    return ikb([buttons, [('✅ 选择影片', 'tmdb_select_item')], [('🔙 返回', 'tmdb_main')]])
+        nav_buttons.append(('下一页 >', 'tmdb_search_next_page'))
+    
+    if nav_buttons:
+        result_buttons.append(nav_buttons)
+    
+    result_buttons.append([('🔙 返回', 'tmdb_main')])
+    
+    return ikb(result_buttons)
 
 # Independent TMDB search buttons (not connected to download center)
 tmdb_main_ikb = ikb([
