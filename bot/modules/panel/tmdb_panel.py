@@ -413,10 +413,8 @@ async def me_request_movie(_, call):
         f"影片：{selected_item.get('title', '未知')}\n"
         f"年份：{selected_item.get('year', '未知')}\n"
         f"类型：{selected_item.get('media_type_cn', '未知')}\n\n"
-        f"💰 **费用信息**:\n"
-        f"• 点播费用: {cost} {sakura_b}\n"
-        f"• 当前余额: {emby_user.iv} {sakura_b}\n"
-        f"• 扣费后余额: {emby_user.iv - cost} {sakura_b}\n\n"
+        f"点播费用: {cost} {sakura_b}\n"
+        f"当前余额: {emby_user.iv} {sakura_b}\n"
         f"确认点播吗？",
         parse_mode=enums.ParseMode.MARKDOWN
     )
