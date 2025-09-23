@@ -186,7 +186,8 @@ async def tmdb_search_results(call, query: str, page: int = 1):
 
         # 计算分页信息 - 每页3个结果
         has_prev = page > 1
-        has_next = len(results) >= 3  # 如果当前页有3个或更多结果，可能还有下一页
+        # 只有当前页恰好有3个结果时才显示下一页按钮，因为少于3个意味着已到末页
+        has_next = len(results) == 3
         
         # 保存搜索结果
         user_tmdb_data[call.from_user.id] = {
@@ -362,39 +363,16 @@ async def show_tmdb_item_details(call, item: dict):
     detail_text += "💡 这是TMDB数据库中的影视信息\n"
     detail_text += "如需观看但Emby中没有，可点击\"🎬 点播此片\"发起请求"
     
-    if poster_url:
-        # 如果有海报，显示海报
-        try:
-            await sendPhoto(
-                call,
-                photo=poster_url,
-                caption=detail_text,
-                buttons=tmdb_search_result_ikb,
-                send=True,
-                chat_id=call.from_user.id,
-                parse_mode=enums.ParseMode.MARKDOWN
-            )
-        except:
-            # 如果海报加载失败，使用默认图片
-            await sendPhoto(
-                call,
-                photo=bot_photo,
-                caption=detail_text,
-                buttons=tmdb_search_result_ikb,
-                send=True,
-                chat_id=call.from_user.id,
-                parse_mode=enums.ParseMode.MARKDOWN
-            )
-    else:
-        await sendPhoto(
-            call,
-            photo=bot_photo,
-            caption=detail_text,
-            buttons=tmdb_search_result_ikb,
-            send=True,
-            chat_id=call.from_user.id,
-            parse_mode=enums.ParseMode.MARKDOWN
-        )
+    # 始终使用默认图片，不显示海报
+    await sendPhoto(
+        call,
+        photo=bot_photo,
+        caption=detail_text,
+        buttons=tmdb_search_result_ikb,
+        send=True,
+        chat_id=call.from_user.id,
+        parse_mode=enums.ParseMode.MARKDOWN
+    )
 
 
 @bot.on_callback_query(filters.regex('^me_request_movie$') & user_in_group_on_filter)
