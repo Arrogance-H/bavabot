@@ -172,21 +172,35 @@ async def tmdb_search_results(call, query: str, page: int = 1):
         
         success, results, pagination_info = await tmdb_service.search_multi(query, page)
         if not success or not results:
-            await editMessage(
-                call, 
-                f'🤷‍♂️ TMDB数据库中未找到关键词 "{query}" 的相关影视作品\n\n'
-                f'💡 **搜索建议:**\n'
-                f'• 尝试使用不同的关键词\n'
-                f'• 使用中文或英文名称\n'
-                f'• 检查拼写是否正确', 
-                buttons=tmdb_main_ikb,
-                parse_mode=enums.ParseMode.MARKDOWN
-            )
-            return
+            # 如果不是第一页且搜索失败，可能是API问题，尝试返回第一页
+            if page > 1:
+                LOGGER.warning(f"TMDB搜索第{page}页失败，尝试返回第1页: {query}")
+                await editMessage(
+                    call, 
+                    f'❌ 第 {page} 页加载失败，正在返回第1页...',
+                    buttons=tmdb_main_ikb
+                )
+                # 递归调用返回第一页
+                return await tmdb_search_results(call, query, 1)
+            else:
+                await editMessage(
+                    call, 
+                    f'🤷‍♂️ TMDB数据库中未找到关键词 "{query}" 的相关影视作品\n\n'
+                    f'💡 **搜索建议:**\n'
+                    f'• 尝试使用不同的关键词\n'
+                    f'• 使用中文或英文名称\n'
+                    f'• 检查拼写是否正确', 
+                    buttons=tmdb_main_ikb,
+                    parse_mode=enums.ParseMode.MARKDOWN
+                )
+                return
 
         # 计算分页信息 - 基于TMDB API返回的分页信息
         has_prev = page > 1
         has_next = page < pagination_info.get("total_pages", 1)
+        
+        # 添加调试日志
+        LOGGER.info(f"TMDB搜索分页信息: 查询='{query}', 当前页={page}, 总页数={pagination_info.get('total_pages', 1)}, has_prev={has_prev}, has_next={has_next}")
         
         # 我们只显示前3个结果
         display_results = results[:3]
@@ -252,8 +266,12 @@ async def tmdb_search_next_page(_, call):
     current_page = user_data.get('current_page', 1)
     pagination_info = user_data.get('pagination_info', {})
     total_pages = pagination_info.get('total_pages', 1)
+    query = user_data.get('query', '')
     
     new_page = current_page + 1
+    
+    # 添加调试日志
+    LOGGER.info(f"TMDB下一页请求: 用户={call.from_user.id}, 查询='{query}', 当前页={current_page}, 目标页={new_page}, 总页数={total_pages}")
     
     # 检查页数边界
     if new_page > total_pages:
