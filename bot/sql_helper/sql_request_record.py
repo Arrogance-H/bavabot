@@ -38,6 +38,68 @@ def sql_add_request_record(tg: int, download_id: str, request_name: str, detail:
             return False
 
 
+def sql_get_all_request_records(page: int = 1, limit: int = 20):
+    """获取所有请求记录，支持分页"""
+    with Session() as session:
+        total_count = session.query(RequestRecord).count()
+        request_records = session.query(RequestRecord).order_by(
+            RequestRecord.create_at.desc()).limit(limit + 1).offset((page - 1) * limit).all()
+        
+        if len(request_records) == 0:
+            return [], False, False, total_count
+        
+        if len(request_records) == limit + 1:
+            has_next = True
+            request_records = request_records[:-1]
+        else:
+            has_next = False
+        
+        has_prev = page > 1
+        return request_records, has_prev, has_next, total_count
+
+
+def sql_delete_request_record(download_id: str):
+    """根据下载ID删除请求记录"""
+    with Session() as session:
+        try:
+            record = session.query(RequestRecord).filter(
+                RequestRecord.download_id == download_id).first()
+            if record:
+                session.delete(record)
+                session.commit()
+                return True
+            return False
+        except Exception as e:
+            session.rollback()
+            return False
+
+
+def sql_get_request_records_by_state(download_state: str = None, transfer_state: str = None, page: int = 1, limit: int = 20):
+    """根据状态获取请求记录"""
+    with Session() as session:
+        query = session.query(RequestRecord)
+        
+        if download_state:
+            query = query.filter(RequestRecord.download_state == download_state)
+        if transfer_state:
+            query = query.filter(RequestRecord.transfer_state == transfer_state)
+            
+        total_count = query.count()
+        request_records = query.order_by(RequestRecord.create_at.desc()).limit(limit + 1).offset((page - 1) * limit).all()
+        
+        if len(request_records) == 0:
+            return [], False, False, total_count
+        
+        if len(request_records) == limit + 1:
+            has_next = True
+            request_records = request_records[:-1]
+        else:
+            has_next = False
+        
+        has_prev = page > 1
+        return request_records, has_prev, has_next, total_count
+
+
 def sql_get_request_record_by_tg(tg: int, page: int = 1, limit: int = 5):
     with Session() as session:
         request_record = session.query(RequestRecord).filter(

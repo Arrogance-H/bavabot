@@ -111,6 +111,11 @@ class MP(BaseModel):
     download_log_chatid: Optional[int] = None
     lv: Optional[str] = "b"
 
+class TMDB(BaseModel):
+    api_key: Optional[str] = ""
+    base_url: str = "https://api.themoviedb.org/3"
+    image_base_url: str = "https://image.tmdb.org/t/p/w500"
+
 class AutoUpdate(BaseModel):
     status: bool = True
     git_repo: Optional[str] = "berry8838/Sakura_embyboss"  # github仓库名/魔改的请填自己的仓库
@@ -187,6 +192,7 @@ class Config(BaseModel):
     # 是否在检测到可疑客户端时封禁用户
     client_filter_block_user: bool = False
     moviepilot: MP = Field(default_factory=MP)
+    tmdb: TMDB = Field(default_factory=TMDB)
     auto_update: AutoUpdate = Field(default_factory=AutoUpdate)
     red_envelope: RedEnvelope = Field(default_factory=RedEnvelope)
     api: API = Field(default_factory=API)
