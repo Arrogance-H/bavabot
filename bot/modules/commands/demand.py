@@ -114,6 +114,12 @@ def get_demand_records_keyboard(current_page, total_pages, current_filter="all")
     ]
     keyboard.append(edit_row)
     
+    # 取消按钮行
+    cancel_row = [
+        InlineKeyboardButton("❌ 取消", callback_data="closeit")
+    ]
+    keyboard.append(cancel_row)
+    
     return InlineKeyboardMarkup(keyboard)
 
 
