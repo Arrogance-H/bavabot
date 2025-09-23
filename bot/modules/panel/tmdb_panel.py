@@ -202,7 +202,7 @@ async def tmdb_search_results(call, query: str, page: int = 1):
         
         for index, item in enumerate(results[:3], start=1):  # 只显示前3个结果
             result_text += tmdb_service.format_search_result_text(item, index)
-            result_text += "\n" + "─" * 30 + "\n\n"
+            result_text += "\n" + "─" * 10 + "\n\n"
 
         # 限制消息长度
         if len(result_text) > 4000:
