@@ -476,9 +476,9 @@ async def show_season_selection(call, tv_series: dict, seasons: list, selected_s
     if selected_seasons:
         total_cost = len(selected_seasons) * calculate_me_request_cost('tv')
         selection_text += f"✅ **已选择**: {len(selected_seasons)} 季\n"
-        selection_text += f"💰 **总费用**: {total_cost} 币\n\n"
+        selection_text += f"💰 **总费用**: {total_cost} {sakura_b}\n\n"
     else:
-        selection_text += "💰 **点播说明**: 每季需要 10 币，可多选\n\n"
+        selection_text += "💰 **点播说明**: 每季需要 10 {sakura_b}，可多选\n\n"
     
     selection_text += "📝 **可选季数** (点击切换选择):\n\n"
     
@@ -538,7 +538,6 @@ async def process_movie_request(call, selected_item: dict):
         await editMessage(call,
             f"⚠️ **此影片已被点播**\n\n"
             f"影片：{existing_request.request_name}\n"
-            f"状态：{status_text}\n"
             f"请求时间：{existing_request.create_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
             f"请求ID：`{existing_request.download_id}`\n\n"
             f"💡 影片已在点播库中，请耐心等待或联系管理员查看进度",
