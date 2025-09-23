@@ -8,7 +8,7 @@ from pyrogram import filters, enums
 from bot import bot, tmdb, bot_photo, LOGGER, owner, admins, sakura_b
 from bot.func_helper.msg_utils import callAnswer, editMessage, sendMessage, sendPhoto, callListen
 from bot.func_helper.filters import user_in_group_on_filter
-from bot.func_helper.fix_bottons import tmdb_main_ikb, tmdb_search_page_ikb, tmdb_search_result_ikb, back_members_ikb, tmdb_season_selection_ikb
+from bot.func_helper.fix_bottons import tmdb_main_ikb, tmdb_search_result_list_ikb, tmdb_search_result_ikb, back_members_ikb, tmdb_season_selection_ikb
 from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby
 from bot.sql_helper.sql_request_record import sql_add_request_record, sql_check_existing_request_by_title
 from bot.func_helper.tmdb import tmdb_service
@@ -214,51 +214,36 @@ async def tmdb_search_results(call, query: str, page: int = 1):
             
             total_results = len(all_results)
 
-        # 基于每页3个结果计算分页信息
-        ITEMS_PER_PAGE = 3
-        total_pages = math.ceil(total_results / ITEMS_PER_PAGE)
-        
-        # 边界检查
-        if page < 1:
-            page = 1
-        elif page > total_pages:
-            page = total_pages
-            
-        has_prev = page > 1
-        has_next = page < total_pages
+        # 只显示前5个搜索结果，无分页
+        MAX_RESULTS = 5
+        display_results = all_results[:MAX_RESULTS]
         
         # 添加调试日志
-        LOGGER.info(f"TMDB搜索分页信息: 查询='{query}', 当前页={page}, 总页数={total_pages}, 总结果={total_results}, has_prev={has_prev}, has_next={has_next}")
+        LOGGER.info(f"TMDB搜索结果: 查询='{query}', 显示结果={len(display_results)}, 总结果={total_results}")
         
-        # 计算当前页显示的结果
-        start_idx = (page - 1) * ITEMS_PER_PAGE
-        end_idx = start_idx + ITEMS_PER_PAGE
-        display_results = all_results[start_idx:end_idx]
-        
-        # 保存搜索结果和分页信息
+        # 保存搜索结果信息
         user_tmdb_data[call.from_user.id] = {
             'query': query,
-            'all_results': all_results,
-            'current_page': page,
-            'total_pages': total_pages,
+            'display_results': display_results,
             'total_results': total_results
         }
 
         # 显示结果
         result_text = f"🎬 **ME点播 - TMDB搜索结果**\n"
         result_text += f"🔍 搜索词: `{query}`\n"
-        result_text += f"📄 第 {page} 页 / 共 {total_pages} 页\n"
-        result_text += f"📊 本页显示 {len(display_results)} 个结果 | 总共 {total_results} 个结果\n\n"
+        result_text += f"📊 显示 {len(display_results)} 个结果"
+        if total_results > MAX_RESULTS:
+            result_text += f" (共找到 {total_results} 个结果)\n\n"
+        else:
+            result_text += f"\n\n"
         
         # 验证显示结果是否有效
         if not display_results:
-            LOGGER.warning(f"TMDB搜索结果为空: 用户{call.from_user.id}, 查询='{query}', 页码={page}, 总结果={total_results}")
-            # 即使结果为空，也要显示分页按钮让用户能导航
+            LOGGER.warning(f"TMDB搜索结果为空: 用户{call.from_user.id}, 查询='{query}', 总结果={total_results}")
             result_text = f"🎬 **ME点播 - TMDB搜索结果**\n"
             result_text += f"🔍 搜索词: `{query}`\n"
-            result_text += f"📄 第 {page} 页 / 共 {total_pages} 页\n"
-            result_text += f"📊 本页无结果 | 总共 {total_results} 个结果\n\n"
-            result_text += "⚠️ 当前页面没有结果，请尝试其他页面"
+            result_text += f"📊 没有找到相关结果\n\n"
+            result_text += "⚠️ 没有找到匹配的影视内容，请尝试其他关键词"
         else:
             # 构建结果文本
             for index, item in enumerate(display_results, start=1):
@@ -281,96 +266,23 @@ async def tmdb_search_results(call, query: str, page: int = 1):
             await editMessage(
                 call, 
                 result_text, 
-                buttons=tmdb_search_page_ikb(has_prev, has_next, page, len(display_results)),
+                buttons=tmdb_search_result_list_ikb(len(display_results)),
                 parse_mode=enums.ParseMode.MARKDOWN
             )
-            LOGGER.info(f"TMDB搜索结果显示成功: 用户{call.from_user.id}, 查询='{query}', 页码={page}/{total_pages}, 结果数={len(display_results)}")
+            LOGGER.info(f"TMDB搜索结果显示成功: 用户{call.from_user.id}, 查询='{query}', 结果数={len(display_results)}")
         except Exception as edit_error:
             LOGGER.error(f"TMDB编辑消息失败: 用户{call.from_user.id}, 错误={str(edit_error)}")
             # 如果编辑消息失败，尝试发送一个简化的消息
-            simple_text = f"🎬 ME点播搜索结果\n📄 第 {page} 页 / 共 {total_pages} 页\n⚠️ 内容显示异常，请重试"
-            await editMessage(call, simple_text, buttons=tmdb_search_page_ikb(has_prev, has_next, page, 0))
+            simple_text = f"🎬 ME点播搜索结果\n⚠️ 内容显示异常，请重试"
+            await editMessage(call, simple_text, buttons=tmdb_main_ikb)
 
     except Exception as e:
         LOGGER.error(f"TMDB搜索出错: {str(e)}")
-        # 如果是分页请求出错，尝试保持在搜索结果页面而不是返回主菜单
-        user_data = user_tmdb_data.get(call.from_user.id)
-        if user_data and 'current_page' in user_data and 'total_pages' in user_data:
-            # 用户正在浏览搜索结果，显示分页按钮而不是主菜单
-            current_page = user_data.get('current_page', 1)
-            total_pages = user_data.get('total_pages', 1) 
-            has_prev = current_page > 1
-            has_next = current_page < total_pages
-            error_buttons = tmdb_search_page_ikb(has_prev, has_next, current_page, 0)
-            await editMessage(call, '❌ 搜索过程中出错，请稍后再试\n\n💡 您可以尝试切换到其他页面或返回主菜单', buttons=error_buttons)
-        else:
-            # 首次搜索出错，显示主菜单
-            await editMessage(call, '❌ 搜索过程中出错，请稍后再试', buttons=tmdb_main_ikb)
+        # 如果是初次搜索出错，显示主菜单
+        await editMessage(call, '❌ 搜索过程中出错，请稍后再试', buttons=tmdb_main_ikb)
 
 
-@bot.on_callback_query(filters.regex('^tmdb_search_prev_page$') & user_in_group_on_filter)
-async def tmdb_search_prev_page(_, call):
-    """TMDB搜索上一页"""
-    user_data = user_tmdb_data.get(call.from_user.id)
-    if not user_data:
-        LOGGER.warning(f"TMDB上一页失败: 用户{call.from_user.id}的搜索会话已过期")
-        return await callAnswer(call, '❌ 搜索会话已过期，请重新搜索', True)
-    
-    current_page = user_data.get('current_page', 1)
-    query = user_data.get('query', '')
-    new_page = current_page - 1
-    
-    LOGGER.info(f"TMDB上一页请求: 用户={call.from_user.id}, 查询='{query}', 当前页={current_page}, 目标页={new_page}")
-    
-    if new_page < 1:
-        LOGGER.info(f"TMDB上一页边界检查: 用户{call.from_user.id}尝试访问第{new_page}页，但已在第一页")
-        return await callAnswer(call, '❌ 已经是第一页了', True)
-    
-    await callAnswer(call, f'📃 正在加载第 {new_page} 页')
-    
-    try:
-        await tmdb_search_results(call, user_data['query'], new_page)
-        LOGGER.info(f"TMDB上一页成功: 用户{call.from_user.id}已跳转到第{new_page}页")
-    except Exception as e:
-        LOGGER.error(f"TMDB上一页调用tmdb_search_results失败: 用户{call.from_user.id}, 错误={str(e)}")
-        # 发生错误时，保持用户在当前页面
-        await callAnswer(call, '❌ 加载页面时出错，请重试', True)
-
-
-@bot.on_callback_query(filters.regex('^tmdb_search_next_page$') & user_in_group_on_filter)
-async def tmdb_search_next_page(_, call):
-    """TMDB搜索下一页"""
-    user_data = user_tmdb_data.get(call.from_user.id)
-    if not user_data:
-        LOGGER.warning(f"TMDB下一页失败: 用户{call.from_user.id}的搜索会话已过期")
-        return await callAnswer(call, '❌ 搜索会话已过期，请重新搜索', True)
-    
-    current_page = user_data.get('current_page', 1)
-    total_pages = user_data.get('total_pages', 1)
-    query = user_data.get('query', '')
-    
-    new_page = current_page + 1
-    
-    # 添加调试日志
-    LOGGER.info(f"TMDB下一页请求: 用户={call.from_user.id}, 查询='{query}', 当前页={current_page}, 目标页={new_page}, 总页数={total_pages}")
-    
-    # 检查页数边界
-    if new_page > total_pages:
-        LOGGER.info(f"TMDB下一页边界检查: 用户{call.from_user.id}尝试访问第{new_page}页，但总页数为{total_pages}")
-        return await callAnswer(call, '❌ 已经是最后一页了', True)
-    
-    await callAnswer(call, f'📃 正在加载第 {new_page} 页')
-    
-    try:
-        await tmdb_search_results(call, user_data['query'], new_page)
-        LOGGER.info(f"TMDB下一页成功: 用户{call.from_user.id}已跳转到第{new_page}页")
-    except Exception as e:
-        LOGGER.error(f"TMDB下一页调用tmdb_search_results失败: 用户{call.from_user.id}, 错误={str(e)}")
-        # 发生错误时，保持用户在当前页面
-        await callAnswer(call, '❌ 加载页面时出错，请重试', True)
-
-
-@bot.on_callback_query(filters.regex('^tmdb_select_[123]$') & user_in_group_on_filter)
+@bot.on_callback_query(filters.regex('^tmdb_select_[12345]$') & user_in_group_on_filter)
 async def tmdb_select_numbered_item(_, call):
     """选择编号对应的TMDB影片查看详情"""
     user_data = user_tmdb_data.get(call.from_user.id)
@@ -382,14 +294,8 @@ async def tmdb_select_numbered_item(_, call):
     
     await callAnswer(call, f'✅ 选择影片 {selected_index}')
     
-    # 计算当前页面显示的结果
-    current_page = user_data.get('current_page', 1)
-    all_results = user_data.get('all_results', [])
-    ITEMS_PER_PAGE = 3
-    
-    start_idx = (current_page - 1) * ITEMS_PER_PAGE
-    end_idx = start_idx + ITEMS_PER_PAGE
-    display_results = all_results[start_idx:end_idx]
+    # 获取显示结果
+    display_results = user_data.get('display_results', [])
     
     if not display_results or selected_index > len(display_results):
         await editMessage(call, '❌ 选择的影片不存在', buttons=tmdb_main_ikb)
@@ -415,14 +321,8 @@ async def tmdb_select_item(_, call):
     
     await callAnswer(call, '✅ 选择影片')
     
-    # 计算当前页面显示的结果
-    current_page = user_data.get('current_page', 1)
-    all_results = user_data.get('all_results', [])
-    ITEMS_PER_PAGE = 3
-    
-    start_idx = (current_page - 1) * ITEMS_PER_PAGE
-    end_idx = start_idx + ITEMS_PER_PAGE
-    display_results = all_results[start_idx:end_idx]
+    # 获取显示结果
+    display_results = user_data.get('display_results', [])
     
     if not display_results:
         await editMessage(call, '❌ 没有可选择的影片', buttons=tmdb_main_ikb)
@@ -1454,5 +1354,4 @@ async def return_to_search_results(_, call):
     await callAnswer(call, '🔙 返回搜索结果')
     # 重新显示搜索结果页面
     query = user_data['query']
-    current_page = user_data.get('current_page', 1)
-    await tmdb_search_results(call, query, current_page)
+    await tmdb_search_results(call, query, page=1)

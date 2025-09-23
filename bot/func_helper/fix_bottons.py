@@ -528,6 +528,26 @@ def mp_search_page_ikb(has_prev: bool, has_next: bool, page: int):
         buttons.append(('下一页 >', 'mp_search_next_page'))
     return ikb([buttons, [('💾 选择下载', 'mp_search_select_download'), ('❌ 取消搜索', 'cancel_search')]])
 
+def tmdb_search_result_list_ikb(results_count: int = 0):
+    """TMDB搜索结果列表按钮 - 无分页版本"""
+    buttons = []
+    
+    # 添加选择按钮行
+    select_buttons = []
+    for i in range(1, min(results_count + 1, 6)):  # 最多5个结果
+        select_buttons.append((f'{i}', f'tmdb_select_{i}'))
+    
+    result_buttons = []
+    if select_buttons:
+        # 每行最多3个按钮
+        for i in range(0, len(select_buttons), 3):
+            row = select_buttons[i:i+3]
+            result_buttons.append(row)
+    
+    result_buttons.append([('🔙 返回', 'tmdb_main')])
+    
+    return ikb(result_buttons)
+
 def tmdb_search_page_ikb(has_prev: bool, has_next: bool, page: int, results_count: int = 0):
     """TMDB搜索结果分页按钮"""
     buttons = []
