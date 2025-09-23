@@ -327,7 +327,7 @@ async def tmdb_select_item(_, call):
 
 
 async def show_tmdb_item_details(call, item: dict):
-    """显示选中影片的详细信息"""
+    """显示选中影片的详细信息，不发送图片，仅文本"""
     title = item.get("title", "未知标题")
     original_title = item.get("original_title", "")
     year = item.get("year", "未知")
@@ -335,42 +335,38 @@ async def show_tmdb_item_details(call, item: dict):
     overview = item.get("overview", "暂无简介")
     vote_average = item.get("vote_average", 0)
     vote_count = item.get("vote_count", 0)
-    poster_url = item.get("poster_url", "")
-    
+
     # 保存选中的影片信息到用户数据中，用于潜在的点播请求
     user_tmdb_data[call.from_user.id] = {
         'selected_item': item,
         'search_title': f"{title} {year}" if year and year != "未知" else title
     }
-    
+
     # 构建详情文本
     detail_text = f"🎬 **影片详情**\n\n"
     detail_text += f"📺 **类型**: {media_type}\n"
     detail_text += f"🎭 **标题**: {title}\n"
-    
+
     if original_title and original_title != title:
         detail_text += f"🔤 **原名**: {original_title}\n"
-        
+
     if year:
         detail_text += f"📅 **年份**: {year}\n"
-        
+
     if vote_average > 0:
         stars = "⭐" * min(int(vote_average/2), 5)
         detail_text += f"⭐ **评分**: {vote_average:.1f}/10 {stars}\n"
         detail_text += f"👥 **投票数**: {vote_count:,} 人\n"
-        
+
     detail_text += f"\n📝 **剧情简介**:\n{overview}\n\n"
     detail_text += "💡 这是TMDB数据库中的影视信息\n"
     detail_text += "如需观看但Emby中没有，可点击\"🎬 点播此片\"发起请求"
-    
-    # 始终使用默认图片，不显示海报
-    await sendPhoto(
+
+    # 只发送文本，无图片
+    await editMessage(
         call,
-        photo=bot_photo,
-        caption=detail_text,
+        detail_text,
         buttons=tmdb_search_result_ikb,
-        send=True,
-        chat_id=call.from_user.id,
         parse_mode=enums.ParseMode.MARKDOWN
     )
 
