@@ -562,7 +562,7 @@ tmdb_main_ikb = ikb([
 ])
 
 tmdb_search_result_ikb = ikb([
-    [('📖 查看详情', 'tmdb_view_details'), ('🎬 点播此片', 'me_request_movie')],
+    [('🎬 点播此片', 'me_request_movie')],
     [('❌ 取消', 'cancel_tmdb_search'), ('🔙 返回', 'tmdb_main')]
 ])
 

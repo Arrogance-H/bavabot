@@ -448,7 +448,7 @@ async def me_request_movie(_, call):
     from bot.func_helper.fix_bottons import ikb
     confirm_buttons = ikb([
     [('✅ 确认', 'confirm_me_request'), ('❌ 取消', 'cancel_tmdb_search')],
-    [('🔙 返回', 'tmdb_main')]
+    [('🔙 返回', 'return_to_search_results')]
     ])
 
     await editMessage(call,
@@ -608,21 +608,6 @@ async def confirm_me_request(_, call):
         user_tmdb_data.pop(call.from_user.id, None)
 
 
-@bot.on_callback_query(filters.regex('^tmdb_view_details$') & user_in_group_on_filter)
-async def tmdb_view_details(_, call):
-    """查看更多详情（扩展功能预留）"""
-    await callAnswer(call, '📖 查看详情')
-    from bot.func_helper.fix_bottons import ikb
-    back_buttons = ikb([[('🔙 返回', 'tmdb_main')]])
-    await editMessage(call, 
-        '📖 **功能说明**\n\n'
-        '当前显示的已经是该影片的详细信息\n'
-        '包含了标题、年份、评分、简介等内容\n\n'
-        '🔄 你可以返回继续搜索其他影片',
-        buttons=back_buttons,
-        parse_mode=enums.ParseMode.MARKDOWN
-    )
-
 
 @bot.on_callback_query(filters.regex('^cancel_tmdb_search$') & user_in_group_on_filter)
 async def cancel_tmdb_search(_, call):
@@ -631,3 +616,20 @@ async def cancel_tmdb_search(_, call):
     # 清除用户的TMDB搜索记录
     user_tmdb_data.pop(call.from_user.id, None)
     await editMessage(call, '🔍 已取消TMDB搜索', buttons=tmdb_main_ikb)
+
+
+@bot.on_callback_query(filters.regex('^return_to_search_results$') & user_in_group_on_filter)
+async def return_to_search_results(_, call):
+    """返回到搜索结果页面"""
+    user_data = user_tmdb_data.get(call.from_user.id)
+    if not user_data or 'query' not in user_data:
+        # 如果没有搜索数据，返回主页面
+        await callAnswer(call, '🔙 返回主页')
+        await editMessage(call, '🔍 搜索会话已过期', buttons=tmdb_main_ikb)
+        return
+    
+    await callAnswer(call, '🔙 返回搜索结果')
+    # 重新显示搜索结果页面
+    query = user_data['query']
+    current_page = user_data.get('current_page', 1)
+    await tmdb_search_results(call, query, current_page)
