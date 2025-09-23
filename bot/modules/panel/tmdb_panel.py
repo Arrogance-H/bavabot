@@ -399,7 +399,7 @@ async def me_request_movie(_, call):
             f"影片：{selected_item.get('title', '未知')}\n"
             f"类型：{selected_item.get('media_type_cn', '未知')}\n"
             f"需要费用：{cost} {sakura_b}\n"
-            f"当前拥有：{emby_user.iv} {sakura_b},
+            f"当前拥有：{emby_user.iv} {sakura_b}",
             buttons=tmdb_main_ikb,
             parse_mode=enums.ParseMode.MARKDOWN
         )
