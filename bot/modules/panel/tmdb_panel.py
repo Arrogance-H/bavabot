@@ -53,6 +53,7 @@ async def tmdb_main_handler(_, call):
     await callAnswer(call, '🍿 ME点播')
     welcome_text = (
         "🎬 **ME点播**\n\n"
+        "🎞️使用JOY币点播 10JOY币点播一部电影或电视剧（一季）"
         "点击下方\"🔍 开始搜索\"按钮开始使用"
     )
     
@@ -117,15 +118,7 @@ async def check_emby_first(call, search_query: str):
             if not success or not tmdb_result:
                 await editMessage(
                     call, 
-                    f'🤷‍♂️ **TMDB ID {tmdb_id} 未找到对应的影视作品**\n\n'
-                    f'💡 **可能原因:**\n'
-                    f'• TMDB ID 不存在或已被删除\n'
-                    f'• 该内容可能为成人内容（已过滤）\n'
-                    f'• TMDB API 临时不可用\n\n'
-                    f'🔍 **建议操作:**\n'
-                    f'• 检查TMDB ID是否正确\n'
-                    f'• 尝试使用影片名称搜索\n'
-                    f'• 访问 themoviedb.org 确认ID有效性', 
+                    f'🤷‍♂️ **TMDB ID {tmdb_id} 未找到对应的影视作品**', 
                     buttons=tmdb_main_ikb,
                     parse_mode=enums.ParseMode.MARKDOWN
                 )
@@ -354,15 +347,7 @@ async def tmdb_id_search_results(call, tmdb_id: int):
         if not success or not result:
             await editMessage(
                 call, 
-                f'🤷‍♂️ **TMDB ID {tmdb_id} 未找到对应的影视作品**\n\n'
-                f'💡 **可能原因:**\n'
-                f'• TMDB ID 不存在或已被删除\n'
-                f'• 该内容可能为成人内容（已过滤）\n'
-                f'• TMDB API 临时不可用\n\n'
-                f'🔍 **建议操作:**\n'
-                f'• 检查TMDB ID是否正确\n'
-                f'• 尝试使用影片名称搜索\n'
-                f'• 访问 themoviedb.org 确认ID有效性', 
+                f'🤷‍♂️ **TMDB ID {tmdb_id} 未找到对应的影视作品**', 
                 buttons=tmdb_main_ikb,
                 parse_mode=enums.ParseMode.MARKDOWN
             )
@@ -764,7 +749,7 @@ async def show_season_selection(call, tv_series: dict, seasons: list, selected_s
         selection_text += f"✅ **已选择**: {len(selected_seasons)} 季\n"
         selection_text += f"💰 **总费用**: {total_cost} {sakura_b}\n\n"
     else:
-        selection_text += "💰 **点播说明**: 每季需要 10 {sakura_b}，可多选\n\n"
+        selection_text += "💰 **点播说明**: 每季需要 10 JOY币，可多选\n\n"
     
     selection_text += "📝 **可选季数** (点击切换选择):\n\n"
     
@@ -1140,7 +1125,6 @@ async def confirm_multi_season_request(_, call):
                 f"**原名**: {selected_item.get('original_title', '未知')}\n"
                 f"**TMDB评分**: {selected_item.get('vote_average', 0):.1f}/10\n"
                 f"**选择季数**: {len(successful_requests)} 季\n"
-                f"**总费用**: {total_cost} {sakura_b}\n\n"
                 f"**季数详情**:\n{season_details}\n\n"
                 f"**TMDB ID**: {selected_item.get('id', '未知')}\n"
                 f"⏰ **请求时间**: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
@@ -1381,7 +1365,7 @@ async def confirm_season_request(_, call):
         if success:
             # 发送成功消息给用户
             await editMessage(call,
-                f"✅ **电视剧季数点播已提交！**\n\n"
+                f"✅ **电视剧点播已提交！**\n\n"
                 f"剧集: {tv_title}\n"
                 f"季数: 第{season_number}季\n"
                 f"集数: {selected_season.get('episode_count', '未知')}集\n"
@@ -1395,7 +1379,7 @@ async def confirm_season_request(_, call):
             
             # 发送通知给管理员和owner
             admin_notification = (
-                f"📺 **ME点播新请求 - 电视剧季数**\n\n"
+                f"📺 **ME点播新请求 - 电视剧**\n\n"
                 f"**用户**: [{call.from_user.first_name}](tg://user?id={call.from_user.id})\n"
                 f"**TG ID**: `{call.from_user.id}`\n"
                 f"**剧集**: {tv_title}\n"
