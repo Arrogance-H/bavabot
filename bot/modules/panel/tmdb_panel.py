@@ -498,7 +498,7 @@ async def show_tmdb_item_details(call, item: dict):
 
     detail_text += f"\n📝 **剧情简介**:\n{overview}\n\n"
     detail_text += "💡 这是TMDB数据库中的影视信息\n"
-    detail_text += "如需观看但Emby中没有，可点击\"🎬 点播\"发起请求"
+    detail_text += "如需观看可点击\"🎬 点播\"发起请求"
 
     # 只发送文本，无图片
     await editMessage(
