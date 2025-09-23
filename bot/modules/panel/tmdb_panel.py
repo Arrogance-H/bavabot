@@ -104,14 +104,44 @@ async def check_emby_first(call, search_query: str):
     try:
         # Check if the search query is a TMDB ID
         if tmdb_service.is_tmdb_id(search_query):
-            # Direct TMDB ID search, skip Emby check
+            # TMDB ID search - first get movie details, then check Emby
             tmdb_id = tmdb_service.extract_tmdb_id(search_query)
             await editMessage(call, 
                 f'🆔 检测到TMDB ID: {tmdb_id}\n'
-                f'正在进行精确查找...',
+                f'正在获取影片信息并检查Emby库...',
                 buttons=tmdb_main_ikb
             )
-            await tmdb_id_search_results(call, tmdb_id)
+            
+            # Get movie details from TMDB first
+            success, tmdb_result = await tmdb_service.search_by_tmdb_id(tmdb_id)
+            if not success or not tmdb_result:
+                await editMessage(
+                    call, 
+                    f'🤷‍♂️ **TMDB ID {tmdb_id} 未找到对应的影视作品**\n\n'
+                    f'💡 **可能原因:**\n'
+                    f'• TMDB ID 不存在或已被删除\n'
+                    f'• 该内容可能为成人内容（已过滤）\n'
+                    f'• TMDB API 临时不可用\n\n'
+                    f'🔍 **建议操作:**\n'
+                    f'• 检查TMDB ID是否正确\n'
+                    f'• 尝试使用影片名称搜索\n'
+                    f'• 访问 themoviedb.org 确认ID有效性', 
+                    buttons=tmdb_main_ikb,
+                    parse_mode=enums.ParseMode.MARKDOWN
+                )
+                return
+            
+            # Now check Emby library using the movie title
+            movie_title = tmdb_result.get('title', '')
+            if movie_title:
+                emby_results = await emby.get_movies(title=movie_title)
+                if emby_results:
+                    # Found in Emby, show Emby results
+                    await show_emby_found_results(call, emby_results, tmdb_id, tmdb_result)
+                    return
+            
+            # Not found in Emby, show TMDB result for potential request
+            await tmdb_id_search_results_with_context(call, tmdb_id, tmdb_result, checked_emby=True)
             return
         
         await editMessage(call, '🔍 正在检查Emby媒体库，请稍后...', buttons=tmdb_main_ikb)
@@ -180,6 +210,135 @@ async def continue_tmdb_search(_, call):
     await callAnswer(call, '🔍 继续TMDB搜索')
     search_query = user_data['search_query']
     await tmdb_search_results(call, search_query, page=1)
+
+
+async def show_emby_found_results(call, emby_results: list, tmdb_id: int, tmdb_result: dict):
+    """显示在Emby中找到的结果（用于TMDB ID搜索）"""
+    title = tmdb_result.get('title', '未知')
+    text = f"🆔 **TMDB ID {tmdb_id} 查找结果**\n\n"
+    text += f"🎯 **Emby媒体库中已存在此影片！**\n\n"
+    text += f"📚 **TMDB信息**: {title}\n"
+    if tmdb_result.get('year'):
+        text += f"📅 **年份**: {tmdb_result['year']}\n"
+    text += f"📺 **类型**: {tmdb_result.get('media_type_cn', '未知')}\n\n"
+    
+    text += "📚 **Emby库中的相关资源:**\n\n"
+    
+    for index, item in enumerate(emby_results, start=1):
+        text += f"**{index}.** {item['title']}"
+        if item['year'] and item['year'] != '缺失':
+            text += f" ({item['year']})"
+        text += f"\n📺 类型: {item.get('item_type', '未知')}\n"
+        if item.get('genres') and item['genres'] != '未知':
+            text += f"🎭 类型: {item['genres']}\n"
+        text += "\n"
+    
+    text += "✅ **观看指引:**\n"
+    text += "请直接使用Emby客户端观看这些内容！\n"
+    text += "• 打开Emby客户端应用\n"
+    text += "• 搜索上述影片名称\n"
+    text += "• 即可开始观看\n\n"
+    text += "💡 如需点播其他内容，可返回主页重新搜索"
+    
+    # 创建按钮：返回主页
+    from bot.func_helper.fix_bottons import ikb
+    emby_found_buttons = ikb([
+        [('🔙 返回主页', 'tmdb_main')]
+    ])
+    
+    await editMessage(call, text, buttons=emby_found_buttons, parse_mode=enums.ParseMode.MARKDOWN)
+
+
+async def tmdb_id_search_results_with_context(call, tmdb_id: int, result: dict, checked_emby: bool = False):
+    """Display TMDB ID search results with Emby check context"""
+    try:
+        # 保存搜索结果信息 (单个结果)
+        display_results = [result]
+        user_tmdb_data[call.from_user.id] = {
+            'query': f'TMDB ID: {tmdb_id}',
+            'display_results': display_results,
+            'total_results': 1,
+            'is_tmdb_id_search': True,
+            'tmdb_id': tmdb_id,
+            'checked_emby': checked_emby
+        }
+
+        # 显示结果
+        result_text = f"🆔 **ME点播 - TMDB ID 精确查找**\n"
+        result_text += f"🔍 TMDB ID: `{tmdb_id}`\n"
+        if checked_emby:
+            result_text += f"✅ 已检查Emby库（未找到）\n"
+        result_text += f"🎯 找到匹配的影视作品\n\n"
+        
+        # 构建结果文本
+        try:
+            result_text += tmdb_service.format_search_result_text(result, 1)
+            
+            # 添加额外的详细信息
+            if result.get('genres'):
+                result_text += f"🎭 **类型**: {result['genres']}\n"
+            
+            if result.get('runtime') and result['runtime'] > 0:
+                result_text += f"⏱️ **时长**: {result['runtime']} 分钟\n"
+            elif result.get('number_of_seasons') and result['number_of_seasons'] > 0:
+                result_text += f"📺 **季数**: {result['number_of_seasons']} 季\n"
+                if result.get('number_of_episodes') and result['number_of_episodes'] > 0:
+                    result_text += f"📼 **总集数**: {result['number_of_episodes']} 集\n"
+            
+            # 添加剧情简介
+            overview = result.get('overview', '').strip()
+            if overview:
+                if len(overview) > 200:
+                    overview = overview[:197] + "..."
+                result_text += f"\n📝 **简介**: {overview}\n"
+            
+            result_text += "\n💡 这是TMDB数据库中的影视信息\n"
+            if checked_emby:
+                result_text += "此影片不在Emby库中，可点击下方\"1\"按钮进行点播"
+            else:
+                result_text += "如需观看可点击下方\"1\"按钮查看详情"
+            
+        except Exception as format_error:
+            LOGGER.error(f"TMDB ID格式化结果失败: 用户{call.from_user.id}, TMDB ID {tmdb_id}, 错误={str(format_error)}")
+            result_text += f"🎬 **影片**: {result.get('title', '未知')}\n"
+            result_text += f"📅 **年份**: {result.get('year', '未知')}\n"
+            result_text += f"📺 **类型**: {result.get('media_type_cn', '未知')}\n"
+            result_text += f"⚠️ 详细信息格式化异常，但影片已找到\n"
+
+        # 使用特殊的单结果按钮布局
+        from bot.func_helper.fix_bottons import ikb
+        tmdb_id_result_ikb = ikb([
+            [('1', 'tmdb_select_1')],
+            [('🔙 返回', 'tmdb_main')]
+        ])
+
+        try:
+            await editMessage(
+                call, 
+                result_text, 
+                buttons=tmdb_id_result_ikb,
+                parse_mode=enums.ParseMode.MARKDOWN
+            )
+            LOGGER.info(f"TMDB ID搜索结果显示成功: 用户{call.from_user.id}, TMDB ID={tmdb_id}, 标题={result.get('title', '未知')}, 已检查Emby={checked_emby}")
+        except Exception as edit_error:
+            LOGGER.error(f"TMDB ID编辑消息失败: 用户{call.from_user.id}, 错误={str(edit_error)}")
+            # 如果编辑消息失败，尝试发送一个简化的消息
+            simple_text = f"🆔 TMDB ID {tmdb_id} 查找成功\n📺 {result.get('title', '未知')}\n⚠️ 内容显示异常，请重试"
+            await editMessage(call, simple_text, buttons=tmdb_main_ikb)
+
+    except Exception as e:
+        LOGGER.error(f"TMDB ID搜索结果显示出错: TMDB ID {tmdb_id}, 错误: {str(e)}")
+        await editMessage(call, 
+            f'❌ **TMDB ID搜索结果显示出错**\n\n'
+            f'TMDB ID: {tmdb_id}\n'
+            f'错误类型: 系统异常\n\n'
+            f'🔧 **解决方案:**\n'
+            f'• 稍后重试此TMDB ID\n'
+            f'• 尝试使用影片名称搜索\n'
+            f'• 联系管理员检查系统状态', 
+            buttons=tmdb_main_ikb,
+            parse_mode=enums.ParseMode.MARKDOWN
+        )
 
 
 async def tmdb_id_search_results(call, tmdb_id: int):
