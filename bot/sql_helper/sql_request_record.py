@@ -150,8 +150,8 @@ def sql_update_request_status(download_id: str, download_state: str, transfer_st
             return False
 
 
-def sql_check_existing_request_by_title_and_user(tg: int, movie_title: str):
-    """检查用户是否已经点播过相同影片"""
+def sql_check_existing_request_by_title(movie_title: str):
+    """检查影片是否已经被点播（任何用户）"""
     with Session() as session:
         try:
             # 清理输入以防止SQL注入
@@ -159,9 +159,8 @@ def sql_check_existing_request_by_title_and_user(tg: int, movie_title: str):
             if not clean_title:
                 return None
                 
-            # 查找该用户的相同影片请求，排除已完全失败的请求
+            # 查找任何用户的相同影片请求，排除已完全失败的请求
             existing_request = session.query(RequestRecord).filter(
-                RequestRecord.tg == tg,
                 RequestRecord.request_name.like(f"%{clean_title}%")
             ).filter(
                 # 只排除同时满足下载失败和入库失败的请求
