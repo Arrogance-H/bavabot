@@ -140,6 +140,101 @@ class TMDBService:
         data = await self._make_request(f"tv/{tv_id}")
         return data
 
+    async def search_by_tmdb_id(self, tmdb_id: int, media_type: str = None) -> Tuple[bool, Optional[Dict]]:
+        """
+        Search for a movie or TV show by its TMDB ID
+        Args:
+            tmdb_id: TMDB ID (numeric)
+            media_type: 'movie' or 'tv'. If None, try both starting with movie
+        Returns:
+            (success, formatted_result)
+        """
+        if not tmdb_id or tmdb_id <= 0:
+            return False, None
+        
+        # If media_type is specified, try that specific type
+        if media_type:
+            if media_type == "movie":
+                data = await self.get_movie_details(tmdb_id)
+            elif media_type == "tv":
+                data = await self.get_tv_details(tmdb_id)
+            else:
+                return False, None
+                
+            if data:
+                return True, self._format_tmdb_detail_result(data, media_type)
+            else:
+                return False, None
+        
+        # If no media_type specified, try movie first, then TV
+        # Try movie first
+        movie_data = await self.get_movie_details(tmdb_id)
+        if movie_data:
+            return True, self._format_tmdb_detail_result(movie_data, "movie")
+        
+        # Try TV show
+        tv_data = await self.get_tv_details(tmdb_id)
+        if tv_data:
+            return True, self._format_tmdb_detail_result(tv_data, "tv")
+        
+        # Not found in either
+        return False, None
+    
+    def _format_tmdb_detail_result(self, data: Dict, media_type: str) -> Dict:
+        """Format TMDB detail API response to match search result format"""
+        if media_type == "movie":
+            result = {
+                "id": data.get("id"),
+                "title": data.get("title", ""),
+                "original_title": data.get("original_title", ""),
+                "release_date": data.get("release_date", ""),
+                "year": data.get("release_date", "")[:4] if data.get("release_date") else "",
+                "overview": data.get("overview", ""),
+                "poster_path": data.get("poster_path", ""),
+                "backdrop_path": data.get("backdrop_path", ""),
+                "vote_average": data.get("vote_average", 0),
+                "vote_count": data.get("vote_count", 0),
+                "popularity": data.get("popularity", 0),
+                "genre_ids": [genre.get("id", 0) for genre in data.get("genres", [])],
+                "genres": ", ".join([genre.get("name", "") for genre in data.get("genres", [])]),
+                "runtime": data.get("runtime", 0),
+                "media_type": "movie",
+                "media_type_cn": "电影"
+            }
+        else:  # tv
+            result = {
+                "id": data.get("id"),
+                "title": data.get("name", ""),
+                "original_title": data.get("original_name", ""),
+                "release_date": data.get("first_air_date", ""),
+                "year": data.get("first_air_date", "")[:4] if data.get("first_air_date") else "",
+                "overview": data.get("overview", ""),
+                "poster_path": data.get("poster_path", ""),
+                "backdrop_path": data.get("backdrop_path", ""),
+                "vote_average": data.get("vote_average", 0),
+                "vote_count": data.get("vote_count", 0),
+                "popularity": data.get("popularity", 0),
+                "genre_ids": [genre.get("id", 0) for genre in data.get("genres", [])],
+                "genres": ", ".join([genre.get("name", "") for genre in data.get("genres", [])]),
+                "number_of_seasons": data.get("number_of_seasons", 0),
+                "number_of_episodes": data.get("number_of_episodes", 0),
+                "media_type": "tv",
+                "media_type_cn": "电视剧"
+            }
+        
+        # Add full image URLs
+        if result["poster_path"]:
+            result["poster_url"] = f"{self.image_base_url}{result['poster_path']}"
+        else:
+            result["poster_url"] = ""
+            
+        if result["backdrop_path"]:
+            result["backdrop_url"] = f"{self.image_base_url}{result['backdrop_path']}"
+        else:
+            result["backdrop_url"] = ""
+        
+        return result
+
     async def get_tv_seasons(self, tv_id: int) -> Tuple[bool, List[Dict]]:
         """
         Get all seasons for a TV series
@@ -182,6 +277,23 @@ class TMDBService:
         
         LOGGER.info(f"Found {len(seasons)} seasons for TV series {tv_id}")
         return True, seasons
+
+    @staticmethod
+    def is_tmdb_id(query: str) -> bool:
+        """Check if the query is a TMDB ID (numeric)"""
+        try:
+            tmdb_id = int(query.strip())
+            return tmdb_id > 0
+        except (ValueError, TypeError):
+            return False
+    
+    @staticmethod 
+    def extract_tmdb_id(query: str) -> Optional[int]:
+        """Extract TMDB ID from query string"""
+        try:
+            return int(query.strip())
+        except (ValueError, TypeError):
+            return None
 
     def format_search_result_text(self, item: Dict, index: int) -> str:
         """Format TMDB search result for display"""
