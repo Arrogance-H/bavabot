@@ -53,13 +53,6 @@ async def tmdb_main_handler(_, call):
     await callAnswer(call, 'ME点播')
     welcome_text = (
         "🎬 **ME点播**\n\n"
-        "智能影视搜索与观看指引！\n\n"
-        "🔍 **功能介绍:**\n"
-        "• 优先检查Emby媒体库现有资源\n"
-        "• 如已存在，直接指引使用Emby客户端观看\n"
-        "• 如不存在，提供TMDB数据库搜索\n"
-        "• 查看详细的影视信息和评分\n\n"
-        "📖 **使用说明:**\n"
         "点击下方\"🔍 开始搜索\"按钮开始使用"
     )
     
@@ -83,9 +76,6 @@ async def tmdb_search_handler(_, call):
         '🎬 **ME点播搜索**\n\n'
         '请在120秒内发送你想搜索的电影或电视剧名称\n'
         '支持中文和外文名称搜索\n\n'
-        '🔍 **搜索流程:**\n'
-        '1. 优先检查Emby媒体库\n'
-        '2. 如不存在，搜索TMDB数据库\n\n'
         '输入 /cancel 取消操作',
         parse_mode=enums.ParseMode.MARKDOWN
     )
@@ -409,9 +399,7 @@ async def me_request_movie(_, call):
             f"影片：{selected_item.get('title', '未知')}\n"
             f"类型：{selected_item.get('media_type_cn', '未知')}\n"
             f"需要费用：{cost} {sakura_b}\n"
-            f"当前拥有：{emby_user.iv} {sakura_b}\n"
-            f"还需要：{cost - emby_user.iv} {sakura_b}\n\n"
-            f"请联系管理员充值后再试",
+            f"当前拥有：{emby_user.iv} {sakura_b},
             buttons=tmdb_main_ikb,
             parse_mode=enums.ParseMode.MARKDOWN
         )
@@ -439,7 +427,7 @@ async def me_request_movie(_, call):
     # 创建确认按钮
     from bot.func_helper.fix_bottons import ikb
     confirm_buttons = ikb([
-        [('✅ 确认请求', 'confirm_me_request'), ('❌ 取消', 'cancel_tmdb_search')],
+        [('✅ 确认', 'confirm_me_request'), ('❌ 取消', 'cancel_tmdb_search')],
         [('🔙 返回', 'tmdb_main')]
     ])
     
@@ -474,8 +462,7 @@ async def confirm_me_request(_, call):
             await editMessage(call,
                 f"❌ **余额不足**\n\n"
                 f"当前余额：{emby_user.iv} {sakura_b}\n"
-                f"需要费用：{cost} {sakura_b}\n"
-                f"请联系管理员充值后再试",
+                f"需要费用：{cost} {sakura_b}",
                 buttons=tmdb_main_ikb
             )
             return
@@ -495,9 +482,7 @@ async def confirm_me_request(_, call):
             f"类型: {selected_item.get('media_type_cn', '未知')}\n"
             f"年份: {selected_item.get('year', '未知')}\n"
             f"TMDB评分: {selected_item.get('vote_average', 0)}/10\n"
-            f"费用: {cost} {sakura_b}\n"
             f"请求时间: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-            f"搜索词: {search_title}\n"
             f"TMDB ID: {selected_item.get('id', '未知')}"
         )
         
@@ -542,11 +527,8 @@ async def confirm_me_request(_, call):
                 f"**年份**: {selected_item.get('year', '未知')}\n"
                 f"**TMDB评分**: {selected_item.get('vote_average', 0):.1f}/10\n"
                 f"**请求ID**: `{request_id}`\n"
-                f"**费用**: {cost} {sakura_b}\n"
-                f"**搜索词**: {search_title}\n"
                 f"**TMDB ID**: {selected_item.get('id', '未知')}\n\n"
                 f"⏰ **请求时间**: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-                f"💰 **用户余额**: {emby_user.iv - cost} {sakura_b} (已扣费)\n\n"
                 f"📝 **简介**: {selected_item.get('overview', '暂无简介')[:200]}{'...' if len(selected_item.get('overview', '')) > 200 else ''}"
             )
             
