@@ -250,24 +250,62 @@ async def tmdb_search_results(call, query: str, page: int = 1):
         result_text += f"📄 第 {page} 页 / 共 {total_pages} 页\n"
         result_text += f"📊 本页显示 {len(display_results)} 个结果 | 总共 {total_results} 个结果\n\n"
         
-        for index, item in enumerate(display_results, start=1):
-            result_text += tmdb_service.format_search_result_text(item, index)
-            result_text += "\n" + "─" * 10 + "\n\n"
+        # 验证显示结果是否有效
+        if not display_results:
+            LOGGER.warning(f"TMDB搜索结果为空: 用户{call.from_user.id}, 查询='{query}', 页码={page}, 总结果={total_results}")
+            # 即使结果为空，也要显示分页按钮让用户能导航
+            result_text = f"🎬 **ME点播 - TMDB搜索结果**\n"
+            result_text += f"🔍 搜索词: `{query}`\n"
+            result_text += f"📄 第 {page} 页 / 共 {total_pages} 页\n"
+            result_text += f"📊 本页无结果 | 总共 {total_results} 个结果\n\n"
+            result_text += "⚠️ 当前页面没有结果，请尝试其他页面"
+        else:
+            # 构建结果文本
+            for index, item in enumerate(display_results, start=1):
+                try:
+                    result_text += tmdb_service.format_search_result_text(item, index)
+                    result_text += "\n" + "─" * 10 + "\n\n"
+                except Exception as format_error:
+                    LOGGER.error(f"TMDB格式化结果失败: 用户{call.from_user.id}, 项目索引{index}, 错误={str(format_error)}")
+                    # 如果单个项目格式化失败，添加简单的占位文本
+                    result_text += f"🎬 **编号**: `{index}`\n"
+                    result_text += f"📺 **标题**: {item.get('title', '格式化失败')}\n"
+                    result_text += f"⚠️ 详细信息显示异常\n"
+                    result_text += "\n" + "─" * 10 + "\n\n"
 
         # 限制消息长度
         if len(result_text) > 4000:
             result_text = result_text[:3900] + "\n...\n\n📝 结果过长，已截断显示"
 
-        await editMessage(
-            call, 
-            result_text, 
-            buttons=tmdb_search_page_ikb(has_prev, has_next, page, len(display_results)),
-            parse_mode=enums.ParseMode.MARKDOWN
-        )
+        try:
+            await editMessage(
+                call, 
+                result_text, 
+                buttons=tmdb_search_page_ikb(has_prev, has_next, page, len(display_results)),
+                parse_mode=enums.ParseMode.MARKDOWN
+            )
+            LOGGER.info(f"TMDB搜索结果显示成功: 用户{call.from_user.id}, 查询='{query}', 页码={page}/{total_pages}, 结果数={len(display_results)}")
+        except Exception as edit_error:
+            LOGGER.error(f"TMDB编辑消息失败: 用户{call.from_user.id}, 错误={str(edit_error)}")
+            # 如果编辑消息失败，尝试发送一个简化的消息
+            simple_text = f"🎬 ME点播搜索结果\n📄 第 {page} 页 / 共 {total_pages} 页\n⚠️ 内容显示异常，请重试"
+            await editMessage(call, simple_text, buttons=tmdb_search_page_ikb(has_prev, has_next, page, 0))
 
     except Exception as e:
         LOGGER.error(f"TMDB搜索出错: {str(e)}")
-        await editMessage(call, '❌ 搜索过程中出错，请稍后再试', buttons=tmdb_main_ikb)
+        # 如果是分页请求出错，尝试保持在搜索结果页面而不是返回主菜单
+        user_data = user_tmdb_data.get(call.from_user.id)
+        if user_data and 'current_page' in user_data and 'total_pages' in user_data:
+            # 用户正在浏览搜索结果，显示分页按钮而不是主菜单
+            current_page = user_data.get('current_page', 1)
+            total_pages = user_data.get('total_pages', 1) 
+            has_prev = current_page > 1
+            has_next = current_page < total_pages
+            error_buttons = tmdb_search_page_ikb(has_prev, has_next, current_page, 0)
+            await editMessage(call, '❌ 搜索过程中出错，请稍后再试\n\n💡 您可以尝试切换到其他页面或返回主菜单', buttons=error_buttons)
+        else:
+            # 首次搜索出错，显示主菜单
+            await editMessage(call, '❌ 搜索过程中出错，请稍后再试', buttons=tmdb_main_ikb)
 
 
 @bot.on_callback_query(filters.regex('^tmdb_search_prev_page$') & user_in_group_on_filter)
@@ -275,16 +313,28 @@ async def tmdb_search_prev_page(_, call):
     """TMDB搜索上一页"""
     user_data = user_tmdb_data.get(call.from_user.id)
     if not user_data:
+        LOGGER.warning(f"TMDB上一页失败: 用户{call.from_user.id}的搜索会话已过期")
         return await callAnswer(call, '❌ 搜索会话已过期，请重新搜索', True)
     
     current_page = user_data.get('current_page', 1)
+    query = user_data.get('query', '')
     new_page = current_page - 1
     
+    LOGGER.info(f"TMDB上一页请求: 用户={call.from_user.id}, 查询='{query}', 当前页={current_page}, 目标页={new_page}")
+    
     if new_page < 1:
+        LOGGER.info(f"TMDB上一页边界检查: 用户{call.from_user.id}尝试访问第{new_page}页，但已在第一页")
         return await callAnswer(call, '❌ 已经是第一页了', True)
     
     await callAnswer(call, f'📃 正在加载第 {new_page} 页')
-    await tmdb_search_results(call, user_data['query'], new_page)
+    
+    try:
+        await tmdb_search_results(call, user_data['query'], new_page)
+        LOGGER.info(f"TMDB上一页成功: 用户{call.from_user.id}已跳转到第{new_page}页")
+    except Exception as e:
+        LOGGER.error(f"TMDB上一页调用tmdb_search_results失败: 用户{call.from_user.id}, 错误={str(e)}")
+        # 发生错误时，保持用户在当前页面
+        await callAnswer(call, '❌ 加载页面时出错，请重试', True)
 
 
 @bot.on_callback_query(filters.regex('^tmdb_search_next_page$') & user_in_group_on_filter)
@@ -292,6 +342,7 @@ async def tmdb_search_next_page(_, call):
     """TMDB搜索下一页"""
     user_data = user_tmdb_data.get(call.from_user.id)
     if not user_data:
+        LOGGER.warning(f"TMDB下一页失败: 用户{call.from_user.id}的搜索会话已过期")
         return await callAnswer(call, '❌ 搜索会话已过期，请重新搜索', True)
     
     current_page = user_data.get('current_page', 1)
@@ -305,10 +356,18 @@ async def tmdb_search_next_page(_, call):
     
     # 检查页数边界
     if new_page > total_pages:
+        LOGGER.info(f"TMDB下一页边界检查: 用户{call.from_user.id}尝试访问第{new_page}页，但总页数为{total_pages}")
         return await callAnswer(call, '❌ 已经是最后一页了', True)
     
     await callAnswer(call, f'📃 正在加载第 {new_page} 页')
-    await tmdb_search_results(call, user_data['query'], new_page)
+    
+    try:
+        await tmdb_search_results(call, user_data['query'], new_page)
+        LOGGER.info(f"TMDB下一页成功: 用户{call.from_user.id}已跳转到第{new_page}页")
+    except Exception as e:
+        LOGGER.error(f"TMDB下一页调用tmdb_search_results失败: 用户{call.from_user.id}, 错误={str(e)}")
+        # 发生错误时，保持用户在当前页面
+        await callAnswer(call, '❌ 加载页面时出错，请重试', True)
 
 
 @bot.on_callback_query(filters.regex('^tmdb_select_[123]$') & user_in_group_on_filter)
