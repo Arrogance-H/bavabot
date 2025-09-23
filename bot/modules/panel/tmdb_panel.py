@@ -232,7 +232,9 @@ async def tmdb_search_prev_page(_, call):
     if not user_data:
         return await callAnswer(call, '❌ 搜索会话已过期，请重新搜索', True)
     
-    new_page = user_data['current_page'] - 1
+    current_page = user_data.get('current_page', 1)
+    new_page = current_page - 1
+    
     if new_page < 1:
         return await callAnswer(call, '❌ 已经是第一页了', True)
     
@@ -247,7 +249,16 @@ async def tmdb_search_next_page(_, call):
     if not user_data:
         return await callAnswer(call, '❌ 搜索会话已过期，请重新搜索', True)
     
-    new_page = user_data['current_page'] + 1
+    current_page = user_data.get('current_page', 1)
+    pagination_info = user_data.get('pagination_info', {})
+    total_pages = pagination_info.get('total_pages', 1)
+    
+    new_page = current_page + 1
+    
+    # 检查页数边界
+    if new_page > total_pages:
+        return await callAnswer(call, '❌ 已经是最后一页了', True)
+    
     await callAnswer(call, f'📃 正在加载第 {new_page} 页')
     await tmdb_search_results(call, user_data['query'], new_page)
 
