@@ -89,6 +89,19 @@ async def editMessage(message, text: str, buttons=None, timer=None, parse_mode: 
         if e.ID == "MESSAGE_NOT_MODIFIED" or e.ID == 'MESSAGE_ID_INVALID':
             # await callAnswer(message, "慢速模式开启，切勿多点\n慢一点，慢一点，生活更有趣 - zztai", True)
             return False
+        # 处理媒体标题过长的错误
+        if e.ID == 'MEDIA_CAPTION_TOO_LONG':
+            LOGGER.warning(f"Caption too long, truncating from {len(text)} to 1024 characters")
+            # 截断文本到1024字符，预留一些空间给可能的省略号
+            truncated_text = text[:1020] + "..." if len(text) > 1024 else text
+            try:
+                edt = await message.edit(text=truncated_text, disable_web_page_preview=True, reply_markup=buttons, parse_mode=parse_mode)
+                if timer is not None:
+                    return await deleteMessage(edt, timer)
+                return True
+            except Exception as retry_error:
+                LOGGER.error(f"Failed to edit message even after truncation: {retry_error}")
+                return False
         else:
             # 记录或处理其他异常
             LOGGER.warning(e)
