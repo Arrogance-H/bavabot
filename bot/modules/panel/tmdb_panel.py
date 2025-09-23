@@ -10,7 +10,7 @@ from bot.func_helper.msg_utils import callAnswer, editMessage, sendMessage, send
 from bot.func_helper.filters import user_in_group_on_filter
 from bot.func_helper.fix_bottons import tmdb_main_ikb, tmdb_search_page_ikb, tmdb_search_result_ikb, back_members_ikb
 from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby
-from bot.sql_helper.sql_request_record import sql_add_request_record
+from bot.sql_helper.sql_request_record import sql_add_request_record, sql_check_existing_request_by_title_and_user
 from bot.func_helper.tmdb import tmdb_service
 from bot.func_helper.emby import emby
 from bot.func_helper.utils import judge_admins
@@ -389,6 +389,41 @@ async def me_request_movie(_, call):
     
     selected_item = user_data['selected_item']
     search_title = user_data['search_title']
+    
+    # 检查是否已经点播过相同影片
+    movie_title = selected_item.get('title', '未知')
+    existing_request = sql_check_existing_request_by_title_and_user(call.from_user.id, movie_title)
+    
+    if existing_request:
+        # 如果已存在相同请求，显示提示信息
+        status_text = "未知状态"
+        if existing_request.transfer_state is not None:
+            if existing_request.transfer_state:
+                status_text = "已入库 📽️"
+            else:
+                status_text = "入库失败 🚫"
+        elif existing_request.download_state:
+            if existing_request.download_state == 'pending':
+                status_text = "等待下载 ⏳"
+            elif existing_request.download_state == 'downloading':
+                progress = existing_request.progress or 0
+                status_text = f"正在下载 📥 ({progress:.1f}%)"
+            elif existing_request.download_state == 'completed':
+                status_text = "下载完成 ✅"
+            elif existing_request.download_state == 'failed':
+                status_text = "下载失败 ❌"
+        
+        await editMessage(call,
+            f"⚠️ **您已点播过此影片**\n\n"
+            f"影片：{existing_request.request_name}\n"
+            f"状态：{status_text}\n"
+            f"请求时间：{existing_request.create_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"请求ID：`{existing_request.download_id}`\n\n"
+            f"💡 如需查看详细进度，请访问点播记录",
+            buttons=tmdb_main_ikb,
+            parse_mode=enums.ParseMode.MARKDOWN
+        )
+        return
     
     # 计算费用
     media_type = selected_item.get('media_type', 'movie')

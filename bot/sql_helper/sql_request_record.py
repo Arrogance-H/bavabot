@@ -148,3 +148,20 @@ def sql_update_request_status(download_id: str, download_state: str, transfer_st
         except Exception as e:
             session.rollback()
             return False
+
+
+def sql_check_existing_request_by_title_and_user(tg: int, movie_title: str):
+    """检查用户是否已经点播过相同影片"""
+    with Session() as session:
+        try:
+            # 查找该用户的活跃请求（未完成或未失败的状态）
+            existing_request = session.query(RequestRecord).filter(
+                RequestRecord.tg == tg,
+                RequestRecord.request_name.like(f"%{movie_title}%"),
+                # 只排除明确失败的状态，其他都算作活跃请求
+                ~((RequestRecord.download_state == 'failed') & (RequestRecord.transfer_state != True))
+            ).first()
+            
+            return existing_request
+        except Exception as e:
+            return None
