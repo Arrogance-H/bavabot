@@ -410,11 +410,11 @@ async def me_request_movie(_, call):
 # 替换原来me_request_movie中的这一段：
 
 # 创建确认按钮
-from bot.func_helper.fix_bottons import ikb
-confirm_buttons = ikb([
+    from bot.func_helper.fix_bottons import ikb
+    confirm_buttons = ikb([
     [('✅ 确认', 'confirm_me_request'), ('❌ 取消', 'cancel_tmdb_search')],
     [('🔙 返回', 'tmdb_main')]
-])
+    ])
 
     await editMessage(call,
     f"🎬 **确认点播**\n\n"
