@@ -50,7 +50,7 @@ async def tmdb_main_handler(_, call):
     if emby_user.lv is None or emby_user.lv not in ['a', 'b']:
         return await editMessage(call, '🫡 您没有权限使用此功能', buttons=back_members_ikb)
 
-    await callAnswer(call, 'ME点播')
+    await callAnswer(call, '🍿 ME点播')
     welcome_text = (
         "🎬 **ME点播**\n\n"
         "点击下方\"🔍 开始搜索\"按钮开始使用"
@@ -126,7 +126,7 @@ async def check_emby_first(call, search_query: str):
             # 创建按钮：继续TMDB搜索 或 返回主页
             from bot.func_helper.fix_bottons import ikb
             emby_found_buttons = ikb([
-                [('🔍 继续TMDB搜索', 'continue_tmdb_search')],
+                [('🔍 继续搜索', 'continue_tmdb_search')],
                 [('🔙 返回主页', 'tmdb_main')]
             ])
             
