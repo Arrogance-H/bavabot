@@ -50,20 +50,11 @@ def format_demand_records(current_page=1, current_filter="all"):
             except:
                 time_str = "未知时间"
             
-            # 状态图标
-            status_icons = {
-                'pending': '⏳',
-                'downloading': '⬇️',
-                'completed': '✅',
-                'failed': '❌'
-            }
-            status_icon = status_icons.get(record.download_state, '❓')
-            
             # ME点播固定费用
             cost_info = "费用: 10币"
             
             text += f"🎬 {record.request_name}\n"
-            text += f"   {status_icon} {record.download_state} | {time_str} | {cost_info}\n"
+            text += f"   {time_str} | {cost_info}\n"
             text += f"   ID: {record.download_id}\n\n"
 
         keyboard = get_demand_records_keyboard(current_page, total_pages, current_filter)
@@ -113,6 +104,12 @@ def get_demand_records_keyboard(current_page, total_pages, current_filter="all")
         InlineKeyboardButton("📝 编辑状态", callback_data="demand_edit_status")
     ]
     keyboard.append(edit_row)
+    
+    # 取消按钮行
+    cancel_row = [
+        InlineKeyboardButton("❌ 取消", callback_data="closeit")
+    ]
+    keyboard.append(cancel_row)
     
     return InlineKeyboardMarkup(keyboard)
 
