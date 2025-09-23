@@ -124,13 +124,14 @@ async def search_site_resources(call, keyword, page=1, all_result=None):
             item['tg_log'] = text
             await sendMessage(call.message, text, send=True, chat_id=call.from_user.id)
 
-        # 创建分页按钮
-        keyboard = mp_search_page_ikb(page > 1, page < total_pages, page)
+        # 创建分页按钮 - 只有在多页时才显示分页按钮
+        has_prev = page > 1 and total_pages > 1
+        has_next = page < total_pages and total_pages > 1
+        keyboard = mp_search_page_ikb(has_prev, has_next, page)
         pagination_text = f"第 {page}/{total_pages} 页 | 共 {len(all_result)} 个资源"
-        await sendPhoto(
+        await sendMessage(
             call.message,
-            photo=bot_photo,
-            caption=f"请点击下载按钮选择下载，如果没有合适的资源，请翻页查询\n\n{pagination_text}", 
+            text=f"请点击下载按钮选择下载，如果没有合适的资源，请翻页查询\n\n{pagination_text}", 
             send=True, 
             chat_id=call.from_user.id,
             buttons=keyboard
@@ -188,7 +189,7 @@ def format_resource_info(index, item):
 async def handle_resource_selection(call, result):
     while True:
         emby_user = sql_get_emby(tg=call.from_user.id)
-        msg = await sendPhoto(call, photo=bot_photo, caption="【选择资源编号】：\n请在120s内对我发送你的资源编号，\n退出点 /cancel", send=True, chat_id=call.from_user.id)
+        msg = await sendMessage(call, text="【选择资源编号】：\n请在120s内对我发送你的资源编号，\n退出点 /cancel", send=True, chat_id=call.from_user.id)
         txt = await callListen(call, 120, buttons=re_download_center_ikb)
         if txt is False:
             user_search_data.pop(call.from_user.id, None)
