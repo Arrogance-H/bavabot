@@ -167,22 +167,39 @@ async def continue_tmdb_search(_, call):
 
 async def tmdb_search_results(call, query: str, page: int = 1):
     """显示TMDB搜索结果"""
+    import math
+    
     try:
         await editMessage(call, '🔍 正在TMDB搜索中，请稍后...', buttons=tmdb_main_ikb)
         
-        success, results, pagination_info = await tmdb_service.search_multi(query, page)
-        if not success or not results:
-            # 如果不是第一页且搜索失败，可能是API问题，尝试返回第一页
-            if page > 1:
-                LOGGER.warning(f"TMDB搜索第{page}页失败，尝试返回第1页: {query}")
-                await editMessage(
-                    call, 
-                    f'❌ 第 {page} 页加载失败，正在返回第1页...',
-                    buttons=tmdb_main_ikb
-                )
-                # 递归调用返回第一页
-                return await tmdb_search_results(call, query, 1)
-            else:
+        # 检查是否已有缓存的搜索结果
+        user_data = user_tmdb_data.get(call.from_user.id, {})
+        if user_data.get('query') == query and 'all_results' in user_data:
+            # 使用缓存的结果
+            all_results = user_data['all_results']
+            total_results = len(all_results)
+        else:
+            # 首次搜索，获取所有可用结果
+            await editMessage(call, '🔍 正在获取TMDB搜索结果，请稍后...', buttons=tmdb_main_ikb)
+            
+            all_results = []
+            api_page = 1
+            max_pages = 5  # 限制最多获取5页API结果，避免过长等待
+            
+            while api_page <= max_pages:
+                success, results, pagination_info = await tmdb_service.search_multi(query, api_page)
+                if not success or not results:
+                    break
+                
+                all_results.extend(results)
+                
+                # 如果已获取所有结果或达到最大页数，停止
+                if api_page >= pagination_info.get("total_pages", 1):
+                    break
+                    
+                api_page += 1
+            
+            if not all_results:
                 await editMessage(
                     call, 
                     f'🤷‍♂️ TMDB数据库中未找到关键词 "{query}" 的相关影视作品\n\n'
@@ -194,30 +211,44 @@ async def tmdb_search_results(call, query: str, page: int = 1):
                     parse_mode=enums.ParseMode.MARKDOWN
                 )
                 return
+            
+            total_results = len(all_results)
 
-        # 计算分页信息 - 基于TMDB API返回的分页信息
+        # 基于每页3个结果计算分页信息
+        ITEMS_PER_PAGE = 3
+        total_pages = math.ceil(total_results / ITEMS_PER_PAGE)
+        
+        # 边界检查
+        if page < 1:
+            page = 1
+        elif page > total_pages:
+            page = total_pages
+            
         has_prev = page > 1
-        has_next = page < pagination_info.get("total_pages", 1)
+        has_next = page < total_pages
         
         # 添加调试日志
-        LOGGER.info(f"TMDB搜索分页信息: 查询='{query}', 当前页={page}, 总页数={pagination_info.get('total_pages', 1)}, has_prev={has_prev}, has_next={has_next}")
+        LOGGER.info(f"TMDB搜索分页信息: 查询='{query}', 当前页={page}, 总页数={total_pages}, 总结果={total_results}, has_prev={has_prev}, has_next={has_next}")
         
-        # 我们只显示前3个结果
-        display_results = results[:3]
+        # 计算当前页显示的结果
+        start_idx = (page - 1) * ITEMS_PER_PAGE
+        end_idx = start_idx + ITEMS_PER_PAGE
+        display_results = all_results[start_idx:end_idx]
         
-        # 保存搜索结果
+        # 保存搜索结果和分页信息
         user_tmdb_data[call.from_user.id] = {
             'query': query,
-            'results': results,
+            'all_results': all_results,
             'current_page': page,
-            'pagination_info': pagination_info
+            'total_pages': total_pages,
+            'total_results': total_results
         }
 
         # 显示结果
         result_text = f"🎬 **ME点播 - TMDB搜索结果**\n"
         result_text += f"🔍 搜索词: `{query}`\n"
-        result_text += f"📄 第 {page} 页 / 共 {pagination_info.get('total_pages', 1)} 页\n"
-        result_text += f"📊 本页显示 {len(display_results)} 个结果 | 总共 {pagination_info.get('total_results', 0)} 个结果\n\n"
+        result_text += f"📄 第 {page} 页 / 共 {total_pages} 页\n"
+        result_text += f"📊 本页显示 {len(display_results)} 个结果 | 总共 {total_results} 个结果\n\n"
         
         for index, item in enumerate(display_results, start=1):
             result_text += tmdb_service.format_search_result_text(item, index)
@@ -264,8 +295,7 @@ async def tmdb_search_next_page(_, call):
         return await callAnswer(call, '❌ 搜索会话已过期，请重新搜索', True)
     
     current_page = user_data.get('current_page', 1)
-    pagination_info = user_data.get('pagination_info', {})
-    total_pages = pagination_info.get('total_pages', 1)
+    total_pages = user_data.get('total_pages', 1)
     query = user_data.get('query', '')
     
     new_page = current_page + 1
@@ -292,10 +322,15 @@ async def tmdb_select_numbered_item(_, call):
     selected_index = int(call.data.split('_')[-1])
     
     await callAnswer(call, f'✅ 选择影片 {selected_index}')
-    results = user_data['results']
     
-    # 只显示前3个结果，所以直接使用索引
-    display_results = results[:3]
+    # 计算当前页面显示的结果
+    current_page = user_data.get('current_page', 1)
+    all_results = user_data.get('all_results', [])
+    ITEMS_PER_PAGE = 3
+    
+    start_idx = (current_page - 1) * ITEMS_PER_PAGE
+    end_idx = start_idx + ITEMS_PER_PAGE
+    display_results = all_results[start_idx:end_idx]
     
     if not display_results or selected_index > len(display_results):
         await editMessage(call, '❌ 选择的影片不存在', buttons=tmdb_main_ikb)
@@ -320,15 +355,23 @@ async def tmdb_select_item(_, call):
         return await callAnswer(call, '❌ 搜索会话已过期，请重新搜索', True)
     
     await callAnswer(call, '✅ 选择影片')
-    results = user_data['results']
     
-    if not results:
+    # 计算当前页面显示的结果
+    current_page = user_data.get('current_page', 1)
+    all_results = user_data.get('all_results', [])
+    ITEMS_PER_PAGE = 3
+    
+    start_idx = (current_page - 1) * ITEMS_PER_PAGE
+    end_idx = start_idx + ITEMS_PER_PAGE
+    display_results = all_results[start_idx:end_idx]
+    
+    if not display_results:
         await editMessage(call, '❌ 没有可选择的影片', buttons=tmdb_main_ikb)
         return
 
     await editMessage(call, 
         '🎬 **选择影片**\n\n'
-        f'请在120秒内发送你要查看的影片编号（1-{min(len(results), 3)}）\n'
+        f'请在120秒内发送你要查看的影片编号（1-{len(display_results)}）\n'
         '输入 /cancel 取消操作',
         parse_mode=enums.ParseMode.MARKDOWN
     )
@@ -342,14 +385,14 @@ async def tmdb_select_item(_, call):
 
     try:
         index = int(txt.text.strip())
-        if index < 1 or index > min(3, len(results)):
+        if index < 1 or index > len(display_results):
             await editMessage(call, 
-                f'❌ 编号无效，请输入1-{min(3, len(results))}之间的数字', 
+                f'❌ 编号无效，请输入1-{len(display_results)}之间的数字', 
                 buttons=tmdb_main_ikb
             )
             return
         
-        selected_item = results[index - 1]
+        selected_item = display_results[index - 1]
         await txt.delete()
         
         # 显示选中的影片详情
