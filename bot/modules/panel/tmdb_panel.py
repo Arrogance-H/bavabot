@@ -407,26 +407,26 @@ async def me_request_movie(_, call):
         )
         return
     
-    # 显示请求确认信息（包含费用）
-    await editMessage(call,
-        f"🎬 **确认点播**\n\n"
-        f"影片：{selected_item.get('title', '未知')}\n"
-        f"年份：{selected_item.get('year', '未知')}\n"
-        f"类型：{selected_item.get('media_type_cn', '未知')}\n\n"
-        f"点播费用: {cost} {sakura_b}\n"
-        f"当前余额: {emby_user.iv} {sakura_b}\n"
-        f"确认点播吗？",
-        parse_mode=enums.ParseMode.MARKDOWN
-    )
-    
-    # 创建确认按钮
-    from bot.func_helper.fix_bottons import ikb
-    confirm_buttons = ikb([
-        [('✅ 确认', 'confirm_me_request'), ('❌ 取消', 'cancel_tmdb_search')],
-        [('🔙 返回', 'tmdb_main')]
-    ])
-    
-    await editMessage(call, call.message.text, buttons=confirm_buttons, parse_mode=enums.ParseMode.MARKDOWN)
+# 替换原来me_request_movie中的这一段：
+
+# 创建确认按钮
+from bot.func_helper.fix_bottons import ikb
+confirm_buttons = ikb([
+    [('✅ 确认', 'confirm_me_request'), ('❌ 取消', 'cancel_tmdb_search')],
+    [('🔙 返回', 'tmdb_main')]
+])
+
+await editMessage(call,
+    f"🎬 **确认点播**\n\n"
+    f"影片：{selected_item.get('title', '未知')}\n"
+    f"年份：{selected_item.get('year', '未知')}\n"
+    f"类型：{selected_item.get('media_type_cn', '未知')}\n\n"
+    f"点播费用: {cost} {sakura_b}\n"
+    f"当前余额: {emby_user.iv} {sakura_b}\n"
+    f"确认点播吗？",
+    buttons=confirm_buttons,
+    parse_mode=enums.ParseMode.MARKDOWN
+)
 
 
 @bot.on_callback_query(filters.regex('^confirm_me_request$') & user_in_group_on_filter)
