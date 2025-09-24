@@ -7,7 +7,7 @@
 import json
 import re
 from bot import LOGGER, config, bot, emby_url, emby_api, group
-from bot.func_helper.emby import EmbyUtils
+from bot.func_helper.emby import emby
 from bot.sql_helper.sql_request_record import (
     sql_get_request_records_by_state, 
     sql_update_request_status
@@ -65,8 +65,7 @@ async def check_emby_requests():
         
         LOGGER.info(f"[Emby Request Check] 开始检查 {len(all_requests)} 个ME点播请求")
         
-        # 创建Emby工具实例
-        emby_utils = EmbyUtils()
+        # 使用全局Emby实例
         updated_count = 0
         
         for request in all_requests:
@@ -79,7 +78,7 @@ async def check_emby_requests():
                     continue
                 
                 # 在Emby库中搜索影片
-                movies = await emby_utils.get_movies(title=request.request_name, limit=10)
+                movies = await emby.get_movies(title=request.request_name, limit=10)
                 
                 if movies and len(movies) > 0:
                     # 使用TMDB ID精准匹配
