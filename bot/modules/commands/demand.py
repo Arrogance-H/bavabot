@@ -69,8 +69,7 @@ def get_demand_records_keyboard(current_page, total_pages, current_filter="all")
     """生成请求记录的键盘"""
     keyboard = []
     
-    # 筛选按钮行
-    filter_row = []
+    # 筛选按钮行 - 分为两行显示
     filter_buttons = [
         ("📋 全部", "all"),
         ("⏳ 待处理", "pending"),
@@ -78,13 +77,23 @@ def get_demand_records_keyboard(current_page, total_pages, current_filter="all")
         ("✅ 已入库", "completed")
     ]
     
-    for text, filter_type in filter_buttons:
+    # 第一行：全部、待处理
+    filter_row1 = []
+    for text, filter_type in filter_buttons[:2]:
         callback_data = f"demand_filter_{filter_type}"
         if filter_type == current_filter:
             text = f"• {text} •"  # 当前选中的筛选项
-        filter_row.append(InlineKeyboardButton(text, callback_data=callback_data))
+        filter_row1.append(InlineKeyboardButton(text, callback_data=callback_data))
+    keyboard.append(filter_row1)
     
-    keyboard.append(filter_row)
+    # 第二行：处理中、已入库
+    filter_row2 = []
+    for text, filter_type in filter_buttons[2:]:
+        callback_data = f"demand_filter_{filter_type}"
+        if filter_type == current_filter:
+            text = f"• {text} •"  # 当前选中的筛选项
+        filter_row2.append(InlineKeyboardButton(text, callback_data=callback_data))
+    keyboard.append(filter_row2)
     
     # 分页按钮行
     page_row = []
