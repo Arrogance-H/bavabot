@@ -108,9 +108,16 @@ async def members(_, call):
     await callAnswer(call, f"✅ 用户界面")
     name, lv, ex, iv, embyid, pwd2, preserve_mode, preserve_mode_changed = data
     
-    # 保号方式显示
-    preserve_mode_text = '活跃保号' if preserve_mode == 'active' else '到期保号'
-    can_switch = preserve_mode_changed == 0
+    # 检查是否为白名单用户
+    is_whitelist = lv == '白名单'
+    
+    # 保号方式显示（白名单用户不显示）
+    preserve_info = ""
+    can_switch = False
+    if not is_whitelist:
+        preserve_mode_text = '活跃保号' if preserve_mode == 'active' else '到期保号'
+        can_switch = preserve_mode_changed == 0
+        preserve_info = f"**· 🛡️ 保号方式** | {preserve_mode_text}" + (" (可切换)" if can_switch else " (已切换)") + "\n"
     
     text = f"▎__欢迎进入用户面板！{call.from_user.first_name}__\n\n" \
            f"**· 🆔 用户のID** | `{call.from_user.id}`\n" \
@@ -118,12 +125,15 @@ async def members(_, call):
            f"**· 🍒 积分{sakura_b}** | {iv}\n" \
            f"**· 💠 账号名称** | [{name}](tg://user?id={call.from_user.id})\n" \
            f"**· 🚨 到期时间** | {ex}\n" \
-           f"**· 🛡️ 保号方式** | {preserve_mode_text}" + (" (可切换)" if can_switch else " (已切换)")
+           f"{preserve_info.rstrip()}"
+    
     if not embyid:
         is_admin = judge_admins(call.from_user.id)
         await editMessage(call, text, members_ikb(is_admin, False))
     else:
-        await editMessage(call, text, members_ikb(account=True, can_switch_preserve=can_switch))
+        # 白名单用户不显示保号切换按钮
+        can_switch_preserve = can_switch and not is_whitelist
+        await editMessage(call, text, members_ikb(account=True, can_switch_preserve=can_switch_preserve))
 
 
 # 创建账户
@@ -725,6 +735,10 @@ async def switch_preserve_mode(_, call):
     e = sql_get_emby(tg=call.from_user.id)
     if not e or not e.embyid:
         return await callAnswer(call, '⚠️ 您还没有账户，无法切换保号方式', True)
+    
+    # 检查是否为白名单用户
+    if e.lv == 'a':
+        return await callAnswer(call, '⚠️ 白名单用户无需保号，无法切换保号方式', True)
     
     # 检查是否已经切换过
     if getattr(e, 'preserve_mode_changed', 0) >= 1:

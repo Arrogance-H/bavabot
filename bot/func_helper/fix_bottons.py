@@ -13,7 +13,7 @@ cache = Cache()
 """start面板 ↓"""
 
 
-def judge_start_ikb(is_admin: bool, account: bool) -> InlineKeyboardMarkup:
+def judge_start_ikb(is_admin: bool, account: bool, user_data=None) -> InlineKeyboardMarkup:
     """
     start面板按钮
     """
@@ -28,7 +28,16 @@ def judge_start_ikb(is_admin: bool, account: bool) -> InlineKeyboardMarkup:
             d.append(['🏪 兑换商店', 'storeall'])
     else:
         d = [['️👥 用户功能', 'members'], ['🌐 服务器', 'server']]
-        if schedall.check_ex: d.append(['🎟️ 使用续期码', 'exchange'])
+        # 只有在检查到期且用户不是活跃保号模式时才显示续期码按钮
+        show_renew_button = schedall.check_ex
+        if user_data and show_renew_button:
+            _, _, _, _, _, _, preserve_mode, _ = user_data
+            # 如果是活跃保号用户，不显示使用续期码按钮
+            if preserve_mode == 'active':
+                show_renew_button = False
+        
+        if show_renew_button:
+            d.append(['🎟️ 使用续期码', 'exchange'])
     if _open.checkin: d.append([f'🎯 签到', 'checkin'])
     if _open.punch_in: d.append([f'🎮 F1', 'punch_in'])
     lines = array_chunk(d, 2)
@@ -69,7 +78,7 @@ def members_ikb(is_admin: bool = False, account: bool = False, can_switch_preser
         normal.append([('♻️ 主界面', 'back_start')])
         return ikb(normal)
     else:
-        return judge_start_ikb(is_admin, account)
+        return judge_start_ikb(is_admin, account, user_data=None)
         # return ikb(
         #     [[('👑 创建账户', 'create')], [('⭕ 换绑TG', 'changetg'), ('🔍 绑定TG', 'bindtg')],
         #      [('♻️ 主界面', 'back_start')]])
