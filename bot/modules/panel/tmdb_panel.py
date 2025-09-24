@@ -53,7 +53,7 @@ async def tmdb_main_handler(_, call):
     await callAnswer(call, '🍿 ME点播')
     welcome_text = (
         "🎬 **ME点播**\n\n"
-        "🎞️使用JOY币点播 10JOY币点播一部电影或电视剧（一季）\n"
+        "🎞️使用JOY币点播\n10JOY币点播一部电影或电视剧（一季）\n\n"
         "点击下方\"🔍 开始搜索\"按钮开始使用"
     )
     
@@ -820,8 +820,8 @@ async def show_season_selection(call, tv_series: dict, seasons: list, selected_s
         total_cost = len(selected_seasons) * calculate_me_request_cost('tv')
         selection_text += f"✅ **已选择**: {len(selected_seasons)} 季\n"
         selection_text += f"💰 **总费用**: {total_cost} {sakura_b}\n\n"
-    else:
-        selection_text += "💰 **点播说明**: 每季需要 10 JOY币，可多选\n\n"
+    #else:
+        #selection_text += "💰 **点播说明**: 可多选\n\n"
     
     selection_text += "📝 **可选季数** (点击切换选择):\n\n"
     
