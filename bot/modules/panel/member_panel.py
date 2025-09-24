@@ -124,8 +124,11 @@ async def members(_, call):
            f"**· 📊 当前状态** | {lv}\n" \
            f"**· 🍒 积分{sakura_b}** | {iv}\n" \
            f"**· 💠 账号名称** | [{name}](tg://user?id={call.from_user.id})\n" \
-           f"**· 🚨 到期时间** | {ex}\n" \
-           f"{preserve_info.rstrip()}"
+           f"**· 🚨 到期时间** | {ex}"
+    
+    # 只有非白名单用户才添加保号信息
+    if preserve_info:
+        text += f"\n{preserve_info.rstrip()}"
     
     if not embyid:
         is_admin = judge_admins(call.from_user.id)
