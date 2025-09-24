@@ -973,6 +973,90 @@ class Embyservice(metaclass=Singleton):
             LOGGER.error(f"搜索电影异常: {title} - {str(e)}")
             return []
 
+    async def get_tv_series_seasons(self, series_id: str) -> Tuple[bool, List[Dict], int]:
+        """
+        获取电视剧的季数信息
+        :param series_id: 电视剧的ID
+        :return: (是否成功, 季数列表, 季数总数)
+        """
+        try:
+            # 获取电视剧的详细信息，包括季数
+            url = f"/emby/Items/{series_id}?Fields=SeasonCount,ChildCount"
+            result = await self._request('GET', url)
+            
+            if not result.success or not result.data:
+                LOGGER.error(f"获取电视剧详情失败: {series_id}")
+                return False, [], 0
+            
+            series_data = result.data
+            
+            # 获取所有季数
+            seasons_url = f"/emby/Items?ParentId={series_id}&IncludeItemTypes=Season&Recursive=false&Fields=Name,IndexNumber,ProductionYear,Overview"
+            seasons_result = await self._request('GET', seasons_url)
+            
+            if not seasons_result.success or not seasons_result.data:
+                LOGGER.error(f"获取电视剧季数失败: {series_id}")
+                return False, [], 0
+            
+            seasons_items = seasons_result.data.get("Items", [])
+            seasons_list = []
+            
+            for season in seasons_items:
+                # 跳过特别季（Season 0）
+                season_number = season.get("IndexNumber", 0)
+                if season_number == 0:
+                    continue
+                    
+                season_info = {
+                    "id": season.get("Id"),
+                    "season_number": season_number,
+                    "name": season.get("Name", f"第 {season_number} 季"),
+                    "overview": season.get("Overview", ""),
+                    "year": season.get("ProductionYear", "")
+                }
+                seasons_list.append(season_info)
+            
+            # 按季数排序
+            seasons_list.sort(key=lambda x: x["season_number"])
+            season_count = len(seasons_list)
+            
+            LOGGER.info(f"获取电视剧季数成功: {series_id}, 共{season_count}季")
+            return True, seasons_list, season_count
+            
+        except Exception as e:
+            LOGGER.error(f"获取电视剧季数异常: {series_id} - {str(e)}")
+            return False, [], 0
+
+    async def search_tv_series_by_title(self, title: str) -> Tuple[bool, Optional[Dict], int]:
+        """
+        根据标题搜索电视剧并返回季数信息
+        :param title: 电视剧标题
+        :return: (是否找到, 电视剧信息, 季数总数)
+        """
+        try:
+            # 搜索电视剧
+            movies = await self.get_movies(title=title, limit=10)
+            
+            # 找到第一个类型为Series的结果
+            for movie in movies:
+                if movie.get('item_type') == 'Series':
+                    series_id = movie.get('item_id')
+                    if series_id:
+                        # 获取季数信息
+                        success, seasons, season_count = await self.get_tv_series_seasons(series_id)
+                        if success:
+                            movie['seasons'] = seasons
+                            movie['season_count'] = season_count
+                            LOGGER.info(f"找到电视剧: {title}, 共{season_count}季")
+                            return True, movie, season_count
+            
+            LOGGER.info(f"未找到电视剧: {title}")
+            return False, None, 0
+            
+        except Exception as e:
+            LOGGER.error(f"搜索电视剧异常: {title} - {str(e)}")
+            return False, None, 0
+
     def __del__(self):
         """析构函数，确保资源清理"""
         if hasattr(self, '_session') and self._session and not self._session.closed:
