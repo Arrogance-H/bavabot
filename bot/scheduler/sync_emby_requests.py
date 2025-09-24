@@ -110,12 +110,10 @@ async def check_emby_requests():
                             # 发送群组通知
                             try:
                                 notification_text = (
-                                    f"🎉 **ME点播自动检测完成**\n\n"
+                                    f"🎉 **ME点播入库**\n\n"
                                     f"🎬 **影片名称**: {request.request_name}\n"
-                                    f"📊 **请求状态**: 已入库 ✅\n"
-                                    f"👤 **请求人**: {username}\n"
-                                    f"🆔 **请求ID**: `{request.download_id}`\n"
-                                    f"🔢 **TMDB ID**: {tmdb_id}\n\n"
+                                    f"📊 **点播状态**: 已入库 ✅\n"
+                                    f"👤 **ME用户**: {username}\n"
                                     f"📺 影片已可在Emby中观看！"
                                 )
                                 
