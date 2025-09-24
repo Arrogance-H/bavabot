@@ -626,7 +626,7 @@ def tmdb_season_selection_ikb(seasons: list, selected_seasons: list = None, emby
             button_text = f"📚 第{season_num}季"
             if episode_count > 0:
                 button_text += f" ({episode_count}集)"
-            button_text += " 已有"
+            button_text += " 已收录"
             # 使用特殊回调数据表示不可点击
             season_buttons.append((button_text, f'emby_exists_{season_num}'))
         else:

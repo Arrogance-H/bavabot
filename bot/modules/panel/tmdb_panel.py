@@ -725,12 +725,15 @@ async def me_request_movie(_, call):
                 # 如果在Emby中找到该电视剧，显示季数对比信息
                 if emby_season_count >= tmdb_season_count:
                     # Emby季数等于或大于TMDB季数，显示已有季数信息
+                    existing_seasons_str = ", ".join([f"第{s}季" for s in sorted(existing_seasons)]) if existing_seasons else "无"
+                    
                     await editMessage(call,
                         f"📚 **电视剧季数信息**\n\n"
                         f"🎭 **剧名**: {tv_title}\n"
                         f"📺 **TMDB总季数**: {tmdb_season_count} 季\n"
-                        f"📚 **Emby库季数**: {emby_season_count} 季\n\n"
+                        f"📚 **Emby已有季数**: {emby_season_count} 季 ({existing_seasons_str})\n\n"
                         f"✅ **Emby库已完整收录该剧的所有季数**\n"
+                        f"💡 您可以直接在Emby客户端中观看完整剧集\n\n"
                         f"正在为您显示详细季数信息...",
                         buttons=tmdb_main_ikb,
                         parse_mode=enums.ParseMode.MARKDOWN
@@ -739,16 +742,21 @@ async def me_request_movie(_, call):
                 else:
                     # Emby季数少于TMDB季数，可以点播缺少的季数
                     # 计算实际缺少的季数（基于TMDB实际季数）
-                    tmdb_season_numbers = [s.get('season_number', 0) for s in tmdb_seasons]
+                    tmdb_season_numbers = [s.get('season_number', 0) for s in tmdb_seasons if s.get('season_number', 0) > 0]
                     missing_seasons = [s for s in tmdb_season_numbers if s not in existing_seasons]
                     missing_count = len(missing_seasons)
+                    
+                    # 构建更详细的季数信息
+                    existing_seasons_str = ", ".join([f"第{s}季" for s in sorted(existing_seasons)]) if existing_seasons else "无"
+                    missing_seasons_str = ", ".join([f"第{s}季" for s in sorted(missing_seasons)]) if missing_seasons else "无"
                     
                     await editMessage(call,
                         f"✅ **检测到缺少季数，可以点播**\n\n"
                         f"🎭 **剧名**: {tv_title}\n"
                         f"📺 **TMDB总季数**: {tmdb_season_count} 季\n"
-                        f"📚 **Emby库季数**: {emby_season_count} 季\n"
-                        f"🔢 **缺少季数**: {missing_count} 季\n\n"
+                        f"📚 **Emby已有季数**: {emby_season_count} 季 ({existing_seasons_str})\n"
+                        f"🔢 **缺少季数**: {missing_count} 季 ({missing_seasons_str})\n\n"
+                        f"💡 您可以选择点播缺少的季数，已有季数无需重复点播\n"
                         f"正在为您显示季数选择界面...",
                         buttons=tmdb_main_ikb,
                         parse_mode=enums.ParseMode.MARKDOWN
@@ -811,13 +819,15 @@ async def show_season_selection(call, tv_series: dict, seasons: list, selected_s
     
     # 显示季数对比信息
     # 计算可选择的季数（排除Emby中已有的）
-    available_seasons = [s for s in seasons if s.get('season_number', 0) not in existing_seasons]
+    available_seasons = [s for s in seasons if s.get('season_number', 0) > 0 and s.get('season_number', 0) not in existing_seasons]
     available_count = len(available_seasons)
     
     if available_count == 0:
         # 没有可选择的季数，但仍显示季数信息供用户查看
+        existing_seasons_str = ", ".join([f"第{s}季" for s in sorted(existing_seasons)]) if existing_seasons else "无"
+        
         selection_text += f"📺 **TMDB总季数**: {tmdb_season_count} 季\n"
-        selection_text += f"📚 **Emby库季数**: {emby_season_count} 季\n"
+        selection_text += f"📚 **Emby已有**: {emby_season_count} 季 ({existing_seasons_str})\n"
         selection_text += f"🚫 **无可点播季数**: 所有季数均已在Emby库中\n\n"
         selection_text += f"💡 **提示**: 请直接在Emby客户端中观看完整剧集\n\n"
         selection_text += f"📝 **已有季数详情**:\n\n"
@@ -858,8 +868,12 @@ async def show_season_selection(call, tv_series: dict, seasons: list, selected_s
     
     selection_text += f"📺 **TMDB总季数**: {tmdb_season_count} 季\n"
     if emby_season_count > 0:
-        selection_text += f"📚 **Emby库季数**: {emby_season_count} 季\n"
-        selection_text += f"🆕 **可点播**: {available_count} 季 (缺少的季数)\n"
+        existing_seasons_str = ", ".join([f"第{s}季" for s in sorted(existing_seasons)]) if existing_seasons else "无"
+        available_season_numbers = [s.get('season_number', 0) for s in available_seasons]
+        missing_seasons_str = ", ".join([f"第{s}季" for s in sorted(available_season_numbers)]) if available_season_numbers else "无"
+        
+        selection_text += f"📚 **Emby已有**: {emby_season_count} 季 ({existing_seasons_str})\n"
+        selection_text += f"🆕 **可点播**: {available_count} 季 ({missing_seasons_str})\n"
     else:
         selection_text += f"📚 **Emby库**: 未收录此剧\n"
         selection_text += f"🆕 **可点播**: {available_count} 季 (全部季数)\n"
@@ -999,7 +1013,7 @@ async def process_movie_request(call, selected_item: dict):
 async def emby_exists_season_info(_, call):
     """提示用户该季在Emby中已存在"""
     season_number = int(call.data.split('_')[-1])
-    await callAnswer(call, f'📚 第{season_number}季在Emby库中已存在，无需点播', True)
+    await callAnswer(call, f'📚 第{season_number}季在Emby库中已收录，无需重复点播', True)
 
 
 @bot.on_callback_query(filters.regex('^toggle_season_[0-9]+$') & user_in_group_on_filter)
