@@ -106,7 +106,7 @@ async def members(_, call):
     if not data:
         return await callAnswer(call, '⚠️ 数据库没有你，请重新 /start录入', True)
     await callAnswer(call, f"✅ 用户界面")
-    name, lv, ex, us, embyid, pwd2, preserve_mode, preserve_mode_changed = data
+    name, lv, ex, iv, embyid, pwd2, preserve_mode, preserve_mode_changed = data
     
     # 保号方式显示
     preserve_mode_text = '活跃保号' if preserve_mode == 'active' else '到期保号'
@@ -115,7 +115,7 @@ async def members(_, call):
     text = f"▎__欢迎进入用户面板！{call.from_user.first_name}__\n\n" \
            f"**· 🆔 用户のID** | `{call.from_user.id}`\n" \
            f"**· 📊 当前状态** | {lv}\n" \
-           f"**· 🍒 积分{sakura_b}** | {us}\n" \
+           f"**· 🍒 积分{sakura_b}** | {iv}\n" \
            f"**· 💠 账号名称** | [{name}](tg://user?id={call.from_user.id})\n" \
            f"**· 🚨 到期时间** | {ex}\n" \
            f"**· 🛡️ 保号方式** | {preserve_mode_text}" + (" (可切换)" if can_switch else " (已切换)")

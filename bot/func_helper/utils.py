@@ -26,7 +26,7 @@ async def members_info(tg=None, name=None):
     基础资料 - 可传递 tg,emby_name
     :param tg: tg_id
     :param name: emby_name
-    :return: name, lv, ex, us, embyid, pwd2
+    :return: name, lv, ex, iv, embyid, pwd2, preserve_mode, preserve_mode_changed
     """
     if tg is None:
         tg = name
