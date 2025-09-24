@@ -129,6 +129,42 @@ def emby_block_ikb(embyid) -> InlineKeyboardMarkup:
 user_emby_block_ikb = ikb([[('✅ 已隐藏', 'members')]])
 user_emby_unblock_ikb = ikb([[('❎ 已显示', 'members')]])
 
+def preserve_switch_confirm_ikb(new_mode: str) -> InlineKeyboardMarkup:
+    """保号方式切换确认按钮"""
+    return ikb([
+        [('✅ 确认切换', f'confirm_preserve_switch_{new_mode}'), ('❌ 取消', 'members')]
+    ])
+
+
+def preserve_manage_ikb() -> InlineKeyboardMarkup:
+    """管理员保号方式管理面板按钮"""
+    return ikb([
+        [('📊 保号统计', 'preserve_stats'), ('🔍 查询用户', 'preserve_user_query')],
+        [('⚙️ 修改保号方式', 'preserve_user_modify'), ('🔄 重置切换权限', 'preserve_reset_switch')],
+        [('🔙 返回', 'manage')]
+    ])
+
+
+def preserve_back_ikb() -> InlineKeyboardMarkup:
+    """保号管理返回按钮"""
+    return ikb([[('🔙 返回', 'preserve_manage')]])
+
+
+def preserve_retry_query_ikb() -> InlineKeyboardMarkup:
+    """保号管理重新查询按钮"""
+    return ikb([[('🔄 重新查询', 'preserve_user_query'), ('🔙 返回', 'preserve_manage')]])
+
+
+def preserve_retry_modify_ikb() -> InlineKeyboardMarkup:
+    """保号管理重新修改按钮"""
+    return ikb([[('🔄 重新输入', 'preserve_user_modify'), ('🔙 返回', 'preserve_manage')]])
+
+
+def preserve_retry_reset_ikb() -> InlineKeyboardMarkup:
+    """保号管理重新重置按钮"""
+    return ikb([[('🔄 重新输入', 'preserve_reset_switch'), ('🔙 返回', 'preserve_manage')]])
+
+
 """server ↓"""
 
 

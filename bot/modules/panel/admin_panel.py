@@ -6,7 +6,6 @@ import asyncio
 from datetime import datetime
 
 from pyrogram import filters
-from pyromod.helpers import ikb
 
 from bot import bot, _open, save_config, bot_photo, LOGGER, bot_name, admins, owner, config
 from bot.func_helper.filters import admins_on_filter
@@ -15,7 +14,8 @@ from bot.sql_helper import Session
 from bot.sql_helper.sql_code import sql_count_code, sql_count_p_code, sql_delete_all_unused, sql_delete_unused_by_days
 from bot.sql_helper.sql_emby import sql_count_emby, sql_get_emby, sql_update_emby, Emby
 from bot.func_helper.fix_bottons import gm_ikb_content, open_menu_ikb, gog_rester_ikb, back_open_menu_ikb, \
-    back_free_ikb, re_cr_link_ikb, close_it_ikb, ch_link_ikb, date_ikb, cr_paginate, cr_renew_ikb, invite_lv_ikb
+    back_free_ikb, re_cr_link_ikb, close_it_ikb, ch_link_ikb, date_ikb, cr_paginate, cr_renew_ikb, invite_lv_ikb, \
+    preserve_manage_ikb, preserve_back_ikb, preserve_retry_query_ikb, preserve_retry_modify_ikb, preserve_retry_reset_ikb
 from bot.func_helper.msg_utils import callAnswer, editMessage, sendPhoto, callListen, deleteMessage, sendMessage
 from bot.func_helper.utils import open_check, cr_link_one,rn_link_one
 
@@ -451,11 +451,7 @@ async def preserve_manage(_, call):
     text += f'• **活跃保号**: 根据观看活跃度判断，{config.activity_check_days}天无观看将被封禁\n'
     text += f'• **到期保号**: 根据到期时间判断，到期后自动续期或封禁'
     
-    buttons = ikb([
-        [('📊 保号统计', 'preserve_stats'), ('🔍 查询用户', 'preserve_user_query')],
-        [('⚙️ 修改保号方式', 'preserve_user_modify'), ('🔄 重置切换权限', 'preserve_reset_switch')],
-        [('🔙 返回', 'manage')]
-    ])
+    buttons = preserve_manage_ikb()
     
     await editMessage(call, text, buttons)
 
@@ -492,7 +488,7 @@ async def preserve_stats(_, call):
         except Exception as e:
             text = f'❌ **统计失败**: {str(e)}'
     
-    await editMessage(call, text, ikb([[('🔙 返回', 'preserve_manage')]]))
+    await editMessage(call, text, preserve_back_ikb())
 
 
 @bot.on_callback_query(filters.regex('preserve_user_query') & admins_on_filter)
@@ -504,13 +500,13 @@ async def preserve_user_query(_, call):
         "🔍 **查询用户保号信息**\n\n"
         "请在 120s 内发送用户ID (TG ID)、用户名或Emby用户名\n"
         "取消请发送 /cancel",
-        ikb([[('🔙 返回', 'preserve_manage')]])
+        preserve_back_ikb()
     )
     
     if send is False:
         return
         
-    txt = await callListen(call, 120, ikb([[('🔙 返回', 'preserve_manage')]]))
+    txt = await callListen(call, 120, preserve_back_ikb())
     if txt is False:
         return
     elif txt.text == "/cancel":
@@ -532,7 +528,7 @@ async def preserve_user_query(_, call):
         if not e:
             await editMessage(call, 
                 "❌ **用户不存在**\n\n未找到该用户的记录", 
-                ikb([[('🔄 重新查询', 'preserve_user_query'), ('🔙 返回', 'preserve_manage')]])
+                preserve_retry_query_ikb()
             )
             return
             
@@ -553,12 +549,12 @@ async def preserve_user_query(_, call):
         if e.ex:
             text += f'⏰ **到期时间**: {e.ex.strftime("%Y-%m-%d %H:%M:%S")}\n'
             
-        await editMessage(call, text, ikb([[('🔙 返回', 'preserve_manage')]]))
+        await editMessage(call, text, preserve_back_ikb())
         
     except Exception as e:
         await editMessage(call,
             f"❌ **查询失败**: {str(e)}",
-            ikb([[('🔄 重新查询', 'preserve_user_query'), ('🔙 返回', 'preserve_manage')]])
+            preserve_retry_query_ikb()
         )
 
 
@@ -574,13 +570,13 @@ async def preserve_user_modify(_, call):
         "保号方式: `active` (活跃保号) 或 `expire` (到期保号)\n"
         "例如: `123456789 expire`\n\n"
         "取消请发送 /cancel",
-        ikb([[('🔙 返回', 'preserve_manage')]])
+        preserve_back_ikb()
     )
     
     if send is False:
         return
         
-    txt = await callListen(call, 120, ikb([[('🔙 返回', 'preserve_manage')]]))
+    txt = await callListen(call, 120, preserve_back_ikb())
     if txt is False:
         return
     elif txt.text == "/cancel":
@@ -594,7 +590,7 @@ async def preserve_user_modify(_, call):
         if len(parts) != 2:
             await editMessage(call,
                 "❌ **格式错误**\n\n请使用格式: `用户ID 保号方式`",
-                ikb([[('🔄 重新输入', 'preserve_user_modify'), ('🔙 返回', 'preserve_manage')]])
+                preserve_retry_modify_ikb()
             )
             return
             
@@ -603,7 +599,7 @@ async def preserve_user_modify(_, call):
         if new_mode not in ['active', 'expire']:
             await editMessage(call,
                 "❌ **保号方式错误**\n\n请使用 `active` 或 `expire`",
-                ikb([[('🔄 重新输入', 'preserve_user_modify'), ('🔙 返回', 'preserve_manage')]])
+                preserve_retry_modify_ikb()
             )
             return
         
@@ -617,7 +613,7 @@ async def preserve_user_modify(_, call):
         if not e or not e.embyid:
             await editMessage(call,
                 "❌ **用户不存在或无账户**",
-                ikb([[('🔄 重新输入', 'preserve_user_modify'), ('🔙 返回', 'preserve_manage')]])
+                preserve_retry_modify_ikb()
             )
             return
         
@@ -631,19 +627,19 @@ async def preserve_user_modify(_, call):
                 f'👤 **用户**: {e.name} (ID: {e.tg})\n'
                 f'🔄 **变更**: {mode_name[old_mode]} → {mode_name[new_mode]}\n'
                 f'👮 **操作员**: {call.from_user.first_name}',
-                ikb([[('🔙 返回', 'preserve_manage')]])
+                preserve_back_ikb()
             )
             LOGGER.info(f"【管理员保号修改】管理员 {call.from_user.id} 将用户 {e.tg} 的保号方式从 {old_mode} 改为 {new_mode}")
         else:
             await editMessage(call,
                 "❌ **修改失败**\n\n数据库更新出错",
-                ikb([[('🔄 重新输入', 'preserve_user_modify'), ('🔙 返回', 'preserve_manage')]])
+                preserve_retry_modify_ikb()
             )
         
     except Exception as e:
         await editMessage(call,
             f"❌ **操作失败**: {str(e)}",
-            ikb([[('🔄 重新输入', 'preserve_user_modify'), ('🔙 返回', 'preserve_manage')]])
+            preserve_retry_modify_ikb()
         )
 
 
@@ -657,13 +653,13 @@ async def preserve_reset_switch(_, call):
         "此操作将允许用户重新切换一次保号方式\n\n"
         "请在 120s 内发送用户ID (TG ID)、用户名或Emby用户名\n"
         "取消请发送 /cancel",
-        ikb([[('🔙 返回', 'preserve_manage')]])
+        preserve_back_ikb()
     )
     
     if send is False:
         return
         
-    txt = await callListen(call, 120, ikb([[('🔙 返回', 'preserve_manage')]]))
+    txt = await callListen(call, 120, preserve_back_ikb())
     if txt is False:
         return
     elif txt.text == "/cancel":
@@ -684,7 +680,7 @@ async def preserve_reset_switch(_, call):
         if not e or not e.embyid:
             await editMessage(call,
                 "❌ **用户不存在或无账户**",
-                ikb([[('🔄 重新输入', 'preserve_reset_switch'), ('🔙 返回', 'preserve_manage')]])
+                preserve_retry_reset_ikb()
             )
             return
         
@@ -695,17 +691,17 @@ async def preserve_reset_switch(_, call):
                 f'👤 **用户**: {e.name} (ID: {e.tg})\n'
                 f'🔄 **状态**: 已重置切换权限，用户可以重新切换保号方式\n'
                 f'👮 **操作员**: {call.from_user.first_name}',
-                ikb([[('🔙 返回', 'preserve_manage')]])
+                preserve_back_ikb()
             )
             LOGGER.info(f"【管理员重置切换权限】管理员 {call.from_user.id} 重置了用户 {e.tg} 的保号切换权限")
         else:
             await editMessage(call,
                 "❌ **重置失败**\n\n数据库更新出错",
-                ikb([[('🔄 重新输入', 'preserve_reset_switch'), ('🔙 返回', 'preserve_manage')]])
+                preserve_retry_reset_ikb()
             )
         
     except Exception as e:
         await editMessage(call,
             f"❌ **操作失败**: {str(e)}",
-            ikb([[('🔄 重新输入', 'preserve_reset_switch'), ('🔙 返回', 'preserve_manage')]])
+            preserve_retry_reset_ikb()
         )

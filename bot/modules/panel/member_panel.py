@@ -18,8 +18,8 @@ from bot.func_helper.filters import user_in_group_on_filter
 from bot.func_helper.utils import members_info, tem_adduser, cr_link_one, judge_admins, tem_deluser, pwd_create
 from bot.func_helper.fix_bottons import members_ikb, back_members_ikb, re_create_ikb, del_me_ikb, re_delme_ikb, \
     re_reset_ikb, re_changetg_ikb, emby_block_ikb, user_emby_block_ikb, user_emby_unblock_ikb, re_exchange_b_ikb, \
-    store_ikb, re_bindtg_ikb, close_it_ikb, store_query_page, re_born_ikb, send_changetg_ikb, favorites_page_ikb
-from pyromod.helpers import ikb
+    store_ikb, re_bindtg_ikb, close_it_ikb, store_query_page, re_born_ikb, send_changetg_ikb, favorites_page_ikb, \
+    preserve_switch_confirm_ikb
 from bot.func_helper.msg_utils import callAnswer, editMessage, callListen, sendMessage, ask_return, deleteMessage
 from bot.modules.commands import p_start
 from bot.modules.commands.exchange import rgs_code
@@ -754,9 +754,7 @@ async def switch_preserve_mode(_, call):
     
     # 显示确认对话框
     await callAnswer(call, '🛡️ 保号方式切换确认')
-    confirm_buttons = ikb([
-        [('✅ 确认切换', f'confirm_preserve_switch_{new_mode}'), ('❌ 取消', 'members')]
-    ])
+    confirm_buttons = preserve_switch_confirm_ikb(new_mode)
     
     await editMessage(call,
         f'🛡️ **保号方式切换确认**\n\n'
