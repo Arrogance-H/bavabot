@@ -19,6 +19,7 @@ from bot.func_helper.utils import members_info, tem_adduser, cr_link_one, judge_
 from bot.func_helper.fix_bottons import members_ikb, back_members_ikb, re_create_ikb, del_me_ikb, re_delme_ikb, \
     re_reset_ikb, re_changetg_ikb, emby_block_ikb, user_emby_block_ikb, user_emby_unblock_ikb, re_exchange_b_ikb, \
     store_ikb, re_bindtg_ikb, close_it_ikb, store_query_page, re_born_ikb, send_changetg_ikb, favorites_page_ikb
+from pyromod.helpers import ikb
 from bot.func_helper.msg_utils import callAnswer, editMessage, callListen, sendMessage, ask_return, deleteMessage
 from bot.modules.commands import p_start
 from bot.modules.commands.exchange import rgs_code
@@ -749,6 +750,41 @@ async def switch_preserve_mode(_, call):
     
     current_mode = getattr(e, 'preserve_mode', 'active')
     new_mode = 'expire' if current_mode == 'active' else 'active'
+    mode_name = {'active': '活跃保号', 'expire': '到期保号'}
+    
+    # 显示确认对话框
+    await callAnswer(call, '🛡️ 保号方式切换确认')
+    confirm_buttons = ikb([
+        [('✅ 确认切换', f'confirm_preserve_switch_{new_mode}'), ('❌ 取消', 'members')]
+    ])
+    
+    await editMessage(call,
+        f'🛡️ **保号方式切换确认**\n\n'
+        f'**当前保号方式**: {mode_name[current_mode]}\n'
+        f'**即将切换到**: {mode_name[new_mode]}\n\n'
+        f'📋 **保号方式说明：**\n'
+        f'• **活跃保号**: 根据观看活跃度判断，{config.activity_check_days}天无观看将被封禁\n'
+        f'• **到期保号**: 根据到期时间判断，到期后自动续期或封禁\n\n'
+        f'⚠️ **重要提醒**: 每个用户只有一次切换机会，请谨慎选择！\n'
+        f'✅ 确认后将立即生效，无法撤销。',
+        buttons=confirm_buttons
+    )
+
+
+@bot.on_callback_query(filters.regex('confirm_preserve_switch_') & user_in_group_on_filter)
+async def confirm_preserve_switch(_, call):
+    """确认保号方式切换"""
+    new_mode = call.data.split('_')[-1]  # 从 confirm_preserve_switch_active 或 confirm_preserve_switch_expire 获取模式
+    
+    e = sql_get_emby(tg=call.from_user.id)
+    if not e or not e.embyid:
+        return await callAnswer(call, '⚠️ 您还没有账户，无法切换保号方式', True)
+    
+    # 再次检查是否已经切换过（防止重复提交）
+    if getattr(e, 'preserve_mode_changed', 0) >= 1:
+        return await callAnswer(call, '⚠️ 您已经切换过保号方式，每个用户只能切换一次', True)
+    
+    current_mode = getattr(e, 'preserve_mode', 'active')
     mode_name = {'active': '活跃保号', 'expire': '到期保号'}
     
     await callAnswer(call, f'🔄 正在切换到{mode_name[new_mode]}...')

@@ -66,15 +66,18 @@ def members_ikb(is_admin: bool = False, account: bool = False, can_switch_preser
                     [('💖 我的收藏', 'my_favorites'),('💠 我的设备', 'my_devices')],
                     ]
         
-        # 添加保号方式切换按钮（如果用户可以切换）
-        if can_switch_preserve:
-            normal.insert(-1, [('🛡️ 保号切换', 'switch_preserve_mode')])
-            
         if moviepilot.status:
             normal.append([('🍿 点播中心', 'download_center')])
-        # Add independent TMDB search if API key is configured
+        
+        # 将保号切换按钮与ME点播按钮放在同一行
+        last_row = []
         if tmdb.api_key:
-            normal.append([('🍿 ME点播', 'tmdb_main')])
+            last_row.append(('🍿 ME点播', 'tmdb_main'))
+        if can_switch_preserve:
+            last_row.append(('🛡️ 保号切换', 'switch_preserve_mode'))
+        
+        if last_row:
+            normal.append(last_row)
         normal.append([('♻️ 主界面', 'back_start')])
         return ikb(normal)
     else:
