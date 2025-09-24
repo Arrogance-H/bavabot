@@ -180,13 +180,16 @@ async def demand_command(_, msg):
                 "🗑️ **删除请求**:\n"
                 "`/demand del 请求ID` - 删除指定ME点播请求\n\n"
                 "🔍 **检查状态**:\n"
-                "`/demand check` - 手动检查Emby库并更新请求状态\n\n"
+                "`/demand check` - 手动检查Emby库并更新请求状态\n"
+                "⏰ 系统每3小时自动检查，使用TMDB ID精准匹配\n\n"
                 "📝 **编辑状态**:\n"
                 "• 点击界面中的'📝 编辑状态'按钮\n"
                 "• 可用状态: pending(待处理), downloading(处理中), completed(已入库)\n\n"
                 "💡 **说明**:\n"
                 "• 只显示和管理ME点播系统的请求\n"
                 "• 🎬 标识ME点播请求，固定费用10币\n"
+                "• 系统使用TMDB ID进行精准匹配和自动状态更新\n"
+                "• 状态更新会在群组中通知\n"
                 "• 删除和编辑操作不可恢复，请谨慎操作"
             )
             await sendMessage(msg, help_text, send=True, chat_id=msg.chat.id)

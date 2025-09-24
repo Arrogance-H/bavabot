@@ -1,23 +1,51 @@
 """
 定时检查请求库中的影片是否已添加到Emby库中
 如果Emby库中已有该影片，则自动更新请求状态为已入库
+使用TMDB ID进行精准匹配
 """
 
-from bot import LOGGER, config, bot, emby_url, emby_api
+import json
+import re
+from bot import LOGGER, config, bot, emby_url, emby_api, group
 from bot.func_helper.emby import EmbyUtils
 from bot.sql_helper.sql_request_record import (
     sql_get_request_records_by_state, 
     sql_update_request_status
 )
+from bot.sql_helper.sql_emby import sql_get_emby
 from bot.func_helper.scheduler import scheduler
 
 
+def extract_tmdb_id_from_detail(detail: str) -> str:
+    """从请求详情中提取TMDB ID"""
+    try:
+        # 尝试匹配 "TMDB ID: xxxxx" 格式
+        tmdb_match = re.search(r'TMDB ID:\s*(\d+)', detail)
+        if tmdb_match:
+            return tmdb_match.group(1)
+        
+        # 尝试匹配纯数字格式
+        number_match = re.search(r'\b(\d{4,7})\b', detail)
+        if number_match:
+            return number_match.group(1)
+        
+        return None
+    except Exception as e:
+        LOGGER.error(f"提取TMDB ID失败: {str(e)}")
+        return None
+
+
 async def check_emby_requests():
-    """检查请求库中的影片是否已添加到Emby库中"""
+    """检查请求库中的影片是否已添加到Emby库中，使用TMDB ID精准匹配"""
     try:
         # 检查Emby配置是否可用
         if not emby_url or not emby_api:
             LOGGER.warning("[Emby Request Check] Emby配置未启用，跳过检查")
+            return
+        
+        # 检查群组配置
+        if not group or len(group) == 0:
+            LOGGER.warning("[Emby Request Check] 群组配置未设置，跳过检查")
             return
         
         # 获取所有待处理和处理中的ME点播请求
@@ -43,27 +71,24 @@ async def check_emby_requests():
         
         for request in all_requests:
             try:
+                # 从请求详情中提取TMDB ID
+                tmdb_id = extract_tmdb_id_from_detail(request.detail)
+                
+                if not tmdb_id:
+                    LOGGER.debug(f"[Emby Request Check] 无法提取TMDB ID，跳过: {request.download_id}")
+                    continue
+                
                 # 在Emby库中搜索影片
-                movies = await emby_utils.get_movies(title=request.request_name, limit=5)
+                movies = await emby_utils.get_movies(title=request.request_name, limit=10)
                 
                 if movies and len(movies) > 0:
-                    # 找到匹配的影片，检查是否为电影类型
-                    found_movie = False
+                    # 使用TMDB ID精准匹配
+                    found_movie = None
                     for movie in movies:
-                        if movie.get('item_type') == 'Movie':
-                            # 简单的名称匹配检查
-                            movie_name = movie.get('item_name', '').lower()
-                            request_name = request.request_name.lower()
-                            
-                            # 如果名称相似度较高，认为找到了匹配的影片
-                            if (request_name in movie_name or 
-                                movie_name in request_name or
-                                # 移除常见的年份、标点符号进行比较
-                                request_name.replace(' ', '').replace('(', '').replace(')', '') in 
-                                movie_name.replace(' ', '').replace('(', '').replace(')', '')):
-                                
-                                found_movie = True
-                                break
+                        emby_tmdb_id = movie.get('tmdbid')
+                        if emby_tmdb_id and str(emby_tmdb_id) == str(tmdb_id):
+                            found_movie = movie
+                            break
                     
                     if found_movie:
                         # 更新请求状态为已入库
@@ -76,20 +101,35 @@ async def check_emby_requests():
                         
                         if success:
                             updated_count += 1
-                            LOGGER.info(f"[Emby Request Check] 发现影片已入库，更新状态: {request.request_name} ({request.download_id})")
+                            LOGGER.info(f"[Emby Request Check] TMDB ID匹配成功，更新状态: {request.request_name} ({request.download_id}) - TMDB ID: {tmdb_id}")
                             
-                            # 发送通知给用户
+                            # 获取请求用户信息
+                            user_info = sql_get_emby(tg=request.tg)
+                            username = user_info.name if user_info else f"用户{request.tg}"
+                            
+                            # 发送群组通知
                             try:
-                                await bot.send_message(
-                                    chat_id=request.tg,
-                                    text=f"🎉 您点播的影片「{request.request_name}」已自动检测到已入库！\n\n"
-                                         f"📺 现在可以在Emby中观看了\n"
-                                         f"🆔 请求ID: {request.download_id}"
+                                notification_text = (
+                                    f"🎉 **ME点播自动检测完成**\n\n"
+                                    f"🎬 **影片名称**: {request.request_name}\n"
+                                    f"📊 **请求状态**: 已入库 ✅\n"
+                                    f"👤 **请求人**: {username}\n"
+                                    f"🆔 **请求ID**: `{request.download_id}`\n"
+                                    f"🔢 **TMDB ID**: {tmdb_id}\n\n"
+                                    f"📺 影片已可在Emby中观看！"
                                 )
+                                
+                                await bot.send_message(
+                                    chat_id=group[0],
+                                    text=notification_text
+                                )
+                                LOGGER.info(f"[Emby Request Check] 群组通知已发送: {request.request_name}")
                             except Exception as e:
-                                LOGGER.error(f"[Emby Request Check] 发送通知失败 {request.tg}: {str(e)}")
+                                LOGGER.error(f"[Emby Request Check] 发送群组通知失败: {str(e)}")
                         else:
                             LOGGER.error(f"[Emby Request Check] 更新状态失败: {request.download_id}")
+                    else:
+                        LOGGER.debug(f"[Emby Request Check] TMDB ID未匹配: {request.request_name} (期望: {tmdb_id})")
                             
             except Exception as e:
                 LOGGER.error(f"[Emby Request Check] 检查请求失败 {request.download_id}: {str(e)}")
@@ -104,15 +144,15 @@ async def check_emby_requests():
         LOGGER.error(f"[Emby Request Check] 检查任务执行失败: {str(e)}")
 
 
-# 添加定时任务 - 每30分钟检查一次
+# 添加定时任务 - 每3小时检查一次
 if emby_url and emby_api:
     scheduler.add_job(
         check_emby_requests, 
         'interval', 
-        minutes=30, 
+        hours=3, 
         id='check_emby_requests',
         max_instances=1  # 确保不会重复执行
     )
-    LOGGER.info("[Emby Request Check] 已添加Emby请求检查定时任务 (每30分钟执行一次)")
+    LOGGER.info("[Emby Request Check] 已添加Emby请求检查定时任务 (每3小时执行一次)")
 else:
     LOGGER.warning("[Emby Request Check] Emby配置未启用，跳过添加定时任务")
