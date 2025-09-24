@@ -70,7 +70,7 @@ async def sync_download_tasks():
                         pass
                     sql_update_request_status(
                         download_id=record.download_id,
-                        transfer_state=transfer_state,
+                        transfer_state='success' if transfer_state else 'failed',
                         download_state='completed',
                         emby_state='processing' if transfer_state else None,
                         progress=100,

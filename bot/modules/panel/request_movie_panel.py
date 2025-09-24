@@ -316,7 +316,14 @@ def get_request_record_text(request_record):
         progress_text = ''
         if item.transfer_state is not None:
             if item.transfer_state:
-                text += f"「{index}」：{item.request_name} \n状态：已入库 📽️\n"
+                # 根据emby_state显示更详细的状态
+                emby_state = getattr(item, 'emby_state', 'not_checked')
+                if emby_state == 'stored':
+                    text += f"「{index}」：{item.request_name} \n状态：已入库 📽️\n"
+                elif emby_state == 'processing':
+                    text += f"「{index}」：{item.request_name} \n状态：处理中 ⏳\n"
+                else:
+                    text += f"「{index}」：{item.request_name} \n状态：处理中 ⏳\n"  # 默认为处理中
             else:
                 text += f"「{index}」：{item.request_name} \n状态：入库失败 🚫\n"
         else:
