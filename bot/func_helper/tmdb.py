@@ -108,7 +108,9 @@ class TMDBService:
                     "popularity": item.get("popularity", 0),
                     "genre_ids": item.get("genre_ids", []),
                     "media_type": "tv",
-                    "media_type_cn": "电视剧"
+                    "media_type_cn": "电视剧",
+                    "number_of_seasons": 0,  # Will be updated with detailed info
+                    "number_of_episodes": 0  # Will be updated with detailed info
                 }
             
             # Add full image URLs
@@ -128,7 +130,35 @@ class TMDBService:
         results.sort(key=lambda x: x["popularity"], reverse=True)
         
         LOGGER.info(f"TMDB search successful for '{query}': found {len(results)} results on page {page}")
-        return True, results, pagination_info
+        # Enhance TV series results with season information
+        enhanced_results = await self._enhance_tv_results_with_seasons(results)
+        
+        return True, enhanced_results, pagination_info
+
+    async def _enhance_tv_results_with_seasons(self, results: List[Dict]) -> List[Dict]:
+        """Enhance TV series results with season information (only for first 5 results to optimize performance)"""
+        enhanced_results = []
+        tv_count = 0
+        
+        for result in results:
+            if result.get("media_type") == "tv" and tv_count < 5:  # Only enhance first 5 TV series
+                # Get detailed TV information to fetch season count
+                tv_id = result.get("id")
+                if tv_id:
+                    try:
+                        tv_details = await self.get_tv_details(tv_id)
+                        if tv_details:
+                            result["number_of_seasons"] = tv_details.get("number_of_seasons", 0)
+                            result["number_of_episodes"] = tv_details.get("number_of_episodes", 0)
+                            LOGGER.info(f"Enhanced TV series {result.get('title', 'Unknown')} with {result['number_of_seasons']} seasons")
+                        tv_count += 1
+                    except Exception as e:
+                        LOGGER.warning(f"Failed to get season info for TV series {tv_id}: {str(e)}")
+                        # Keep default values if failed
+            
+            enhanced_results.append(result)
+        
+        return enhanced_results
 
     async def get_movie_details(self, movie_id: int) -> Optional[Dict]:
         """Get detailed movie information"""
@@ -330,6 +360,35 @@ class TMDBService:
             
         if year:
             text += f"📅 **年份**: {year}\n"
+        
+        # Add season information for TV series
+        if item.get("media_type") == "tv":
+            number_of_seasons = item.get("number_of_seasons", 0)
+            number_of_episodes = item.get("number_of_episodes", 0)
+            emby_found = item.get("emby_found", False)
+            emby_season_count = item.get("emby_season_count", 0)
+            
+            if number_of_seasons > 0:
+                text += f"📺 **TMDB季数**: {number_of_seasons} 季"
+                if number_of_episodes > 0:
+                    text += f" ({number_of_episodes} 集)\n"
+                else:
+                    text += "\n"
+                
+                # Add Emby library information if available
+                if emby_found:
+                    text += f"📚 **Emby库季数**: {emby_season_count} 季"
+                    if emby_season_count >= number_of_seasons:
+                        text += " (已全部收录)\n"
+                    elif emby_season_count > 0:
+                        missing_seasons = number_of_seasons - emby_season_count
+                        text += f" (缺少 {missing_seasons} 季)\n"
+                    else:
+                        text += " (未收录)\n"
+                else:
+                    text += f"📚 **Emby库**: 未收录\n"
+            else:
+                text += f"📺 **季数**: 获取中...\n"
             
         if vote_average > 0:
             stars = "⭐" * min(int(vote_average/2), 5)

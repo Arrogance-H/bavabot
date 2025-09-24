@@ -436,6 +436,34 @@ async def tmdb_id_search_results(call, tmdb_id: int):
         )
 
 
+async def enhance_results_with_emby_info(display_results: list) -> list:
+    """为搜索结果中的电视剧添加Emby库信息"""
+    enhanced_results = []
+    
+    for item in display_results:
+        if item.get('media_type') == 'tv':
+            # 为电视剧检查Emby库信息
+            tv_title = item.get('title', '')
+            if tv_title:
+                try:
+                    emby_found, emby_tv_info, emby_season_count = await emby.search_tv_series_by_title(tv_title)
+                    if emby_found:
+                        item['emby_found'] = True
+                        item['emby_season_count'] = emby_season_count
+                        LOGGER.info(f"在Emby中找到电视剧: {tv_title}, Emby季数: {emby_season_count}")
+                    else:
+                        item['emby_found'] = False
+                        item['emby_season_count'] = 0
+                except Exception as e:
+                    LOGGER.warning(f"检查Emby库失败: {tv_title} - {str(e)}")
+                    item['emby_found'] = False
+                    item['emby_season_count'] = 0
+        
+        enhanced_results.append(item)
+    
+    return enhanced_results
+
+
 async def tmdb_search_results(call, query: str, page: int = 1):
     """显示TMDB搜索结果"""
     import math
@@ -488,6 +516,9 @@ async def tmdb_search_results(call, query: str, page: int = 1):
         # 只显示前5个搜索结果，无分页
         MAX_RESULTS = 5
         display_results = all_results[:MAX_RESULTS]
+        
+        # 为电视剧添加Emby库信息
+        display_results = await enhance_results_with_emby_info(display_results)
         
         # 添加调试日志
         LOGGER.info(f"TMDB搜索结果: 查询='{query}', 显示结果={len(display_results)}, 总结果={total_results}")
