@@ -722,24 +722,20 @@ async def me_request_movie(_, call):
             emby_found, emby_tv_info, emby_season_count = await emby.search_tv_series_by_title(tv_title)
             
             if emby_found:
-                # 如果在Emby中找到该电视剧，比较季数
+                # 如果在Emby中找到该电视剧，显示季数对比信息
                 if emby_season_count >= tmdb_season_count:
-                    # Emby季数等于或大于TMDB季数，不允许点播
+                    # Emby季数等于或大于TMDB季数，显示已有季数信息
                     await editMessage(call,
-                        f"🚫 **此电视剧不能点播**\n\n"
+                        f"📚 **电视剧季数信息**\n\n"
                         f"🎭 **剧名**: {tv_title}\n"
                         f"📺 **TMDB总季数**: {tmdb_season_count} 季\n"
                         f"📚 **Emby库季数**: {emby_season_count} 季\n\n"
                         f"✅ **Emby库已完整收录该剧的所有季数**\n"
-                        f"请直接在Emby客户端中观看!\n\n"
-                        f"💡 **观看指引:**\n"
-                        f"• 打开Emby客户端应用\n"
-                        f"• 搜索剧名: {tv_title}\n"
-                        f"• 即可开始观看所有季数",
+                        f"正在为您显示详细季数信息...",
                         buttons=tmdb_main_ikb,
                         parse_mode=enums.ParseMode.MARKDOWN
                     )
-                    return
+                    await asyncio.sleep(2)  # 让用户看到提示信息
                 else:
                     # Emby季数少于TMDB季数，可以点播缺少的季数
                     await editMessage(call,
@@ -812,9 +808,32 @@ async def show_season_selection(call, tv_series: dict, seasons: list, selected_s
     available_count = len(available_seasons)
     
     if available_count == 0:
-        # 没有可选择的季数
+        # 没有可选择的季数，但仍显示季数信息供用户查看
+        selection_text += f"📺 **TMDB总季数**: {tmdb_season_count} 季\n"
+        selection_text += f"📚 **Emby库季数**: {emby_season_count} 季\n"
         selection_text += f"🚫 **无可点播季数**: 所有季数均已在Emby库中\n\n"
-        selection_text += f"💡 **提示**: 请直接在Emby客户端中观看完整剧集"
+        selection_text += f"💡 **提示**: 请直接在Emby客户端中观看完整剧集\n\n"
+        selection_text += f"📝 **已有季数详情**:\n\n"
+        
+        # 显示已有季数的详细信息
+        for season in seasons[:8]:  # 显示前8季的详细信息
+            season_num = season.get('season_number', 0)
+            episode_count = season.get('episode_count', 0)
+            air_date = season.get('air_date', '')
+            year_info = f" ({air_date[:4]})" if air_date else ""
+            
+            # 所有季数在Emby中都已有
+            if season_num <= emby_season_count:
+                status_icon = "📚"  # Emby中已有
+                season_text = f"{status_icon} **第{season_num}季**: {episode_count}集{year_info} (Emby已有)"
+            else:
+                status_icon = "❓"  # 理论上不应该出现，但保持一致性
+                season_text = f"{status_icon} **第{season_num}季**: {episode_count}集{year_info}"
+                
+            selection_text += season_text + "\n"
+        
+        if len(seasons) > 8:
+            selection_text += f"... 还有 {len(seasons) - 8} 季\n"
         
         # 显示简化的返回按钮
         from bot.func_helper.fix_bottons import ikb
