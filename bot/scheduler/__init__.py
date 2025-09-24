@@ -6,4 +6,5 @@ from .check_restart import check_restart
 from .ranks_task import week_ranks, day_ranks
 from .sync_favorites import sync_favorites
 from .sync_mp_download import sync_download_tasks
+from .sync_emby_requests import check_emby_requests
 # Hunt scheduler functions removed
