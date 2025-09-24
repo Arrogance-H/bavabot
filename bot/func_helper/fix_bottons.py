@@ -13,7 +13,7 @@ cache = Cache()
 """start面板 ↓"""
 
 
-def judge_start_ikb(is_admin: bool, account: bool) -> InlineKeyboardMarkup:
+def judge_start_ikb(is_admin: bool, account: bool, user_data=None) -> InlineKeyboardMarkup:
     """
     start面板按钮
     """
@@ -28,7 +28,16 @@ def judge_start_ikb(is_admin: bool, account: bool) -> InlineKeyboardMarkup:
             d.append(['🏪 兑换商店', 'storeall'])
     else:
         d = [['️👥 用户功能', 'members'], ['🌐 服务器', 'server']]
-        if schedall.check_ex: d.append(['🎟️ 使用续期码', 'exchange'])
+        # 只有在检查到期且用户不是活跃保号模式时才显示续期码按钮
+        show_renew_button = schedall.check_ex
+        if user_data and show_renew_button:
+            _, _, _, _, _, _, preserve_mode, _ = user_data
+            # 如果是活跃保号用户，不显示使用续期码按钮
+            if preserve_mode == 'active':
+                show_renew_button = False
+        
+        if show_renew_button:
+            d.append(['🎟️ 使用续期码', 'exchange'])
     if _open.checkin: d.append([f'🎯 签到', 'checkin'])
     if _open.punch_in: d.append([f'🎮 F1', 'punch_in'])
     lines = array_chunk(d, 2)
@@ -57,19 +66,22 @@ def members_ikb(is_admin: bool = False, account: bool = False, can_switch_preser
                     [('💖 我的收藏', 'my_favorites'),('💠 我的设备', 'my_devices')],
                     ]
         
-        # 添加保号方式切换按钮（如果用户可以切换）
-        if can_switch_preserve:
-            normal.insert(-1, [('🛡️ 保号切换', 'switch_preserve_mode')])
-            
         if moviepilot.status:
             normal.append([('🍿 点播中心', 'download_center')])
-        # Add independent TMDB search if API key is configured
+        
+        # 将保号切换按钮与ME点播按钮放在同一行
+        last_row = []
         if tmdb.api_key:
-            normal.append([('🍿 ME点播', 'tmdb_main')])
+            last_row.append(('🍿 ME点播', 'tmdb_main'))
+        if can_switch_preserve:
+            last_row.append(('🛡️ 保号切换', 'switch_preserve_mode'))
+        
+        if last_row:
+            normal.append(last_row)
         normal.append([('♻️ 主界面', 'back_start')])
         return ikb(normal)
     else:
-        return judge_start_ikb(is_admin, account)
+        return judge_start_ikb(is_admin, account, user_data=None)
         # return ikb(
         #     [[('👑 创建账户', 'create')], [('⭕ 换绑TG', 'changetg'), ('🔍 绑定TG', 'bindtg')],
         #      [('♻️ 主界面', 'back_start')]])
@@ -116,6 +128,42 @@ def emby_block_ikb(embyid) -> InlineKeyboardMarkup:
 
 user_emby_block_ikb = ikb([[('✅ 已隐藏', 'members')]])
 user_emby_unblock_ikb = ikb([[('❎ 已显示', 'members')]])
+
+def preserve_switch_confirm_ikb(new_mode: str) -> InlineKeyboardMarkup:
+    """保号方式切换确认按钮"""
+    return ikb([
+        [('✅ 确认切换', f'confirm_preserve_switch_{new_mode}'), ('❌ 取消', 'members')]
+    ])
+
+
+def preserve_manage_ikb() -> InlineKeyboardMarkup:
+    """管理员保号方式管理面板按钮"""
+    return ikb([
+        [('📊 保号统计', 'preserve_stats'), ('🔍 查询用户', 'preserve_user_query')],
+        [('⚙️ 修改保号方式', 'preserve_user_modify'), ('🔄 重置切换权限', 'preserve_reset_switch')],
+        [('🔙 返回', 'manage')]
+    ])
+
+
+def preserve_back_ikb() -> InlineKeyboardMarkup:
+    """保号管理返回按钮"""
+    return ikb([[('🔙 返回', 'preserve_manage')]])
+
+
+def preserve_retry_query_ikb() -> InlineKeyboardMarkup:
+    """保号管理重新查询按钮"""
+    return ikb([[('🔄 重新查询', 'preserve_user_query'), ('🔙 返回', 'preserve_manage')]])
+
+
+def preserve_retry_modify_ikb() -> InlineKeyboardMarkup:
+    """保号管理重新修改按钮"""
+    return ikb([[('🔄 重新输入', 'preserve_user_modify'), ('🔙 返回', 'preserve_manage')]])
+
+
+def preserve_retry_reset_ikb() -> InlineKeyboardMarkup:
+    """保号管理重新重置按钮"""
+    return ikb([[('🔄 重新输入', 'preserve_reset_switch'), ('🔙 返回', 'preserve_manage')]])
+
 
 """server ↓"""
 

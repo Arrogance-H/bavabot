@@ -93,7 +93,7 @@ async def p_start(_, msg):
             await asyncio.gather(deleteMessage(msg),
                                  sendPhoto(msg, bot_photo,
                                            f"**BAVA Hi~**\n\n🎉欢迎您 [{msg.from_user.first_name}](tg://user?id={msg.from_user.id})",
-                                           buttons=judge_start_ikb(is_admin, True)))
+                                           buttons=judge_start_ikb(is_admin, True, user_data=data)))
 
 
 # 返回面板
@@ -101,10 +101,12 @@ async def p_start(_, msg):
 async def b_start(_, call):
     if await user_in_group_filter(_, call):
         is_admin = judge_admins(call.from_user.id)
+        # 获取用户数据以确定是否显示续期码按钮
+        data = await members_info(tg=call.from_user.id)
         await asyncio.gather(callAnswer(call, "⭐ 返回start"),
                              editMessage(call,
                                          text=f"**BAVA Hi~**\n\n🎉欢迎您 [{call.from_user.first_name}](tg://user?id={call.from_user.id})",
-                                         buttons=judge_start_ikb(is_admin, account=True)))
+                                         buttons=judge_start_ikb(is_admin, account=True, user_data=data)))
     elif not await user_in_group_filter(_, call):
         await asyncio.gather(callAnswer(call, "⭐ 返回start"),
                              editMessage(call, text='💢 拜托啦！请先点击下面加入我们的群组和频道，然后再 /start 一下好吗？\n\n'
