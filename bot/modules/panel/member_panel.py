@@ -585,10 +585,19 @@ async def call_exchange(_, call):
 
 @bot.on_callback_query(filters.regex('storeall'))
 async def do_store(_, call):
+    # 获取用户信息，检查保号方式
+    e = sql_get_emby(tg=call.from_user.id)
+    preserve_mode = getattr(e, 'preserve_mode', 'active') if e else 'active'
+    
+    # 构建兑换商店文本
+    store_text = '**🏪 请选择想要使用的服务：**\n\n'
+    
+    # 只有到期保号用户才显示自动续期状态
+    if preserve_mode == 'expire':
+        store_text += f'🤖 自动{sakura_b}续期状态：{_open.exchange} {_open.exchange_cost}/月'
+    
     await asyncio.gather(callAnswer(call, '✔️ 欢迎进入兑换商店'),
-                         editMessage(call,
-                                     f'**🏪 请选择想要使用的服务：**\n\n🤖 自动{sakura_b}续期状态：{_open.exchange} {_open.exchange_cost}/月',
-                                     buttons=store_ikb()))
+                         editMessage(call, store_text, buttons=store_ikb()))
 
 
 @bot.on_callback_query(filters.regex('store-reborn'))
