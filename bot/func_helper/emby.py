@@ -973,11 +973,11 @@ class Embyservice(metaclass=Singleton):
             LOGGER.error(f"搜索电影异常: {title} - {str(e)}")
             return []
 
-    async def get_tv_series_seasons(self, series_id: str) -> Tuple[bool, List[Dict], int]:
+    async def get_tv_series_seasons(self, series_id: str) -> Tuple[bool, List[Dict], int, List[int]]:
         """
         获取电视剧的季数信息
         :param series_id: 电视剧的ID
-        :return: (是否成功, 季数列表, 季数总数)
+        :return: (是否成功, 季数列表, 季数总数, 现有季数编号列表)
         """
         try:
             # 获取电视剧的详细信息，包括季数
@@ -1019,19 +1019,20 @@ class Embyservice(metaclass=Singleton):
             # 按季数排序
             seasons_list.sort(key=lambda x: x["season_number"])
             season_count = len(seasons_list)
+            existing_season_numbers = [s["season_number"] for s in seasons_list]
             
-            LOGGER.info(f"获取电视剧季数成功: {series_id}, 共{season_count}季")
-            return True, seasons_list, season_count
+            LOGGER.info(f"获取电视剧季数成功: {series_id}, 共{season_count}季, 季数: {existing_season_numbers}")
+            return True, seasons_list, season_count, existing_season_numbers
             
         except Exception as e:
             LOGGER.error(f"获取电视剧季数异常: {series_id} - {str(e)}")
-            return False, [], 0
+            return False, [], 0, []
 
-    async def search_tv_series_by_title(self, title: str) -> Tuple[bool, Optional[Dict], int]:
+    async def search_tv_series_by_title(self, title: str) -> Tuple[bool, Optional[Dict], int, List[int]]:
         """
         根据标题搜索电视剧并返回季数信息
         :param title: 电视剧标题
-        :return: (是否找到, 电视剧信息, 季数总数)
+        :return: (是否找到, 电视剧信息, 季数总数, 现有季数编号列表)
         """
         try:
             # 搜索电视剧
@@ -1043,19 +1044,20 @@ class Embyservice(metaclass=Singleton):
                     series_id = movie.get('item_id')
                     if series_id:
                         # 获取季数信息
-                        success, seasons, season_count = await self.get_tv_series_seasons(series_id)
+                        success, seasons, season_count, existing_seasons = await self.get_tv_series_seasons(series_id)
                         if success:
                             movie['seasons'] = seasons
                             movie['season_count'] = season_count
-                            LOGGER.info(f"找到电视剧: {title}, 共{season_count}季")
-                            return True, movie, season_count
+                            movie['existing_seasons'] = existing_seasons
+                            LOGGER.info(f"找到电视剧: {title}, 共{season_count}季, 现有季数: {existing_seasons}")
+                            return True, movie, season_count, existing_seasons
             
             LOGGER.info(f"未找到电视剧: {title}")
-            return False, None, 0
+            return False, None, 0, []
             
         except Exception as e:
             LOGGER.error(f"搜索电视剧异常: {title} - {str(e)}")
-            return False, None, 0
+            return False, None, 0, []
 
     def __del__(self):
         """析构函数，确保资源清理"""

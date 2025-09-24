@@ -603,10 +603,12 @@ def mp_config_ikb():
     ])
     return keyboard
 
-def tmdb_season_selection_ikb(seasons: list, selected_seasons: list = None, emby_season_count: int = 0):
+def tmdb_season_selection_ikb(seasons: list, selected_seasons: list = None, emby_season_count: int = 0, existing_seasons: list = None):
     """TMDB电视剧季数选择按钮 - 支持多选，排除Emby中已有的季数"""
     if selected_seasons is None:
         selected_seasons = []
+    if existing_seasons is None:
+        existing_seasons = []
     
     buttons = []
     
@@ -616,8 +618,8 @@ def tmdb_season_selection_ikb(seasons: list, selected_seasons: list = None, emby
         season_num = season.get('season_number', 0)
         episode_count = season.get('episode_count', 0)
         
-        # 检查该季是否在Emby中已存在
-        is_in_emby = emby_season_count > 0 and season_num <= emby_season_count
+        # 检查该季是否在Emby中已存在 - 使用实际的现有季数列表
+        is_in_emby = season_num in existing_seasons
         
         if is_in_emby:
             # Emby中已有的季数，显示为已有状态，不可点击
