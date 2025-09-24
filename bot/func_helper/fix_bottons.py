@@ -47,7 +47,7 @@ judge_group_ikb = ikb([[('🌟 频道入口 ', f't.me/{chanel}', 'url'),
 """members ↓"""
 
 
-def members_ikb(is_admin: bool = False, account: bool = False) -> InlineKeyboardMarkup:
+def members_ikb(is_admin: bool = False, account: bool = False, can_switch_preserve: bool = False) -> InlineKeyboardMarkup:
     """
     判断用户面板
     """
@@ -56,6 +56,11 @@ def members_ikb(is_admin: bool = False, account: bool = False) -> InlineKeyboard
                     [('🎬 显示/隐藏', 'embyblock'), ('⭕ 重置密码', 'reset')],
                     [('💖 我的收藏', 'my_favorites'),('💠 我的设备', 'my_devices')],
                     ]
+        
+        # 添加保号方式切换按钮（如果用户可以切换）
+        if can_switch_preserve:
+            normal.insert(-1, [('🛡️ 保号切换', 'switch_preserve_mode')])
+            
         if moviepilot.status:
             normal.append([('🍿 点播中心', 'download_center')])
         # Add independent TMDB search if API key is configured
@@ -138,7 +143,8 @@ async def cr_page_server():
 gm_ikb_content = ikb([[('⭕ 注册状态', 'open-menu'), ('🎟️ 注册/续期码', 'cr_link')],
                       [('💊 查询注册', 'ch_link'), ('🏬 兑换设置', 'set_renew')],
                       [('👥 用户列表', 'normaluser'), ('👑 白名单列表', 'whitelist'), ('💠 设备列表', 'user_devices')],
-                      [('🌏 定时', 'schedall'), ('🕹️ 主界面', 'back_start'), ('其他 🪟', 'back_config')]])
+                      [('🛡️ 保号管理', 'preserve_manage'), ('🌏 定时', 'schedall')],
+                      [('🕹️ 主界面', 'back_start'), ('其他 🪟', 'back_config')]])
 
 
 def open_menu_ikb(openstats, timingstats) -> InlineKeyboardMarkup:
@@ -384,10 +390,18 @@ async def cr_kk_ikb(uid, first):
     if data is None:
         text += f'**· 🆔 TG** ：[{first}](tg://user?id={uid}) [`{uid}`]\n数据库中没有此ID。ta 还没有私聊过我'
     else:
-        name, lv, ex, iv, embyid, pwd2 = data
+        name, lv, ex, iv, embyid, pwd2, preserve_mode, preserve_mode_changed = data
         if name != '无账户信息':
             ban = "🌟 解除禁用" if lv == "**已禁用**" else '💢 禁用账户'
             keyboard = [[ban, f'user_ban-{uid}'], ['⚠️ 删除账户', f'closeemby-{uid}']]
+            
+            # 添加保号方式管理按钮
+            mode_name = {'active': '活跃保号', 'expire': '到期保号'}
+            current_mode_text = mode_name.get(preserve_mode, '未知')
+            switch_to_mode = 'expire' if preserve_mode == 'active' else 'active'
+            switch_to_text = mode_name.get(switch_to_mode, '未知')
+            keyboard.append([f'🛡️ 切换至{switch_to_text}', f'kk_preserve_switch-{uid}'])
+            
             if len(extra_emby_libs) > 0:
                 success, rep = await emby.user(emby_id=embyid)
                 if success:
@@ -420,12 +434,22 @@ async def cr_kk_ikb(uid, first):
                 text1 = f"**· 📅 过去30天未有记录**"
         else:
             keyboard.append(['✨ 赠送资格', f'gift-{uid}'])
+        
+        # 添加保号方式信息到显示文本
+        if name != '无账户信息':
+            preserve_mode_text = mode_name.get(preserve_mode, '未知')
+            switch_status = '已切换' if preserve_mode_changed >= 1 else '可切换'
+            preserve_info = f"**· 🛡️ 保号方式** | {preserve_mode_text} ({switch_status})\n"
+        else:
+            preserve_info = ""
+            
         text += f"**· 🍉 TG&名称** | [{first}](tg://user?id={uid})\n" \
                 f"**· 🍒 识别のID** | `{uid}`\n" \
                 f"**· 🍓 当前状态** | {lv}\n" \
                 f"**· 🍥 持有{sakura_b}** | {iv}\n" \
                 f"**· 💠 账号名称** | {name}\n" \
-                f"**· 🚨 到期时间** | **{ex}**\n"
+                f"**· 🚨 到期时间** | **{ex}**\n" \
+                f"{preserve_info}"
         text += text1
         keyboard.extend([['🚫 踢出并封禁', f'fuckoff-{uid}'], ['❌ 删除消息', f'closeit']])
         lines = array_chunk(keyboard, 2)

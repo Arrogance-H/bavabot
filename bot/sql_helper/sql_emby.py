@@ -25,6 +25,8 @@ class Emby(Base):
     us = Column(Integer, default=0)
     iv = Column(Integer, default=0)
     ch = Column(DateTime, nullable=True)
+    preserve_mode = Column(String(10), default='active')  # 'active' or 'expire'
+    preserve_mode_changed = Column(Integer, default=0)  # 0 = not changed, 1 = changed once
 
 
 Emby.__table__.create(bind=engine, checkfirst=True)

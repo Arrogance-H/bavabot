@@ -69,11 +69,11 @@ async def create_user(_, call, us, stats):
                 eid = data[0]
                 ex = data[2]
                 
-                # 数据库操作
+                # 数据库操作，新用户默认为活跃保号模式
                 if stats:
-                    sql_update_emby(Emby.tg == tg, embyid=eid, name=emby_name, pwd=pwd, pwd2=emby_pwd2, lv='b', cr=datetime.now(), ex=ex) 
+                    sql_update_emby(Emby.tg == tg, embyid=eid, name=emby_name, pwd=pwd, pwd2=emby_pwd2, lv='b', cr=datetime.now(), ex=ex, preserve_mode='active') 
                 else:
-                    sql_update_emby(Emby.tg == tg, embyid=eid, name=emby_name, pwd=pwd, pwd2=emby_pwd2, lv='b', cr=datetime.now(), ex=ex, us=0)
+                    sql_update_emby(Emby.tg == tg, embyid=eid, name=emby_name, pwd=pwd, pwd2=emby_pwd2, lv='b', cr=datetime.now(), ex=ex, us=0, preserve_mode='active')
                 
                 # 在锁内更新计数器
                 tem_adduser()
@@ -106,18 +106,24 @@ async def members(_, call):
     if not data:
         return await callAnswer(call, '⚠️ 数据库没有你，请重新 /start录入', True)
     await callAnswer(call, f"✅ 用户界面")
-    name, lv, ex, us, embyid, pwd2 = data
+    name, lv, ex, us, embyid, pwd2, preserve_mode, preserve_mode_changed = data
+    
+    # 保号方式显示
+    preserve_mode_text = '活跃保号' if preserve_mode == 'active' else '到期保号'
+    can_switch = preserve_mode_changed == 0
+    
     text = f"▎__欢迎进入用户面板！{call.from_user.first_name}__\n\n" \
            f"**· 🆔 用户のID** | `{call.from_user.id}`\n" \
            f"**· 📊 当前状态** | {lv}\n" \
            f"**· 🍒 积分{sakura_b}** | {us}\n" \
            f"**· 💠 账号名称** | [{name}](tg://user?id={call.from_user.id})\n" \
-           f"**· 🚨 到期时间** | {ex}"
+           f"**· 🚨 到期时间** | {ex}\n" \
+           f"**· 🛡️ 保号方式** | {preserve_mode_text}" + (" (可切换)" if can_switch else " (已切换)")
     if not embyid:
         is_admin = judge_admins(call.from_user.id)
         await editMessage(call, text, members_ikb(is_admin, False))
     else:
-        await editMessage(call, text, members_ikb(account=True))
+        await editMessage(call, text, members_ikb(account=True, can_switch_preserve=can_switch))
 
 
 # 创建账户
@@ -579,10 +585,19 @@ async def call_exchange(_, call):
 
 @bot.on_callback_query(filters.regex('storeall'))
 async def do_store(_, call):
+    # 获取用户信息，检查保号方式
+    e = sql_get_emby(tg=call.from_user.id)
+    preserve_mode = getattr(e, 'preserve_mode', 'active') if e else 'active'
+    
+    # 构建兑换商店文本
+    store_text = '**🏪 请选择想要使用的服务：**\n\n'
+    
+    # 只有到期保号用户才显示自动续期状态
+    if preserve_mode == 'expire':
+        store_text += f'🤖 自动{sakura_b}续期状态：{_open.exchange} {_open.exchange_cost}/月'
+    
     await asyncio.gather(callAnswer(call, '✔️ 欢迎进入兑换商店'),
-                         editMessage(call,
-                                     f'**🏪 请选择想要使用的服务：**\n\n🤖 自动{sakura_b}续期状态：{_open.exchange} {_open.exchange_cost}/月',
-                                     buttons=store_ikb()))
+                         editMessage(call, store_text, buttons=store_ikb()))
 
 
 @bot.on_callback_query(filters.regex('store-reborn'))
@@ -702,6 +717,59 @@ async def do_store_invite(_, call):
 @bot.on_callback_query(filters.regex('store-query'))
 async def do_store_query(_, call):
     a, b = sql_count_c_code(tg_id=call.from_user.id)
+
+
+@bot.on_callback_query(filters.regex('switch_preserve_mode') & user_in_group_on_filter)
+async def switch_preserve_mode(_, call):
+    """用户切换保号方式"""
+    e = sql_get_emby(tg=call.from_user.id)
+    if not e or not e.embyid:
+        return await callAnswer(call, '⚠️ 您还没有账户，无法切换保号方式', True)
+    
+    # 检查是否已经切换过
+    if getattr(e, 'preserve_mode_changed', 0) >= 1:
+        return await callAnswer(call, '⚠️ 您已经切换过保号方式，每个用户只能切换一次', True)
+    
+    current_mode = getattr(e, 'preserve_mode', 'active')
+    new_mode = 'expire' if current_mode == 'active' else 'active'
+    mode_name = {'active': '活跃保号', 'expire': '到期保号'}
+    
+    await callAnswer(call, f'🔄 正在切换到{mode_name[new_mode]}...')
+    
+    # 准备更新的字段
+    update_fields = {'preserve_mode': new_mode, 'preserve_mode_changed': 1}
+    
+    # 根据切换类型设置相应的时间参数
+    switch_date = datetime.now()
+    if new_mode == 'expire':
+        # 活跃保号 → 到期保号：设置30天后到期
+        new_expiry = switch_date + timedelta(days=30)
+        update_fields['ex'] = new_expiry
+        time_info = f'\n🕐 **到期时间已重置**: {new_expiry.strftime("%Y-%m-%d %H:%M:%S")} (从切换日起30天)'
+    else:
+        # 到期保号 → 活跃保号：活跃检测将从切换日开始计算（Emby服务器自动处理）
+        time_info = f'\n🕐 **活跃检测重置**: 从切换日 {switch_date.strftime("%Y-%m-%d")} 开始计算活跃天数'
+    
+    # 更新数据库
+    if sql_update_emby(Emby.tg == call.from_user.id, **update_fields):
+        await editMessage(call, 
+            f'✅ **保号方式切换成功！**\n\n'
+            f'🔄 从 **{mode_name[current_mode]}** 切换到 **{mode_name[new_mode]}**\n'
+            f'{time_info}\n\n'
+            f'📋 **保号方式说明：**\n'
+            f'• **活跃保号**: 根据观看活跃度判断，{config.activity_check_days}天无观看将被封禁\n'
+            f'• **到期保号**: 根据到期时间判断，到期后自动续期或封禁\n\n'
+            f'⚠️ **注意**: 每个用户只能切换一次保号方式',
+            buttons=back_members_ikb
+        )
+        LOGGER.info(f"【保号切换】用户 {call.from_user.id} 从 {current_mode} 切换到 {new_mode}, 时间重置: {time_info}")
+    else:
+        await editMessage(call, 
+            '❌ **切换失败**\n\n数据库更新出错，请稍后重试或联系管理员',
+            buttons=back_members_ikb
+        )
+
+
     if not a:
         return await callAnswer(call, '❌ 空', True)
     try:

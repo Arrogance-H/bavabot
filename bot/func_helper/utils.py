@@ -48,7 +48,12 @@ async def members_info(tg=None, name=None):
             ex = ' __无需保号，放心食用__'
         else:
             ex = data.ex or '无账户信息'
-        return name, lv, ex, iv, embyid, pwd2
+        
+        # 获取保号方式信息
+        preserve_mode = getattr(data, 'preserve_mode', 'active')  # 默认为活跃保号
+        preserve_mode_changed = getattr(data, 'preserve_mode_changed', 0)
+        
+        return name, lv, ex, iv, embyid, pwd2, preserve_mode, preserve_mode_changed
 
 
 async def open_check():

@@ -195,6 +195,11 @@ class Uplaysinfo:
                             msg += f'**🔋活跃检测** - [{e.name}](tg://user?id={e.tg})\n#id{e.tg} 禁用后未解禁，执行删除失败。\n\n'
                             LOGGER.info(f"【活跃检测】- 删除账户失败 {user['Name']} #id{e.tg}")
             elif e.lv == 'b':
+                # 只对设置为活跃保号的用户进行活跃检测
+                user_preserve_mode = getattr(e, 'preserve_mode', 'active')
+                if user_preserve_mode != 'active':
+                    continue  # 跳过非活跃保号用户
+                    
                 try:
                     ac_date = convert_to_beijing_time(user["LastActivityDate"])
                     

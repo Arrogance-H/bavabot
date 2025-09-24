@@ -3,6 +3,7 @@ kk - 纯装x
 赠与账户，禁用，删除
 """
 import pyrogram
+from datetime import datetime, timedelta
 from pyrogram import filters
 from pyrogram.errors import BadRequest
 from bot import bot, prefixes, owner, admins, LOGGER, extra_emby_libs, config
@@ -237,3 +238,78 @@ async def fuck_off_m(_, call):
     except pyrogram.errors.UserAdminInvalid:
         await editMessage(call,
                           f"⚠️ 打咩，no，机器人不可以对群组管理员出手喔，请[自己](tg://user?id={call.from_user.id})解决")
+
+
+# 管理员切换用户保号方式
+@bot.on_callback_query(filters.regex('kk_preserve_switch'))
+async def kk_preserve_switch(_, call):
+    """在kk面板中切换用户保号方式"""
+    if not judge_admins(call.from_user.id):
+        return await call.answer("请不要以下犯上 ok？", show_alert=True)
+
+    await call.answer("🛡️ 正在切换保号方式...")
+    user_id = int(call.data.split("-")[1])
+    
+    # 获取用户信息
+    e = sql_get_emby(tg=user_id)
+    if not e or not e.embyid:
+        return await editMessage(call, f'💢 用户没有账户，无法切换保号方式。', timer=60)
+    
+    # 获取当前保号方式并切换
+    current_mode = getattr(e, 'preserve_mode', 'active')
+    new_mode = 'expire' if current_mode == 'active' else 'active'
+    mode_name = {'active': '活跃保号', 'expire': '到期保号'}
+    
+    # 准备更新的字段
+    update_fields = {'preserve_mode': new_mode}
+    
+    # 根据切换类型设置相应的时间参数
+    switch_date = datetime.now()
+    time_info = ""
+    if new_mode == 'expire':
+        # 活跃保号 → 到期保号：设置30天后到期
+        new_expiry = switch_date + timedelta(days=30)
+        update_fields['ex'] = new_expiry
+        time_info = f"到期时间已重置为 {new_expiry.strftime('%Y-%m-%d %H:%M:%S')}"
+    else:
+        # 到期保号 → 活跃保号：活跃检测将从切换日开始计算
+        time_info = f"活跃检测从 {switch_date.strftime('%Y-%m-%d')} 重新开始计算"
+    
+    # 更新数据库
+    if sql_update_emby(Emby.tg == user_id, **update_fields):
+        try:
+            target_user = await bot.get_chat(user_id)
+            target_name = target_user.first_name
+        except:
+            target_name = f"ID:{user_id}"
+            
+        success_text = f'🛡️ **保号方式切换成功**\n\n' \
+                      f'👤 **目标用户**: [{target_name}](tg://user?id={user_id})\n' \
+                      f'🔄 **变更**: {mode_name[current_mode]} → {mode_name[new_mode]}\n' \
+                      f'🕐 **时间重置**: {time_info}\n' \
+                      f'👮 **操作员**: [{call.from_user.first_name}](tg://user?id={call.from_user.id})'
+        
+        # 更新kk面板显示
+        text, keyboard = await cr_kk_ikb(user_id, target_name)
+        await editMessage(call, text, buttons=keyboard)
+        
+        # 通知目标用户
+        try:
+            await bot.send_message(user_id, 
+                f'🛡️ **保号方式已更新**\n\n'
+                f'管理员 [{call.from_user.first_name}](tg://user?id={call.from_user.id}) '
+                f'已将您的保号方式从 **{mode_name[current_mode]}** 切换到 **{mode_name[new_mode]}**\n\n'
+                f'🕐 {time_info}\n\n'
+                f'📋 **保号方式说明：**\n'
+                f'• **活跃保号**: 根据观看活跃度判断，{config.activity_check_days}天无观看将被封禁\n'
+                f'• **到期保号**: 根据到期时间判断，到期后自动续期或封禁'
+            )
+        except:
+            pass  # 如果无法发送通知给用户，继续执行
+            
+        LOGGER.info(f"【kk保号切换】管理员 {call.from_user.id} 将用户 {user_id} 的保号方式从 {current_mode} 改为 {new_mode}, {time_info}")
+    else:
+        await editMessage(call, 
+            f'❌ **切换失败**\n\n数据库更新出错，请稍后重试。', 
+            timer=60
+        )
