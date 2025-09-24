@@ -157,6 +157,18 @@ async def demand_command(_, msg):
                 LOGGER.info(f"管理员删除ME点播请求记录: {download_id}")
             else:
                 await sendMessage(msg, f"❌ 删除失败\n\n请求ID不存在或删除出错: `{download_id}`", send=True, chat_id=msg.chat.id)
+        
+        elif args[0] == 'check' and len(args) == 1:
+            # 手动触发Emby库检查
+            try:
+                from bot.scheduler.sync_emby_requests import check_emby_requests
+                await sendMessage(msg, "🔍 开始检查ME点播请求在Emby库中的状态...", send=True, chat_id=msg.chat.id)
+                await check_emby_requests()
+                await sendMessage(msg, "✅ Emby库检查完成！如有更新会自动通知用户", send=True, chat_id=msg.chat.id)
+                LOGGER.info(f"管理员手动触发Emby库检查")
+            except Exception as e:
+                await sendMessage(msg, f"❌ Emby库检查失败: {str(e)[:100]}", send=True, chat_id=msg.chat.id)
+                LOGGER.error(f"手动Emby库检查失败: {str(e)}")
         else:
             # 帮助信息
             help_text = (
@@ -167,6 +179,8 @@ async def demand_command(_, msg):
                 "`/demand completed` - 查看已入库请求\n\n"
                 "🗑️ **删除请求**:\n"
                 "`/demand del 请求ID` - 删除指定ME点播请求\n\n"
+                "🔍 **检查状态**:\n"
+                "`/demand check` - 手动检查Emby库并更新请求状态\n\n"
                 "📝 **编辑状态**:\n"
                 "• 点击界面中的'📝 编辑状态'按钮\n"
                 "• 可用状态: pending(待处理), downloading(处理中), completed(已入库)\n\n"
