@@ -719,7 +719,7 @@ async def me_request_movie(_, call):
             tv_title = selected_item.get('title', '未知')
             
             # 在Emby库中搜索该电视剧
-            emby_found, emby_tv_info, emby_season_count = await emby.search_tv_series_by_title(tv_title)
+            emby_found, emby_tv_info, emby_season_count, existing_seasons = await emby.search_tv_series_by_title(tv_title)
             
             if emby_found:
                 # 如果在Emby中找到该电视剧，显示季数对比信息
@@ -738,12 +738,17 @@ async def me_request_movie(_, call):
                     await asyncio.sleep(2)  # 让用户看到提示信息
                 else:
                     # Emby季数少于TMDB季数，可以点播缺少的季数
+                    # 计算实际缺少的季数（基于TMDB实际季数）
+                    tmdb_season_numbers = [s.get('season_number', 0) for s in tmdb_seasons]
+                    missing_seasons = [s for s in tmdb_season_numbers if s not in existing_seasons]
+                    missing_count = len(missing_seasons)
+                    
                     await editMessage(call,
                         f"✅ **检测到缺少季数，可以点播**\n\n"
                         f"🎭 **剧名**: {tv_title}\n"
                         f"📺 **TMDB总季数**: {tmdb_season_count} 季\n"
                         f"📚 **Emby库季数**: {emby_season_count} 季\n"
-                        f"🔢 **缺少季数**: {tmdb_season_count - emby_season_count} 季\n\n"
+                        f"🔢 **缺少季数**: {missing_count} 季\n\n"
                         f"正在为您显示季数选择界面...",
                         buttons=tmdb_main_ikb,
                         parse_mode=enums.ParseMode.MARKDOWN
@@ -764,6 +769,7 @@ async def me_request_movie(_, call):
             # 保存季数信息到用户数据
             user_tmdb_data[call.from_user.id]['seasons'] = tmdb_seasons
             user_tmdb_data[call.from_user.id]['emby_season_count'] = emby_season_count if emby_found else 0
+            user_tmdb_data[call.from_user.id]['existing_seasons'] = existing_seasons if emby_found else []
             user_tmdb_data[call.from_user.id]['tmdb_season_count'] = tmdb_season_count
             
             # 显示季数选择界面
@@ -795,6 +801,7 @@ async def show_season_selection(call, tv_series: dict, seasons: list, selected_s
     # 获取用户数据中的Emby季数信息
     user_data = user_tmdb_data.get(call.from_user.id, {})
     emby_season_count = user_data.get('emby_season_count', 0)
+    existing_seasons = user_data.get('existing_seasons', [])
     tmdb_season_count = user_data.get('tmdb_season_count', len(seasons))
     
     selection_text = f"📺 **电视剧季数选择**\n\n"
@@ -804,7 +811,7 @@ async def show_season_selection(call, tv_series: dict, seasons: list, selected_s
     
     # 显示季数对比信息
     # 计算可选择的季数（排除Emby中已有的）
-    available_seasons = [s for s in seasons if s.get('season_number', 0) > emby_season_count]
+    available_seasons = [s for s in seasons if s.get('season_number', 0) not in existing_seasons]
     available_count = len(available_seasons)
     
     if available_count == 0:
@@ -823,7 +830,7 @@ async def show_season_selection(call, tv_series: dict, seasons: list, selected_s
             year_info = f" ({air_date[:4]})" if air_date else ""
             
             # 所有季数在Emby中都已有
-            if season_num <= emby_season_count:
+            if season_num in existing_seasons:
                 status_icon = "📚"  # Emby中已有
                 season_text = f"{status_icon} **第{season_num}季**: {episode_count}集{year_info} (Emby已有)"
             else:
@@ -872,7 +879,7 @@ async def show_season_selection(call, tv_series: dict, seasons: list, selected_s
         year_info = f" ({air_date[:4]})" if air_date else ""
         
         # 标记已选择的季数和Emby中已有的季数
-        if emby_season_count > 0 and season_num <= emby_season_count:
+        if season_num in existing_seasons:
             status_icon = "📚"  # Emby中已有，不可选择
             season_text = f"{status_icon} **第{season_num}季**: {episode_count}集{year_info} (Emby已有)"
         elif season_num in selected_seasons:
@@ -902,7 +909,7 @@ async def show_season_selection(call, tv_series: dict, seasons: list, selected_s
     await editMessage(
         call,
         selection_text,
-        buttons=tmdb_season_selection_ikb(seasons, selected_seasons, emby_season_count),
+        buttons=tmdb_season_selection_ikb(seasons, selected_seasons, emby_season_count, existing_seasons),
         parse_mode=enums.ParseMode.MARKDOWN
     )
 
@@ -1005,9 +1012,9 @@ async def toggle_season_selection(_, call):
     # 提取季数编号
     season_number = int(call.data.split('_')[-1])
     
-    # 检查该季是否在Emby中已存在
-    emby_season_count = user_data.get('emby_season_count', 0)
-    if emby_season_count > 0 and season_number <= emby_season_count:
+    # 检查该季是否在Emby中已存在 - 使用实际的现有季数列表
+    existing_seasons = user_data.get('existing_seasons', [])
+    if season_number in existing_seasons:
         return await callAnswer(call, f'📚 第{season_number}季在Emby库中已存在，无需点播', True)
     
     # 初始化或获取已选择的季数列表
