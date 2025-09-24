@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 """
-数据库迁移脚本 - 添加保号方式相关字段
-Database Migration Script - Add preservation mode fields
+数据库迁移脚本 - 添加保号方式相关字段 (手动模式)
+Database Migration Script - Add preservation mode fields (Manual Mode)
+
+注意：此脚本用于非 Docker 环境。Docker 用户无需手动运行此脚本，
+因为 Docker 模式下会自动执行数据库迁移。
+
+Note: This script is for non-Docker environments. Docker users don't need 
+to run this script manually as Docker mode performs automatic migration.
 
 这个脚本用于安全地向现有的 emby 表添加新的保号方式字段
 This script safely adds new preservation mode fields to the existing emby table
@@ -12,6 +18,19 @@ import os
 
 # 添加项目路径
 sys.path.append(os.path.dirname(__file__))
+
+def check_docker_mode():
+    """检查是否在 Docker 模式下运行"""
+    docker_mode = os.getenv('DOCKER_MODE', '0') == '1'
+    if docker_mode:
+        print("🐳 检测到 Docker 模式！")
+        print("📋 Docker 模式下数据库迁移是自动的，无需手动运行此脚本。")
+        print("✅ 请直接启动 Bot，迁移会自动完成。")
+        print()
+        response = input("确定要继续手动迁移吗？(y/N): ")
+        if response.lower() != 'y':
+            print("操作已取消。")
+            sys.exit(0)
 
 try:
     from bot import db_host, db_user, db_pwd, db_name, db_port
@@ -123,10 +142,13 @@ try:
     
     if __name__ == "__main__":
         print("=" * 60)
-        print("BavaBot 保号方式数据库迁移工具")
-        print("BavaBot Preservation Mode Database Migration Tool")
+        print("BavaBot 保号方式数据库迁移工具 (手动模式)")
+        print("BavaBot Preservation Mode Database Migration Tool (Manual Mode)")
         print("=" * 60)
         print()
+        
+        # 检查 Docker 模式
+        check_docker_mode()
         
         success = migrate_preserve_mode_fields()
         
@@ -139,6 +161,10 @@ try:
             print("📋 新增字段说明:")
             print("• preserve_mode: 用户保号方式 ('active'=活跃保号, 'expire'=到期保号)")
             print("• preserve_mode_changed: 是否已切换过 (0=未切换, 1=已切换)")
+            print()
+            print("🐳 Docker 用户提示：")
+            print("如果您使用 Docker 部署，下次可以直接启动容器，")
+            print("系统会自动处理数据库迁移，无需手动运行此脚本。")
         else:
             print()
             print("❌ 迁移失败")
@@ -149,4 +175,8 @@ except ImportError as e:
     print(f"❌ 导入错误: {e}")
     print("请确保在 bavabot 项目根目录下运行此脚本")
     print("Please run this script from the bavabot project root directory")
+    print()
+    print("🐳 Docker 用户注意：")
+    print("如果您使用 Docker，无需运行此脚本。")
+    print("直接启动 Docker 容器即可，迁移会自动完成。")
     sys.exit(1)

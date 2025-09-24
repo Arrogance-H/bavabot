@@ -3,34 +3,69 @@
 
 ## 概述 (Overview)
 
-此文档说明如何安全地将保号方式功能的数据库更改应用到现有的 BavaBot 实例中。
+此文档说明如何将保号方式功能的数据库更改应用到现有的 BavaBot 实例中。
 
-This document explains how to safely apply the preservation mode feature database changes to an existing BavaBot instance.
+This document explains how to apply the preservation mode feature database changes to an existing BavaBot instance.
 
-## 新增数据库字段 (New Database Fields)
+## 🐳 Docker 模式（推荐）
+
+**对于 Docker 用户，数据库迁移是完全自动的！**
+
+For Docker users, database migration is completely automatic!
+
+### Docker 自动迁移特性
+
+- **自动检测**: Bot 启动时自动检测 `DOCKER_MODE=1` 环境变量
+- **智能迁移**: 自动检查和添加缺失的数据库字段
+- **零配置**: 无需手动执行任何迁移脚本
+- **安全操作**: 只添加新字段，不修改现有数据
+
+### Docker 启动流程
+
+```bash
+# 1. 正常启动 Docker 容器
+docker-compose up -d
+
+# 2. Bot 会自动执行以下操作：
+# - 检测 Docker 模式
+# - 检查数据库字段
+# - 自动添加保号方式字段
+# - 设置现有用户默认值
+# - 启动 Bot 服务
+
+# 3. 查看自动迁移日志
+docker logs bavabot
+```
+
+### Docker 迁移日志示例
+
+```
+🐳 Docker模式检测到，执行自动数据库迁移...
+➕ 自动添加 preserve_mode 字段...
+✅ preserve_mode 字段自动添加成功
+➕ 自动添加 preserve_mode_changed 字段...
+✅ preserve_mode_changed 字段自动添加成功
+🔄 更新现有记录的默认值...
+✅ 现有记录默认值更新完成
+✅ Docker模式下保号方式字段自动迁移完成
+```
+
+## 📋 手动迁移模式（非 Docker 环境）
+
+对于非 Docker 环境，提供了手动迁移选项。
+
+For non-Docker environments, manual migration options are provided.
+
+### 新增数据库字段 (New Database Fields)
 
 保号方式功能在 `emby` 表中添加了两个新字段：
-
-The preservation mode feature adds two new fields to the `emby` table:
 
 ```sql
 ALTER TABLE emby ADD COLUMN preserve_mode VARCHAR(10) DEFAULT 'active' COMMENT '保号方式: active=活跃保号, expire=到期保号';
 ALTER TABLE emby ADD COLUMN preserve_mode_changed INT DEFAULT 0 COMMENT '是否已切换过保号方式: 0=未切换, 1=已切换';
 ```
 
-### 字段说明 (Field Descriptions)
-
-- **preserve_mode**: 用户的保号方式
-  - `'active'`: 活跃保号 (基于观看活跃度)
-  - `'expire'`: 到期保号 (基于到期时间)
-  
-- **preserve_mode_changed**: 用户是否已切换过保号方式
-  - `0`: 未切换，用户可以切换一次
-  - `1`: 已切换，用户不能再次切换
-
-## 迁移方式 (Migration Methods)
-
-### 方式一：自动迁移脚本 (推荐)
+### 方式一：自动迁移脚本
 
 运行提供的迁移脚本：
 
@@ -39,15 +74,7 @@ cd /path/to/bavabot
 python3 migrate_preserve_mode.py
 ```
 
-这个脚本会：
-- 检查数据库连接
-- 检查字段是否已存在
-- 安全地添加缺失的字段
-- 为现有用户设置默认值
-
 ### 方式二：手动 SQL 执行
-
-如果自动脚本无法运行，可以手动执行 SQL：
 
 ```sql
 -- 检查字段是否存在
@@ -65,53 +92,59 @@ UPDATE emby SET preserve_mode = 'active' WHERE preserve_mode IS NULL;
 UPDATE emby SET preserve_mode_changed = 0 WHERE preserve_mode_changed IS NULL;
 ```
 
-### 方式三：SQLAlchemy 自动创建
-
-对于新安装或表结构完全重建的情况，SQLAlchemy 会自动创建包含新字段的表。
-
 ## 验证迁移 (Verify Migration)
 
-运行验证脚本检查迁移是否成功：
+### Docker 模式验证
+
+Docker 模式下，迁移状态会在启动日志中显示。如需详细验证：
+
+```bash
+# 进入容器
+docker exec -it bavabot sh
+
+# 运行验证脚本（可选）
+python3 verify_preserve_mode_db.py
+```
+
+### 手动模式验证
 
 ```bash
 python3 verify_preserve_mode_db.py
 ```
 
-这个脚本会：
-- 检查字段是否正确添加
-- 验证数据完整性
-- 测试 SQLAlchemy 集成
-- 提供详细的统计信息
+## 字段说明 (Field Descriptions)
 
-## 启动 Bot (Starting the Bot)
-
-迁移完成后，Bot 可以正常启动。新的保号方式功能将自动可用：
-
-- 新用户默认使用活跃保号
-- 现有用户保持活跃保号模式
-- 用户可以在用户面板中切换保号方式
-- 管理员可以在管理面板和 kk 命令中管理用户保号方式
+- **preserve_mode**: 用户的保号方式
+  - `'active'`: 活跃保号 (基于观看活跃度)
+  - `'expire'`: 到期保号 (基于到期时间)
+  
+- **preserve_mode_changed**: 用户是否已切换过保号方式
+  - `0`: 未切换，用户可以切换一次
+  - `1`: 已切换，用户不能再次切换
 
 ## 故障排除 (Troubleshooting)
 
-### 常见问题
+### Docker 模式常见问题
+
+1. **自动迁移失败**
+   - 检查容器日志: `docker logs bavabot`
+   - 确保数据库连接正常
+   - 检查数据库用户权限
+
+2. **环境变量未设置**
+   - Dockerfile 中已包含 `DOCKER_MODE=1`
+   - 无需手动设置
+
+### 手动模式常见问题
 
 1. **数据库连接失败**
    - 检查 `config.json` 中的数据库配置
    - 确保数据库服务正在运行
-   - 检查用户权限
 
-2. **字段添加失败**
+2. **权限不足**
    - 确保数据库用户有 ALTER TABLE 权限
-   - 检查是否有其他进程正在使用数据库
-   - 尝试重启数据库服务
 
-3. **SQLAlchemy 报错**
-   - 重启 Bot 应用
-   - 检查 Python 依赖是否完整
-   - 查看详细错误日志
-
-### 回滚方案
+## 回滚方案
 
 如果需要回滚更改：
 
@@ -125,16 +158,19 @@ ALTER TABLE emby DROP COLUMN preserve_mode_changed;
 
 ## 安全注意事项 (Security Notes)
 
-- 在生产环境中进行迁移前，请先备份数据库
-- 建议在维护时间窗口内执行迁移
-- 迁移脚本设计为幂等的，可以安全地多次运行
+- Docker 模式下迁移是幂等的，可以安全地重复启动
+- 在生产环境中建议先备份数据库
 - 所有现有用户数据保持不变，只添加新字段
+- 自动迁移只在 Docker 模式下启用，避免意外修改
 
-## 支持 (Support)
+## 部署建议
 
-如果遇到迁移问题，请：
+### Docker 用户（推荐）
+1. 正常启动容器即可，无需额外操作
+2. 监控启动日志确认迁移成功
+3. 验证保号方式功能正常工作
 
-1. 检查日志输出
-2. 运行验证脚本
-3. 查看此文档的故障排除部分
-4. 在 GitHub Issues 中报告问题并附上详细日志
+### 非 Docker 用户
+1. 先备份数据库
+2. 运行迁移脚本或手动执行 SQL
+3. 验证迁移成功后启动 Bot
