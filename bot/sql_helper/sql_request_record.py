@@ -14,7 +14,7 @@ class RequestRecord(Base):
     cost = Column(String(255), nullable=False)
     detail = Column(Text, nullable=False)
     left_time = Column(String(255))
-    download_state= Column(String(50), default='pending')  # pending(待处理), downloading(处理中), completed(已入库)
+    download_state= Column(String(50), default='pending')  # pending, downloading, completed, failed
     transfer_state = Column(String(50))  # success, failed
     progress = Column(Float, default=0)
     create_at = Column(DateTime, default=datetime.datetime.utcnow)
@@ -159,9 +159,13 @@ def sql_check_existing_request_by_title(movie_title: str):
             if not clean_title:
                 return None
                 
-            # 查找任何用户的相同影片请求
+            # 查找任何用户的相同影片请求，排除已完全失败的请求
             existing_request = session.query(RequestRecord).filter(
                 RequestRecord.request_name.like(f"%{clean_title}%")
+            ).filter(
+                # 只排除同时满足下载失败和入库失败的请求
+                ~((RequestRecord.download_state == 'failed') & 
+                  ((RequestRecord.transfer_state == False) | (RequestRecord.transfer_state == None)))
             ).order_by(RequestRecord.create_at.desc()).first()
             
             return existing_request
