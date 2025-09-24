@@ -699,31 +699,89 @@ async def me_request_movie(_, call):
     selected_item = user_data['selected_item']
     media_type = selected_item.get('media_type', 'movie')
     
-    # 如果是电视剧，显示季数选择
+    # 如果是电视剧，先检查Emby库中电视剧季数与TMDB数据季数对比
     if media_type == 'tv':
         tv_id = selected_item.get('id')
         if not tv_id:
             await editMessage(call, '❌ 获取电视剧ID失败', buttons=tmdb_main_ikb)
             return
             
-        await editMessage(call, '🔍 正在获取电视剧季数信息...', buttons=tmdb_main_ikb)
+        await editMessage(call, '🔍 正在检查电视剧季数信息...', buttons=tmdb_main_ikb)
         
         try:
-            success, seasons = await tmdb_service.get_tv_seasons(tv_id)
-            if not success or not seasons:
-                await editMessage(call, '❌ 无法获取电视剧季数信息', buttons=tmdb_main_ikb)
+            # 获取TMDB季数信息
+            success, tmdb_seasons = await tmdb_service.get_tv_seasons(tv_id)
+            if not success or not tmdb_seasons:
+                await editMessage(call, '❌ 无法获取TMDB电视剧季数信息', buttons=tmdb_main_ikb)
                 return
             
+            tmdb_season_count = len(tmdb_seasons)
+            tv_title = selected_item.get('title', '未知')
+            
+            # 在Emby库中搜索该电视剧
+            emby_found, emby_tv_info, emby_season_count = await emby.search_tv_series_by_title(tv_title)
+            
+            if emby_found:
+                # 如果在Emby中找到该电视剧，比较季数
+                if emby_season_count >= tmdb_season_count:
+                    # Emby季数等于或大于TMDB季数，不允许点播
+                    await editMessage(call,
+                        f"🚫 **此电视剧不能点播**\n\n"
+                        f"🎭 **剧名**: {tv_title}\n"
+                        f"📺 **TMDB总季数**: {tmdb_season_count} 季\n"
+                        f"📚 **Emby库季数**: {emby_season_count} 季\n\n"
+                        f"✅ **Emby库已完整收录该剧的所有季数**\n"
+                        f"请直接在Emby客户端中观看!\n\n"
+                        f"💡 **观看指引:**\n"
+                        f"• 打开Emby客户端应用\n"
+                        f"• 搜索剧名: {tv_title}\n"
+                        f"• 即可开始观看所有季数",
+                        buttons=tmdb_main_ikb,
+                        parse_mode=enums.ParseMode.MARKDOWN
+                    )
+                    return
+                else:
+                    # Emby季数少于TMDB季数，可以点播缺少的季数
+                    await editMessage(call,
+                        f"✅ **检测到缺少季数，可以点播**\n\n"
+                        f"🎭 **剧名**: {tv_title}\n"
+                        f"📺 **TMDB总季数**: {tmdb_season_count} 季\n"
+                        f"📚 **Emby库季数**: {emby_season_count} 季\n"
+                        f"🔢 **缺少季数**: {tmdb_season_count - emby_season_count} 季\n\n"
+                        f"正在为您显示季数选择界面...",
+                        buttons=tmdb_main_ikb,
+                        parse_mode=enums.ParseMode.MARKDOWN
+                    )
+                    await asyncio.sleep(2)  # 让用户看到提示信息
+            else:
+                # Emby中没有找到该电视剧，可以点播
+                await editMessage(call,
+                    f"✅ **Emby库中未找到该剧，可以点播**\n\n"
+                    f"🎭 **剧名**: {tv_title}\n"
+                    f"📺 **TMDB总季数**: {tmdb_season_count} 季\n\n"
+                    f"正在为您显示季数选择界面...",
+                    buttons=tmdb_main_ikb,
+                    parse_mode=enums.ParseMode.MARKDOWN
+                )
+                await asyncio.sleep(2)  # 让用户看到提示信息
+            
             # 保存季数信息到用户数据
-            user_tmdb_data[call.from_user.id]['seasons'] = seasons
+            user_tmdb_data[call.from_user.id]['seasons'] = tmdb_seasons
+            user_tmdb_data[call.from_user.id]['emby_season_count'] = emby_season_count if emby_found else 0
+            user_tmdb_data[call.from_user.id]['tmdb_season_count'] = tmdb_season_count
             
             # 显示季数选择界面
-            await show_season_selection(call, selected_item, seasons)
+            await show_season_selection(call, selected_item, tmdb_seasons)
             return
             
         except Exception as e:
-            LOGGER.error(f"获取电视剧季数失败: {str(e)}")
-            await editMessage(call, '❌ 获取季数信息时出错', buttons=tmdb_main_ikb)
+            LOGGER.error(f"检查电视剧季数失败: {str(e)}")
+            await editMessage(call, 
+                f'❌ 检查季数信息时出错\n\n'
+                f'错误信息: {str(e)[:100]}\n'
+                f'请稍后重试或联系管理员', 
+                buttons=tmdb_main_ikb
+            )
             return
     
     # 如果是电影，继续原有流程
@@ -738,11 +796,25 @@ async def show_season_selection(call, tv_series: dict, seasons: list, selected_s
     title = tv_series.get("title", "未知电视剧")
     year = tv_series.get("year", "未知")
     
+    # 获取用户数据中的Emby季数信息
+    user_data = user_tmdb_data.get(call.from_user.id, {})
+    emby_season_count = user_data.get('emby_season_count', 0)
+    tmdb_season_count = user_data.get('tmdb_season_count', len(seasons))
+    
     selection_text = f"📺 **电视剧季数选择**\n\n"
     selection_text += f"🎭 **剧名**: {title}\n"
     if year:
         selection_text += f"📅 **年份**: {year}\n"
-    selection_text += f"🎬 **总季数**: {len(seasons)} 季\n\n"
+    
+    # 显示季数对比信息
+    selection_text += f"📺 **TMDB总季数**: {tmdb_season_count} 季\n"
+    if emby_season_count > 0:
+        selection_text += f"📚 **Emby库季数**: {emby_season_count} 季\n"
+        if tmdb_season_count > emby_season_count:
+            selection_text += f"🆕 **可点播**: {tmdb_season_count - emby_season_count} 季 (缺少的季数)\n"
+    else:
+        selection_text += f"📚 **Emby库**: 未收录此剧\n"
+    selection_text += "\n"
     
     if selected_seasons:
         total_cost = len(selected_seasons) * calculate_me_request_cost('tv')
@@ -759,12 +831,28 @@ async def show_season_selection(call, tv_series: dict, seasons: list, selected_s
         air_date = season.get('air_date', '')
         year_info = f" ({air_date[:4]})" if air_date else ""
         
-        # 标记已选择的季数
-        status_icon = "✅" if season_num in selected_seasons else "⭕"
-        selection_text += f"{status_icon} **第{season_num}季**: {episode_count}集{year_info}\n"
+        # 标记已选择的季数和Emby中已有的季数
+        if season_num in selected_seasons:
+            status_icon = "✅"
+        elif emby_season_count > 0 and season_num <= emby_season_count:
+            status_icon = "📚"  # Emby中已有
+        else:
+            status_icon = "⭕"
+        
+        season_text = f"{status_icon} **第{season_num}季**: {episode_count}集{year_info}"
+        if emby_season_count > 0 and season_num <= emby_season_count:
+            season_text += " (Emby已有)"
+        selection_text += season_text + "\n"
     
     if len(seasons) > 8:
         selection_text += f"... 还有 {len(seasons) - 8} 季\n"
+    
+    # 添加图例说明
+    selection_text += f"\n📋 **图例说明**:\n"
+    selection_text += f"✅ 已选择点播  ⭕ 可选择点播"
+    if emby_season_count > 0:
+        selection_text += f"  📚 Emby已有"
+    selection_text += "\n"
     
     if selected_seasons:
         selection_text += f"\n💡 **提示**: 点击 '✅ 确认选择' 继续，或继续选择其他季数"
