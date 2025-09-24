@@ -59,7 +59,7 @@ def members_ikb(is_admin: bool = False, account: bool = False, can_switch_preser
         
         # 添加保号方式切换按钮（如果用户可以切换）
         if can_switch_preserve:
-            normal.insert(-1, [('🛡️ 切换保号方式', 'switch_preserve_mode')])
+            normal.insert(-1, [('🛡️ 保号切换', 'switch_preserve_mode')])
             
         if moviepilot.status:
             normal.append([('🍿 点播中心', 'download_center')])
