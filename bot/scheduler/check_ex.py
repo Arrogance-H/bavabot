@@ -15,9 +15,10 @@ from bot.sql_helper.sql_emby2 import get_all_emby2, Emby2, sql_update_emby2
 
 async def check_expired():
     # 询问 到期时间的用户，判断有无积分，有则续期，无就禁用
-    rst = get_all_emby(and_(Emby.ex < datetime.now(), Emby.lv == 'b'))
+    # 只处理设置为到期保号的用户
+    rst = get_all_emby(and_(Emby.ex < datetime.now(), Emby.lv == 'b', Emby.preserve_mode == 'expire'))
     if rst is None:
-        return LOGGER.info('【到期检测】- 等级 b 无到期用户，跳过')
+        return LOGGER.info('【到期检测】- 等级 b 无到期用户（到期保号模式），跳过')
     ext = (datetime.now() + timedelta(days=30))
     for r in rst:
         if r.us >= 30:
@@ -82,9 +83,9 @@ async def check_expired():
             except Exception as e:
                 LOGGER.error(e)
 
-    rsc = get_all_emby(and_(Emby.ex < datetime.now(), Emby.lv == 'c'))
+    rsc = get_all_emby(and_(Emby.ex < datetime.now(), Emby.lv == 'c', Emby.preserve_mode == 'expire'))
     if rsc is None:
-        return LOGGER.info('【到期检测】- 等级 c 无到期用户，跳过')
+        return LOGGER.info('【到期检测】- 等级 c 无到期用户（到期保号模式），跳过')
     for c in rsc:
         if c.us >= 30:
             c_us = c.us - 30

@@ -47,7 +47,7 @@ judge_group_ikb = ikb([[('🌟 频道入口 ', f't.me/{chanel}', 'url'),
 """members ↓"""
 
 
-def members_ikb(is_admin: bool = False, account: bool = False) -> InlineKeyboardMarkup:
+def members_ikb(is_admin: bool = False, account: bool = False, can_switch_preserve: bool = False) -> InlineKeyboardMarkup:
     """
     判断用户面板
     """
@@ -56,6 +56,11 @@ def members_ikb(is_admin: bool = False, account: bool = False) -> InlineKeyboard
                     [('🎬 显示/隐藏', 'embyblock'), ('⭕ 重置密码', 'reset')],
                     [('💖 我的收藏', 'my_favorites'),('💠 我的设备', 'my_devices')],
                     ]
+        
+        # 添加保号方式切换按钮（如果用户可以切换）
+        if can_switch_preserve:
+            normal.insert(-1, [('🛡️ 切换保号方式', 'switch_preserve_mode')])
+            
         if moviepilot.status:
             normal.append([('🍿 点播中心', 'download_center')])
         # Add independent TMDB search if API key is configured
@@ -138,7 +143,8 @@ async def cr_page_server():
 gm_ikb_content = ikb([[('⭕ 注册状态', 'open-menu'), ('🎟️ 注册/续期码', 'cr_link')],
                       [('💊 查询注册', 'ch_link'), ('🏬 兑换设置', 'set_renew')],
                       [('👥 用户列表', 'normaluser'), ('👑 白名单列表', 'whitelist'), ('💠 设备列表', 'user_devices')],
-                      [('🌏 定时', 'schedall'), ('🕹️ 主界面', 'back_start'), ('其他 🪟', 'back_config')]])
+                      [('🛡️ 保号管理', 'preserve_manage'), ('🌏 定时', 'schedall')],
+                      [('🕹️ 主界面', 'back_start'), ('其他 🪟', 'back_config')]])
 
 
 def open_menu_ikb(openstats, timingstats) -> InlineKeyboardMarkup:

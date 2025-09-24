@@ -3,14 +3,17 @@
  功能暂定 开关注册，生成注册码，查看注册码情况，邀请注册排名情况
 """
 import asyncio
+from datetime import datetime
 
 from pyrogram import filters
+from pyromod.helpers import ikb
 
 from bot import bot, _open, save_config, bot_photo, LOGGER, bot_name, admins, owner, config
 from bot.func_helper.filters import admins_on_filter
 from bot.schemas import ExDate
+from bot.sql_helper import Session
 from bot.sql_helper.sql_code import sql_count_code, sql_count_p_code, sql_delete_all_unused, sql_delete_unused_by_days
-from bot.sql_helper.sql_emby import sql_count_emby
+from bot.sql_helper.sql_emby import sql_count_emby, sql_get_emby, sql_update_emby, Emby
 from bot.func_helper.fix_bottons import gm_ikb_content, open_menu_ikb, gog_rester_ikb, back_open_menu_ikb, \
     back_free_ikb, re_cr_link_ikb, close_it_ikb, ch_link_ikb, date_ikb, cr_paginate, cr_renew_ikb, invite_lv_ikb
 from bot.func_helper.msg_utils import callAnswer, editMessage, sendPhoto, callListen, deleteMessage, sendMessage
@@ -432,3 +435,277 @@ async def invite_lv_set(_, call):
         return
     except IndexError:
         pass
+
+
+@bot.on_callback_query(filters.regex('preserve_manage') & admins_on_filter)
+async def preserve_manage(_, call):
+    """管理员保号方式管理面板"""
+    await callAnswer(call, '🛡️ 进入保号管理')
+    
+    text = f'🛡️ **用户保号方式管理**\n\n'
+    text += f'**功能说明：**\n'
+    text += f'• 查看用户保号方式统计\n'
+    text += f'• 修改指定用户的保号方式\n'
+    text += f'• 重置用户的切换次数\n\n'
+    text += f'**保号方式类型：**\n'
+    text += f'• **活跃保号**: 根据观看活跃度判断，{config.activity_check_days}天无观看将被封禁\n'
+    text += f'• **到期保号**: 根据到期时间判断，到期后自动续期或封禁'
+    
+    buttons = ikb([
+        [('📊 保号统计', 'preserve_stats'), ('🔍 查询用户', 'preserve_user_query')],
+        [('⚙️ 修改保号方式', 'preserve_user_modify'), ('🔄 重置切换权限', 'preserve_reset_switch')],
+        [('🔙 返回', 'manage')]
+    ])
+    
+    await editMessage(call, text, buttons)
+
+
+@bot.on_callback_query(filters.regex('preserve_stats') & admins_on_filter)
+async def preserve_stats(_, call):
+    """显示保号方式统计"""
+    await callAnswer(call, '📊 正在统计保号方式数据...')
+    
+    # 查询所有用户的保号统计
+    with Session() as session:
+        try:
+            total_users = session.query(Emby).filter(Emby.embyid.isnot(None)).count()
+            active_users = session.query(Emby).filter(
+                Emby.embyid.isnot(None), 
+                Emby.preserve_mode == 'active'
+            ).count()
+            expire_users = session.query(Emby).filter(
+                Emby.embyid.isnot(None), 
+                Emby.preserve_mode == 'expire'
+            ).count()
+            switched_users = session.query(Emby).filter(
+                Emby.embyid.isnot(None), 
+                Emby.preserve_mode_changed >= 1
+            ).count()
+            
+            text = f'📊 **保号方式统计报告**\n\n'
+            text += f'👥 **总用户数**: {total_users}\n\n'
+            text += f'🛡️ **活跃保号**: {active_users} 人 ({active_users/total_users*100:.1f}%)\n'
+            text += f'⏰ **到期保号**: {expire_users} 人 ({expire_users/total_users*100:.1f}%)\n'
+            text += f'🔄 **已切换过**: {switched_users} 人 ({switched_users/total_users*100:.1f}%)\n\n'
+            text += f'📅 **统计时间**: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'
+            
+        except Exception as e:
+            text = f'❌ **统计失败**: {str(e)}'
+    
+    await editMessage(call, text, ikb([[('🔙 返回', 'preserve_manage')]]))
+
+
+@bot.on_callback_query(filters.regex('preserve_user_query') & admins_on_filter)
+async def preserve_user_query(_, call):
+    """查询指定用户的保号方式"""
+    await callAnswer(call, '🔍 查询用户保号信息')
+    
+    send = await editMessage(call,
+        "🔍 **查询用户保号信息**\n\n"
+        "请在 120s 内发送用户ID (TG ID)、用户名或Emby用户名\n"
+        "取消请发送 /cancel",
+        ikb([[('🔙 返回', 'preserve_manage')]])
+    )
+    
+    if send is False:
+        return
+        
+    txt = await callListen(call, 120, ikb([[('🔙 返回', 'preserve_manage')]]))
+    if txt is False:
+        return
+    elif txt.text == "/cancel":
+        await txt.delete()
+        return await preserve_manage(_, call)
+    
+    try:
+        await txt.delete()
+        user_input = txt.text.strip()
+        
+        # 尝试作为数字解析（TG ID）
+        try:
+            tg_id = int(user_input)
+            e = sql_get_emby(tg=tg_id)
+        except ValueError:
+            # 作为用户名查询
+            e = sql_get_emby(tg=user_input)
+        
+        if not e:
+            await editMessage(call, 
+                "❌ **用户不存在**\n\n未找到该用户的记录", 
+                ikb([[('🔄 重新查询', 'preserve_user_query'), ('🔙 返回', 'preserve_manage')]])
+            )
+            return
+            
+        # 获取用户信息
+        preserve_mode = getattr(e, 'preserve_mode', 'active')
+        preserve_mode_changed = getattr(e, 'preserve_mode_changed', 0)
+        mode_name = {'active': '活跃保号', 'expire': '到期保号'}
+        
+        text = f'🔍 **用户保号信息查询**\n\n'
+        text += f'👤 **TG ID**: {e.tg}\n'
+        text += f'💠 **用户名**: {e.name or "无账户"}\n'
+        text += f'🛡️ **保号方式**: {mode_name.get(preserve_mode, "未知")}\n'
+        text += f'🔄 **切换状态**: {"已切换过" if preserve_mode_changed >= 1 else "可切换"}\n'
+        
+        lv_dict = {"a": "白名单", "b": "正常用户", "c": "已禁用", "d": "未注册"}
+        text += f'📊 **用户等级**: {lv_dict.get(e.lv, "未知")}\n'
+        
+        if e.ex:
+            text += f'⏰ **到期时间**: {e.ex.strftime("%Y-%m-%d %H:%M:%S")}\n'
+            
+        await editMessage(call, text, ikb([[('🔙 返回', 'preserve_manage')]]))
+        
+    except Exception as e:
+        await editMessage(call,
+            f"❌ **查询失败**: {str(e)}",
+            ikb([[('🔄 重新查询', 'preserve_user_query'), ('🔙 返回', 'preserve_manage')]])
+        )
+
+
+@bot.on_callback_query(filters.regex('preserve_user_modify') & admins_on_filter)
+async def preserve_user_modify(_, call):
+    """修改用户保号方式"""
+    await callAnswer(call, '⚙️ 修改用户保号方式')
+    
+    send = await editMessage(call,
+        "⚙️ **修改用户保号方式**\n\n"
+        "请在 120s 内发送要修改的用户信息，格式：\n"
+        "`用户ID 保号方式`\n\n"
+        "保号方式: `active` (活跃保号) 或 `expire` (到期保号)\n"
+        "例如: `123456789 expire`\n\n"
+        "取消请发送 /cancel",
+        ikb([[('🔙 返回', 'preserve_manage')]])
+    )
+    
+    if send is False:
+        return
+        
+    txt = await callListen(call, 120, ikb([[('🔙 返回', 'preserve_manage')]]))
+    if txt is False:
+        return
+    elif txt.text == "/cancel":
+        await txt.delete()
+        return await preserve_manage(_, call)
+    
+    try:
+        await txt.delete()
+        parts = txt.text.strip().split()
+        
+        if len(parts) != 2:
+            await editMessage(call,
+                "❌ **格式错误**\n\n请使用格式: `用户ID 保号方式`",
+                ikb([[('🔄 重新输入', 'preserve_user_modify'), ('🔙 返回', 'preserve_manage')]])
+            )
+            return
+            
+        user_input, new_mode = parts
+        
+        if new_mode not in ['active', 'expire']:
+            await editMessage(call,
+                "❌ **保号方式错误**\n\n请使用 `active` 或 `expire`",
+                ikb([[('🔄 重新输入', 'preserve_user_modify'), ('🔙 返回', 'preserve_manage')]])
+            )
+            return
+        
+        # 查找用户
+        try:
+            tg_id = int(user_input)
+            e = sql_get_emby(tg=tg_id)
+        except ValueError:
+            e = sql_get_emby(tg=user_input)
+        
+        if not e or not e.embyid:
+            await editMessage(call,
+                "❌ **用户不存在或无账户**",
+                ikb([[('🔄 重新输入', 'preserve_user_modify'), ('🔙 返回', 'preserve_manage')]])
+            )
+            return
+        
+        old_mode = getattr(e, 'preserve_mode', 'active')
+        mode_name = {'active': '活跃保号', 'expire': '到期保号'}
+        
+        # 更新保号方式（管理员修改不影响用户的切换权限）
+        if sql_update_emby(Emby.tg == e.tg, preserve_mode=new_mode):
+            await editMessage(call,
+                f'✅ **修改成功**\n\n'
+                f'👤 **用户**: {e.name} (ID: {e.tg})\n'
+                f'🔄 **变更**: {mode_name[old_mode]} → {mode_name[new_mode]}\n'
+                f'👮 **操作员**: {call.from_user.first_name}',
+                ikb([[('🔙 返回', 'preserve_manage')]])
+            )
+            LOGGER.info(f"【管理员保号修改】管理员 {call.from_user.id} 将用户 {e.tg} 的保号方式从 {old_mode} 改为 {new_mode}")
+        else:
+            await editMessage(call,
+                "❌ **修改失败**\n\n数据库更新出错",
+                ikb([[('🔄 重新输入', 'preserve_user_modify'), ('🔙 返回', 'preserve_manage')]])
+            )
+        
+    except Exception as e:
+        await editMessage(call,
+            f"❌ **操作失败**: {str(e)}",
+            ikb([[('🔄 重新输入', 'preserve_user_modify'), ('🔙 返回', 'preserve_manage')]])
+        )
+
+
+@bot.on_callback_query(filters.regex('preserve_reset_switch') & admins_on_filter)
+async def preserve_reset_switch(_, call):
+    """重置用户的保号方式切换权限"""
+    await callAnswer(call, '🔄 重置用户切换权限')
+    
+    send = await editMessage(call,
+        "🔄 **重置用户切换权限**\n\n"
+        "此操作将允许用户重新切换一次保号方式\n\n"
+        "请在 120s 内发送用户ID (TG ID)、用户名或Emby用户名\n"
+        "取消请发送 /cancel",
+        ikb([[('🔙 返回', 'preserve_manage')]])
+    )
+    
+    if send is False:
+        return
+        
+    txt = await callListen(call, 120, ikb([[('🔙 返回', 'preserve_manage')]]))
+    if txt is False:
+        return
+    elif txt.text == "/cancel":
+        await txt.delete()
+        return await preserve_manage(_, call)
+    
+    try:
+        await txt.delete()
+        user_input = txt.text.strip()
+        
+        # 查找用户
+        try:
+            tg_id = int(user_input)
+            e = sql_get_emby(tg=tg_id)
+        except ValueError:
+            e = sql_get_emby(tg=user_input)
+        
+        if not e or not e.embyid:
+            await editMessage(call,
+                "❌ **用户不存在或无账户**",
+                ikb([[('🔄 重新输入', 'preserve_reset_switch'), ('🔙 返回', 'preserve_manage')]])
+            )
+            return
+        
+        # 重置切换权限
+        if sql_update_emby(Emby.tg == e.tg, preserve_mode_changed=0):
+            await editMessage(call,
+                f'✅ **重置成功**\n\n'
+                f'👤 **用户**: {e.name} (ID: {e.tg})\n'
+                f'🔄 **状态**: 已重置切换权限，用户可以重新切换保号方式\n'
+                f'👮 **操作员**: {call.from_user.first_name}',
+                ikb([[('🔙 返回', 'preserve_manage')]])
+            )
+            LOGGER.info(f"【管理员重置切换权限】管理员 {call.from_user.id} 重置了用户 {e.tg} 的保号切换权限")
+        else:
+            await editMessage(call,
+                "❌ **重置失败**\n\n数据库更新出错",
+                ikb([[('🔄 重新输入', 'preserve_reset_switch'), ('🔙 返回', 'preserve_manage')]])
+            )
+        
+    except Exception as e:
+        await editMessage(call,
+            f"❌ **操作失败**: {str(e)}",
+            ikb([[('🔄 重新输入', 'preserve_reset_switch'), ('🔙 返回', 'preserve_manage')]])
+        )
