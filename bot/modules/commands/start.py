@@ -77,12 +77,12 @@ async def p_start(_, msg):
                                            f"初次使用，录入数据库完成。\n"
                                            f"请点击 /start 重新召唤面板"))
             return
-        name, lv, ex, us, embyid, pwd2 = data
+        name, lv, ex, iv, embyid, pwd2, preserve_mode, preserve_mode_changed = data
         stat, all_user, tem, timing = await open_check()
         text = f"▎__欢迎进入用户面板！{msg.from_user.first_name}__\n\n" \
                f"**· 🆔 用户のID** | `{msg.from_user.id}`\n" \
                f"**· 📊 当前状态** | {lv}\n" \
-               f"**· 🍒 积分{sakura_b}** | {us}\n" \
+               f"**· 🍒 积分{sakura_b}** | {iv}\n" \
                f"**· ®️ 注册状态** | {stat}\n" \
                f"**· 🎫 总注册限制** | {all_user}\n" \
                f"**· 🎟️ 可注册席位** | {all_user - tem}\n"
