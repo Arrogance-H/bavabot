@@ -736,18 +736,33 @@ async def switch_preserve_mode(_, call):
     
     await callAnswer(call, f'🔄 正在切换到{mode_name[new_mode]}...')
     
+    # 准备更新的字段
+    update_fields = {'preserve_mode': new_mode, 'preserve_mode_changed': 1}
+    
+    # 根据切换类型设置相应的时间参数
+    switch_date = datetime.now()
+    if new_mode == 'expire':
+        # 活跃保号 → 到期保号：设置30天后到期
+        new_expiry = switch_date + timedelta(days=30)
+        update_fields['ex'] = new_expiry
+        time_info = f'\n🕐 **到期时间已重置**: {new_expiry.strftime("%Y-%m-%d %H:%M:%S")} (从切换日起30天)'
+    else:
+        # 到期保号 → 活跃保号：活跃检测将从切换日开始计算（Emby服务器自动处理）
+        time_info = f'\n🕐 **活跃检测重置**: 从切换日 {switch_date.strftime("%Y-%m-%d")} 开始计算活跃天数'
+    
     # 更新数据库
-    if sql_update_emby(Emby.tg == call.from_user.id, preserve_mode=new_mode, preserve_mode_changed=1):
+    if sql_update_emby(Emby.tg == call.from_user.id, **update_fields):
         await editMessage(call, 
             f'✅ **保号方式切换成功！**\n\n'
-            f'🔄 从 **{mode_name[current_mode]}** 切换到 **{mode_name[new_mode]}**\n\n'
+            f'🔄 从 **{mode_name[current_mode]}** 切换到 **{mode_name[new_mode]}**\n'
+            f'{time_info}\n\n'
             f'📋 **保号方式说明：**\n'
             f'• **活跃保号**: 根据观看活跃度判断，{config.activity_check_days}天无观看将被封禁\n'
             f'• **到期保号**: 根据到期时间判断，到期后自动续期或封禁\n\n'
             f'⚠️ **注意**: 每个用户只能切换一次保号方式',
             buttons=back_members_ikb
         )
-        LOGGER.info(f"【保号切换】用户 {call.from_user.id} 从 {current_mode} 切换到 {new_mode}")
+        LOGGER.info(f"【保号切换】用户 {call.from_user.id} 从 {current_mode} 切换到 {new_mode}, 时间重置: {time_info}")
     else:
         await editMessage(call, 
             '❌ **切换失败**\n\n数据库更新出错，请稍后重试或联系管理员',
