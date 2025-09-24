@@ -74,8 +74,8 @@ def get_demand_records_keyboard(current_page, total_pages, current_filter="all")
     filter_buttons = [
         ("📋 全部", "all"),
         ("⏳ 待处理", "pending"),
-        ("✅ 已完成", "completed"),
-        ("❌ 失败", "failed")
+        ("🔄 处理中", "downloading"),
+        ("✅ 已入库", "completed")
     ]
     
     for text, filter_type in filter_buttons:
@@ -128,7 +128,7 @@ async def demand_command(_, msg):
             text, keyboard = format_demand_records(1, "all")
             await sendMessage(msg, text, send=True, chat_id=msg.chat.id, buttons=keyboard)
             
-        elif args[0] in ['pending', 'completed', 'failed']:
+        elif args[0] in ['pending', 'completed']:
             # 按状态筛选ME点播请求
             filter_type = args[0]
             text, keyboard = format_demand_records(1, filter_type)
@@ -155,13 +155,12 @@ async def demand_command(_, msg):
                 "🔍 **查看请求**:\n"
                 "`/demand` - 查看所有ME点播请求\n"
                 "`/demand pending` - 查看待处理请求\n"
-                "`/demand completed` - 查看已完成请求\n"
-                "`/demand failed` - 查看失败请求\n\n"
+                "`/demand completed` - 查看已入库请求\n\n"
                 "🗑️ **删除请求**:\n"
                 "`/demand del 请求ID` - 删除指定ME点播请求\n\n"
                 "📝 **编辑状态**:\n"
                 "• 点击界面中的'📝 编辑状态'按钮\n"
-                "• 可用状态: pending, downloading, completed, failed\n\n"
+                "• 可用状态: pending(待处理), downloading(处理中), completed(已入库)\n\n"
                 "💡 **说明**:\n"
                 "• 只显示和管理ME点播系统的请求\n"
                 "• 🎬 标识ME点播请求，固定费用10币\n"
@@ -202,8 +201,8 @@ async def handle_demand_filter(_, call):
         filter_names = {
             "all": "全部",
             "pending": "待处理",
-            "completed": "已完成",
-            "failed": "失败"
+            "downloading": "处理中",
+            "completed": "已入库"
         }
         await callAnswer(call, f"已筛选: {filter_names.get(filter_type, filter_type)}")
         
@@ -236,7 +235,7 @@ async def handle_demand_edit_status(_, call):
             "📝 编辑ME点播请求状态\n\n"
             "请按以下格式发送消息:\n"
             "`请求ID 新状态`\n\n"
-            "可用状态: pending, downloading, completed, failed\n\n"
+            "可用状态: pending, downloading, completed\n\n"
             "示例: `ME20241201abc123 completed`\n"
             "取消请发送 /cancel")
         
@@ -268,7 +267,7 @@ async def handle_demand_edit_status(_, call):
             return
         
         # 验证状态
-        valid_statuses = ['pending', 'downloading', 'completed', 'failed']
+        valid_statuses = ['pending', 'downloading', 'completed']
         if new_status not in valid_statuses:
             await msg.delete()
             await editMessage(call, f"❌ 无效状态，可用状态: {', '.join(valid_statuses)}")

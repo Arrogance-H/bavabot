@@ -37,12 +37,12 @@ async def sync_download_tasks():
                         left_time='0'
                     )
                 elif download_state == 'failed':
-                    # 下载失败
+                    # 下载失败 - 映射到处理中状态，表示需要重新处理
                     sql_update_request_status(
                         download_id=download_id,
-                        download_state='failed',
+                        download_state='downloading',
                         progress=progress,
-                        left_time='失败'
+                        left_time='重新处理中'
                     )
                 elif download_state == 'pending':
                     # 等待下载
