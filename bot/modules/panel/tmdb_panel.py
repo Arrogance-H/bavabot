@@ -880,7 +880,14 @@ async def process_movie_request(call, selected_item: dict):
         status_text = "未知状态"
         if existing_request.transfer_state is not None:
             if existing_request.transfer_state:
-                status_text = "已入库 📽️"
+                # 根据emby_state显示更详细的状态
+                emby_state = getattr(existing_request, 'emby_state', 'not_checked')
+                if emby_state == 'stored':
+                    status_text = "已入库 📽️"
+                elif emby_state == 'processing':
+                    status_text = "处理中 ⏳"
+                else:
+                    status_text = "处理中 ⏳"  # 默认为处理中
             else:
                 status_text = "入库失败 🚫"
         elif existing_request.download_state:

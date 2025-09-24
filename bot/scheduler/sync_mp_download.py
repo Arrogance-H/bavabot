@@ -62,14 +62,17 @@ async def sync_download_tasks():
                 transfer_state = await get_history_transfer_task_by_title_download_id("", record.download_id, count=100)
                 if transfer_state is not None:
                     if transfer_state:
-                        try:
-                            await bot.send_message(chat_id=record.tg, text = f"💯恭喜您点播的「{record.request_name}」已成功入库！")
-                        except Exception as e:
-                            LOGGER.error(f"[MoviePilot] 发送通知到{record.tg}失败: {str(e)}")
+                        # 注释掉原来的成功入库通知，改为在Emby库检查时发送
+                        # try:
+                        #     await bot.send_message(chat_id=record.tg, text = f"💯恭喜您点播的「{record.request_name}」已成功入库！")
+                        # except Exception as e:
+                        #     LOGGER.error(f"[MoviePilot] 发送通知到{record.tg}失败: {str(e)}")
+                        pass
                     sql_update_request_status(
                         download_id=record.download_id,
                         transfer_state=transfer_state,
                         download_state='completed',
+                        emby_state='processing' if transfer_state else None,
                         progress=100,
                         left_time='0'
                     )

@@ -16,6 +16,7 @@ class RequestRecord(Base):
     left_time = Column(String(255))
     download_state= Column(String(50), default='pending')  # pending, downloading, completed, failed
     transfer_state = Column(String(50))  # success, failed
+    emby_state = Column(String(50), default='not_checked')  # not_checked, processing, stored
     progress = Column(Float, default=0)
     create_at = Column(DateTime, default=datetime.datetime.utcnow)
     update_at = Column(DateTime, default=datetime.datetime.utcnow,
@@ -128,7 +129,18 @@ def sql_get_request_record_by_transfer_state(transfer_state: str = None):
         return request_record
 
 
-def sql_update_request_status(download_id: str, download_state: str, transfer_state: str = None, progress: float = None, left_time: str = None):
+def sql_get_request_records_for_emby_check():
+    """获取需要检查Emby状态的记录"""
+    with Session() as session:
+        # 获取transfer_state为success但emby_state为not_checked或processing的记录
+        request_records = session.query(RequestRecord).filter(
+            RequestRecord.transfer_state == "success",
+            RequestRecord.emby_state.in_(["not_checked", "processing"])
+        ).all()
+        return request_records
+
+
+def sql_update_request_status(download_id: str, download_state: str, transfer_state: str = None, emby_state: str = None, progress: float = None, left_time: str = None):
     """更新下载状态"""
     with Session() as session:
         try:
@@ -139,6 +151,8 @@ def sql_update_request_status(download_id: str, download_state: str, transfer_st
                     record.download_state = download_state
                 if transfer_state is not None:
                     record.transfer_state = transfer_state
+                if emby_state is not None:
+                    record.emby_state = emby_state
                 if progress is not None:
                     record.progress = progress
                 if left_time is not None:
