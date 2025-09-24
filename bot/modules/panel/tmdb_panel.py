@@ -738,12 +738,17 @@ async def me_request_movie(_, call):
                     await asyncio.sleep(2)  # 让用户看到提示信息
                 else:
                     # Emby季数少于TMDB季数，可以点播缺少的季数
+                    # 计算实际缺少的季数（基于TMDB实际季数）
+                    tmdb_season_numbers = [s.get('season_number', 0) for s in tmdb_seasons]
+                    missing_seasons = [s for s in tmdb_season_numbers if s not in existing_seasons]
+                    missing_count = len(missing_seasons)
+                    
                     await editMessage(call,
                         f"✅ **检测到缺少季数，可以点播**\n\n"
                         f"🎭 **剧名**: {tv_title}\n"
                         f"📺 **TMDB总季数**: {tmdb_season_count} 季\n"
                         f"📚 **Emby库季数**: {emby_season_count} 季\n"
-                        f"🔢 **缺少季数**: {tmdb_season_count - emby_season_count} 季\n\n"
+                        f"🔢 **缺少季数**: {missing_count} 季\n\n"
                         f"正在为您显示季数选择界面...",
                         buttons=tmdb_main_ikb,
                         parse_mode=enums.ParseMode.MARKDOWN
