@@ -111,11 +111,18 @@ async def uun_info(_, msg, name = None):
     except AttributeError:
         a = ''
 
-    if e.name and schedall.low_activity and not schedall.check_ex:
-        ex = f'__若{config.activity_check_days}天无观看将封禁__'
-
-    elif e.name and not schedall.low_activity and not schedall.check_ex:
-        ex = ' __无需保号，放心食用__'
+    # Use consistent preserve mode logic for expiration display
+    if e.name:
+        preserve_mode = getattr(e, 'preserve_mode', 'active')
+        if preserve_mode == 'expire':
+            # For 'expire' mode (到期保号), show the formatted expiration date
+            ex = e.ex.strftime("%Y-%m-%d %H:%M:%S") if e.ex else '无账户信息'
+        elif preserve_mode == 'active':
+            # For 'active' mode (活跃保号), show activity warning message
+            ex = f'__若{config.activity_check_days}天无观看将封禁__'
+        else:
+            # For any other preserve_mode, show the default message
+            ex = '__无需保号，放心食用__'
     else:
         ex = e.ex or '无账户信息'
     text += f"▎ 查询返回\n" \

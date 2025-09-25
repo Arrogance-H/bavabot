@@ -109,31 +109,6 @@ async def members(_, call):
     # 检查是否为白名单用户
     is_whitelist = lv == '白名单'
     
-    # Update ex display logic based on user's preserve_mode instead of global schedall settings
-    # This implements preserve mode specific logic for displaying expiration information:
-    # - 'expire' mode: shows formatted expiration date (到期保号)
-    # - 'active' mode: shows activity warning message (活跃保号) 
-    # - other modes: shows default no-preservation message
-    if not is_whitelist and name != '无账户信息':
-        # Get the actual database record to access preserve_mode and ex field
-        db_record = sql_get_emby(tg=call.from_user.id)
-        if db_record:
-            user_preserve_mode = getattr(db_record, 'preserve_mode', 'active')
-            
-            if user_preserve_mode == 'expire':
-                # For 'expire' mode (到期保号), show the formatted expiration date
-                if db_record.ex:
-                    ex = db_record.ex.strftime("%Y-%m-%d %H:%M:%S")
-                else:
-                    ex = '无账户信息'
-            elif user_preserve_mode == 'active':
-                # For 'active' mode (活跃保号), show activity warning message
-                ex = f'__若{config.activity_check_days}天无观看将封禁__'
-            else:
-                # For any other preserve_mode, show the default message
-                ex = '__无需保号，放心食用__'
-    # For whitelist users, ex remains as set by members_info (should be '+ ∞')
-    
     # 保号方式显示（白名单用户不显示）
     preserve_info = ""
     can_switch = False
