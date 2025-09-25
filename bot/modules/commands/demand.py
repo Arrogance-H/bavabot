@@ -73,7 +73,8 @@ def format_demand_records(current_page=1, current_filter="all"):
             user_info = f"用户ID: {record.tg}"
             
             text += f"🎬 {record.request_name}\n"
-            text += f"   {time_str} | {user_info}\n\n"
+            text += f"   {time_str} | {user_info}\n"
+            text += f"   请求ID: {record.download_id}\n\n"
 
         keyboard = get_demand_records_keyboard(current_page, total_pages, current_filter)
         return text, keyboard
