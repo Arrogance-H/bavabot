@@ -79,11 +79,30 @@ async def p_start(_, msg):
             return
         name, lv, ex, iv, embyid, pwd2, preserve_mode, preserve_mode_changed = data
         stat, all_user, tem, timing = await open_check()
+        
+        # 检查是否为白名单用户
+        is_whitelist = lv == '白名单'
+        
+        # 构建基础用户信息文本，与 member_panel.py 保持一致的格式
         text = f"▎__欢迎进入用户面板！{msg.from_user.first_name}__\n\n" \
                f"**· 🆔 用户のID** | `{msg.from_user.id}`\n" \
                f"**· 📊 当前状态** | {lv}\n" \
-               f"**· 🍒 积分{sakura_b}** | {iv}\n" \
-               f"**· ®️ 注册状态** | {stat}\n" \
+               f"**· 🍒 积分{sakura_b}** | {iv}\n"
+        
+        # 只有有账户的用户才有这些字段
+        if name != '无账户信息':
+            text += f"**· 💠 账号名称** | [{name}](tg://user?id={msg.from_user.id})\n" \
+                   f"**· 🚨 到期时间** | {ex}\n"
+            
+            # 保号方式显示（白名单用户不显示）
+            if not is_whitelist:
+                preserve_mode_text = '活跃保号' if preserve_mode == 'active' else '到期保号'
+                can_switch = preserve_mode_changed == 0
+                preserve_info = f"**· 🛡️ 保号方式** | {preserve_mode_text}" + (" (可切换)" if can_switch else " (已切换)")
+                text += f"{preserve_info}\n"
+        
+        # 添加注册相关信息
+        text += f"**· ®️ 注册状态** | {stat}\n" \
                f"**· 🎫 总注册限制** | {all_user}\n" \
                f"**· 🎟️ 可注册席位** | {all_user - tem}\n"
         if not embyid:

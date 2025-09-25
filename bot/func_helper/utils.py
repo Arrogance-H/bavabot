@@ -40,18 +40,34 @@ async def members_info(tg=None, name=None):
         iv = data.iv
         lv_dict = {'a': '白名单', 'b': '**正常**', 'c': '**已禁用**', 'd': '未注册'}  # , 'e': '**21天未活跃/无信息**'
         lv = lv_dict.get(data.lv, '未知')
-        if lv == '白名单':
-            ex = '+ ∞'
-        elif data.name is not None and schedall.low_activity and not schedall.check_ex:
-            ex = f'__若{config.activity_check_days}天无观看将封禁__'
-        elif data.name is not None and not schedall.low_activity and not schedall.check_ex:
-            ex = ' __无需保号，放心食用__'
-        else:
-            ex = data.ex or '无账户信息'
         
         # 获取保号方式信息
         preserve_mode = getattr(data, 'preserve_mode', 'active')  # 默认为活跃保号
         preserve_mode_changed = getattr(data, 'preserve_mode_changed', 0)
+        
+        # Update ex display logic based on user's preserve_mode instead of global schedall settings
+        # This implements preserve mode specific logic for displaying expiration information:
+        # - whitelist users: show infinity symbol
+        # - 'expire' mode: shows formatted expiration date (到期保号)
+        # - 'active' mode: shows activity warning message (活跃保号) 
+        # - no account: shows default message
+        if lv == '白名单':
+            ex = '+ ∞'
+        elif name != '无账户信息':
+            if preserve_mode == 'expire':
+                # For 'expire' mode (到期保号), show the formatted expiration date
+                if data.ex:
+                    ex = data.ex.strftime("%Y-%m-%d %H:%M:%S")
+                else:
+                    ex = '无账户信息'
+            elif preserve_mode == 'active':
+                # For 'active' mode (活跃保号), show activity warning message
+                ex = f'__若{config.activity_check_days}天无观看将封禁__'
+            else:
+                # For any other preserve_mode, show the default message
+                ex = '__无需保号，放心食用__'
+        else:
+            ex = data.ex or '无账户信息'
         
         return name, lv, ex, iv, embyid, pwd2, preserve_mode, preserve_mode_changed
 
