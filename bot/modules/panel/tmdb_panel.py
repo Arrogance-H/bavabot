@@ -96,24 +96,24 @@ async def tmdb_search_handler(_, call):
     search_query = txt.text.strip()
     await txt.delete()
     
-    # 首先检查Emby库
-    await check_emby_first(call, search_query)
+    # 直接进行TMDB搜索（跳过Emby库检查）
+    await direct_tmdb_search(call, search_query)
 
 
-async def check_emby_first(call, search_query: str):
-    """首先检查Emby库中是否存在该影视，或直接进行TMDB ID搜索"""
+async def direct_tmdb_search(call, search_query: str):
+    """直接进行TMDB搜索，不检查Emby库"""
     try:
         # Check if the search query is a TMDB ID
         if tmdb_service.is_tmdb_id(search_query):
-            # TMDB ID search - first get movie details, then check Emby
+            # TMDB ID search - get movie details directly
             tmdb_id = tmdb_service.extract_tmdb_id(search_query)
             await editMessage(call, 
                 f'🆔 检测到TMDB ID: {tmdb_id}\n'
-                f'正在获取影片信息并检查Emby库...',
+                f'正在获取影片信息...',
                 buttons=tmdb_main_ikb
             )
             
-            # Get movie details from TMDB first
+            # Get movie details from TMDB
             success, tmdb_result = await tmdb_service.search_by_tmdb_id(tmdb_id)
             if not success or not tmdb_result:
                 await editMessage(
@@ -124,126 +124,35 @@ async def check_emby_first(call, search_query: str):
                 )
                 return
             
-            # Now check Emby library using the movie title
-            movie_title = tmdb_result.get('title', '')
-            if movie_title:
-                emby_results = await emby.get_movies(title=movie_title)
-                if emby_results:
-                    # Found in Emby, show Emby results
-                    await show_emby_found_results(call, emby_results, tmdb_id, tmdb_result)
-                    return
-            
-            # Not found in Emby, show TMDB result for potential request
-            await tmdb_id_search_results_with_context(call, tmdb_id, tmdb_result, checked_emby=True)
+            # Show TMDB result directly for potential request
+            await tmdb_id_search_results_with_context(call, tmdb_id, tmdb_result)
             return
         
-        await editMessage(call, '🔍 正在检查Emby媒体库，请稍后...', buttons=tmdb_main_ikb)
-        
-        # 使用request_movie_panel.py中相同的Emby查询逻辑
-        emby_results = await emby.get_movies(title=search_query)
-        
-        if emby_results:
-            # 如果Emby库中存在，显示结果并提示使用Emby客户端观看
-            text = "🎯 **Emby媒体库中已存在相关内容！**\n\n"
-            text += "📚 **已找到以下影视资源:**\n\n"
-            
-            for index, item in enumerate(emby_results, start=1):
-                text += f"**{index}.** {item['title']}"
-                if item['year'] and item['year'] != '缺失':
-                    text += f" ({item['year']})"
-                text += f"\n📺 类型: {item.get('item_type', '未知')}\n"
-                if item.get('genres') and item['genres'] != '未知':
-                    text += f"🎭 类型: {item['genres']}\n"
-                text += "\n"
-            
-            text += "✅ **观看指引:**\n"
-            text += "请直接使用Emby客户端观看这些内容！\n"
-            text += "• 打开Emby客户端应用\n"
-            text += "• 搜索上述影片名称\n"
-            text += "• 即可开始观看\n\n"
-            text += "💡 如需搜索其他内容，可继续使用TMDB搜索"
-            
-            # 创建按钮：继续TMDB搜索 或 返回主页
-            from bot.func_helper.fix_bottons import ikb
-            emby_found_buttons = ikb([
-                [('🔍 继续搜索', 'continue_tmdb_search')],
-                [('🔙 返回主页', 'tmdb_main')]
-            ])
-            
-            # 保存搜索词以便继续搜索使用
-            user_tmdb_data[call.from_user.id] = {'search_query': search_query}
-            
-            await editMessage(call, text, buttons=emby_found_buttons, parse_mode=enums.ParseMode.MARKDOWN)
-            return
-        
-        # 如果Emby中没有找到，继续TMDB搜索
+        # For text search, go directly to TMDB search
         await editMessage(call, 
-            f'🔍 Emby库中未找到 "{search_query}"\n'
-            f'正在TMDB数据库中搜索...',
+            f'🔍 正在TMDB数据库中搜索 "{search_query}"...',
             buttons=tmdb_main_ikb
         )
         await tmdb_search_results(call, search_query, page=1)
         
     except Exception as e:
-        LOGGER.error(f"检查Emby库时出错: {str(e)}")
+        LOGGER.error(f"TMDB搜索时出错: {str(e)}")
         await editMessage(call, 
-            '❌ 检查Emby库时出错，直接进行TMDB搜索...',
+            '❌ TMDB搜索时出错，请稍后重试...',
             buttons=tmdb_main_ikb
         )
         await tmdb_search_results(call, search_query, page=1)
 
 
-@bot.on_callback_query(filters.regex('^continue_tmdb_search$') & user_in_group_on_filter)
-async def continue_tmdb_search(_, call):
-    """继续TMDB搜索（在Emby已找到内容后）"""
-    user_data = user_tmdb_data.get(call.from_user.id)
-    if not user_data or 'search_query' not in user_data:
-        return await callAnswer(call, '❌ 搜索会话已过期，请重新搜索', True)
-    
-    await callAnswer(call, '🔍 继续TMDB搜索')
-    search_query = user_data['search_query']
-    await tmdb_search_results(call, search_query, page=1)
+# Note: continue_tmdb_search function removed as it's no longer needed
+# since we go directly to TMDB search without Emby checks
 
 
-async def show_emby_found_results(call, emby_results: list, tmdb_id: int, tmdb_result: dict):
-    """显示在Emby中找到的结果（用于TMDB ID搜索）"""
-    title = tmdb_result.get('title', '未知')
-    text = f"🆔 **TMDB ID {tmdb_id} 查找结果**\n\n"
-    text += f"🎯 **Emby媒体库中已存在此影片！**\n\n"
-    text += f"📚 **TMDB信息**: {title}\n"
-    if tmdb_result.get('year'):
-        text += f"📅 **年份**: {tmdb_result['year']}\n"
-    text += f"📺 **类型**: {tmdb_result.get('media_type_cn', '未知')}\n\n"
-    
-    text += "📚 **Emby库中的相关资源:**\n\n"
-    
-    for index, item in enumerate(emby_results, start=1):
-        text += f"**{index}.** {item['title']}"
-        if item['year'] and item['year'] != '缺失':
-            text += f" ({item['year']})"
-        text += f"\n📺 类型: {item.get('item_type', '未知')}\n"
-        if item.get('genres') and item['genres'] != '未知':
-            text += f"🎭 类型: {item['genres']}\n"
-        text += "\n"
-    
-    text += "✅ **观看指引:**\n"
-    text += "请直接使用Emby客户端观看这些内容！\n"
-    text += "• 打开Emby客户端应用\n"
-    text += "• 搜索上述影片名称\n"
-    text += "• 即可开始观看\n\n"
-    text += "💡 如需点播其他内容，可返回主页重新搜索"
-    
-    # 创建按钮：返回主页
-    from bot.func_helper.fix_bottons import ikb
-    emby_found_buttons = ikb([
-        [('🔙 返回主页', 'tmdb_main')]
-    ])
-    
-    await editMessage(call, text, buttons=emby_found_buttons, parse_mode=enums.ParseMode.MARKDOWN)
+# Note: show_emby_found_results function removed as we no longer check Emby first
 
 
-async def tmdb_id_search_results_with_context(call, tmdb_id: int, result: dict, checked_emby: bool = False):
-    """Display TMDB ID search results with Emby check context - directly as movie details page"""
+async def tmdb_id_search_results_with_context(call, tmdb_id: int, result: dict):
+    """Display TMDB ID search results - directly as movie details page"""
     try:
         # 保存搜索结果信息到用户数据中，用于潜在的点播请求
         title = result.get("title", "未知标题")
@@ -266,12 +175,8 @@ async def tmdb_id_search_results_with_context(call, tmdb_id: int, result: dict, 
         vote_average = result.get("vote_average", 0)
         vote_count = result.get("vote_count", 0)
 
-        # 构建详情文本 - 以影片详情页的格式显示
         detail_text = f"🎬 **影片详情**\n"
-        if checked_emby:
-            detail_text += f"🆔 **TMDB ID**: `{tmdb_id}` \n\n"
-        else:
-            detail_text += f"🆔 **TMDB ID**: `{tmdb_id}`\n\n"
+        detail_text += f"🆔 **TMDB ID**: `{tmdb_id}`\n\n"
         
         detail_text += f"📺 **类型**: {media_type}\n"
         detail_text += f"🎭 **标题**: {title}\n"
@@ -300,11 +205,7 @@ async def tmdb_id_search_results_with_context(call, tmdb_id: int, result: dict, 
 
         detail_text += f"\n📝 **剧情简介**:\n{overview}\n\n"
         detail_text += "💡 这是TMDB数据库中的影视信息\n"
-        
-        if checked_emby:
-            detail_text += "此影片不在Emby库中，如需观看可点击\"🎬 点播\"发起请求"
-        else:
-            detail_text += "如需观看可点击\"🎬 点播\"发起请求"
+        detail_text += "如需观看可点击\"🎬 点播\"发起请求"
 
         # 使用与普通影片详情页相同的按钮布局 (点播 + 返回)
         try:
@@ -699,14 +600,14 @@ async def me_request_movie(_, call):
     selected_item = user_data['selected_item']
     media_type = selected_item.get('media_type', 'movie')
     
-    # 如果是电视剧，先检查Emby库中电视剧季数与TMDB数据季数对比
+    # 如果是电视剧，直接获取季数信息用于选择
     if media_type == 'tv':
         tv_id = selected_item.get('id')
         if not tv_id:
             await editMessage(call, '❌ 获取电视剧ID失败', buttons=tmdb_main_ikb)
             return
             
-        await editMessage(call, '🔍 正在检查电视剧季数信息...', buttons=tmdb_main_ikb)
+        await editMessage(call, '🔍 正在获取电视剧季数信息...', buttons=tmdb_main_ikb)
         
         try:
             # 获取TMDB季数信息
@@ -718,66 +619,21 @@ async def me_request_movie(_, call):
             tmdb_season_count = len(tmdb_seasons)
             tv_title = selected_item.get('title', '未知')
             
-            # 在Emby库中搜索该电视剧
-            emby_found, emby_tv_info, emby_season_count, existing_seasons = await emby.search_tv_series_by_title(tv_title)
+            await editMessage(call,
+                f"📺 **电视剧季数信息**\n\n"
+                f"🎭 **剧名**: {tv_title}\n"
+                f"📺 **TMDB总季数**: {tmdb_season_count} 季\n\n"
+                f"✅ **所有季数均可点播**\n"
+                f"正在为您显示季数选择界面...",
+                buttons=tmdb_main_ikb,
+                parse_mode=enums.ParseMode.MARKDOWN
+            )
+            await asyncio.sleep(1)  # 让用户看到提示信息
             
-            if emby_found:
-                # 如果在Emby中找到该电视剧，显示季数对比信息
-                if emby_season_count >= tmdb_season_count:
-                    # Emby季数等于或大于TMDB季数，显示已有季数信息
-                    existing_seasons_str = ", ".join([f"第{s}季" for s in sorted(existing_seasons)]) if existing_seasons else "无"
-                    
-                    await editMessage(call,
-                        f"📚 **电视剧季数信息**\n\n"
-                        f"🎭 **剧名**: {tv_title}\n"
-                        f"📺 **TMDB总季数**: {tmdb_season_count} 季\n"
-                        f"📚 **Emby已有季数**: {emby_season_count} 季 ({existing_seasons_str})\n\n"
-                        f"✅ **Emby库已完整收录该剧的所有季数**\n"
-                        f"💡 您可以直接在Emby客户端中观看完整剧集\n\n"
-                        f"正在为您显示详细季数信息...",
-                        buttons=tmdb_main_ikb,
-                        parse_mode=enums.ParseMode.MARKDOWN
-                    )
-                    await asyncio.sleep(2)  # 让用户看到提示信息
-                else:
-                    # Emby季数少于TMDB季数，可以点播缺少的季数
-                    # 计算实际缺少的季数（基于TMDB实际季数）
-                    tmdb_season_numbers = [s.get('season_number', 0) for s in tmdb_seasons if s.get('season_number', 0) > 0]
-                    missing_seasons = [s for s in tmdb_season_numbers if s not in existing_seasons]
-                    missing_count = len(missing_seasons)
-                    
-                    # 构建更详细的季数信息
-                    existing_seasons_str = ", ".join([f"第{s}季" for s in sorted(existing_seasons)]) if existing_seasons else "无"
-                    missing_seasons_str = ", ".join([f"第{s}季" for s in sorted(missing_seasons)]) if missing_seasons else "无"
-                    
-                    await editMessage(call,
-                        f"✅ **检测到缺少季数，可以点播**\n\n"
-                        f"🎭 **剧名**: {tv_title}\n"
-                        f"📺 **TMDB总季数**: {tmdb_season_count} 季\n"
-                        f"📚 **Emby已有季数**: {emby_season_count} 季 ({existing_seasons_str})\n"
-                        f"🔢 **缺少季数**: {missing_count} 季 ({missing_seasons_str})\n\n"
-                        f"💡 您可以选择点播缺少的季数，已有季数无需重复点播\n"
-                        f"正在为您显示季数选择界面...",
-                        buttons=tmdb_main_ikb,
-                        parse_mode=enums.ParseMode.MARKDOWN
-                    )
-                    await asyncio.sleep(2)  # 让用户看到提示信息
-            else:
-                # Emby中没有找到该电视剧，可以点播
-                await editMessage(call,
-                    f"✅ **Emby库中未找到该剧，可以点播**\n\n"
-                    f"🎭 **剧名**: {tv_title}\n"
-                    f"📺 **TMDB总季数**: {tmdb_season_count} 季\n\n"
-                    f"正在为您显示季数选择界面...",
-                    buttons=tmdb_main_ikb,
-                    parse_mode=enums.ParseMode.MARKDOWN
-                )
-                await asyncio.sleep(2)  # 让用户看到提示信息
-            
-            # 保存季数信息到用户数据
+            # 保存季数信息到用户数据（不需要Emby比较信息）
             user_tmdb_data[call.from_user.id]['seasons'] = tmdb_seasons
-            user_tmdb_data[call.from_user.id]['emby_season_count'] = emby_season_count if emby_found else 0
-            user_tmdb_data[call.from_user.id]['existing_seasons'] = existing_seasons if emby_found else []
+            user_tmdb_data[call.from_user.id]['emby_season_count'] = 0  # 不检查Emby，设为0
+            user_tmdb_data[call.from_user.id]['existing_seasons'] = []  # 不检查Emby，设为空
             user_tmdb_data[call.from_user.id]['tmdb_season_count'] = tmdb_season_count
             
             # 显示季数选择界面
@@ -799,84 +655,22 @@ async def me_request_movie(_, call):
 
 
 async def show_season_selection(call, tv_series: dict, seasons: list, selected_seasons: list = None):
-    """显示电视剧季数选择界面 - 支持多选"""
+    """显示电视剧季数选择界面 - 支持多选（不检查Emby限制）"""
     if selected_seasons is None:
         selected_seasons = []
         
     title = tv_series.get("title", "未知电视剧")
     year = tv_series.get("year", "未知")
     
-    # 获取用户数据中的Emby季数信息
-    user_data = user_tmdb_data.get(call.from_user.id, {})
-    emby_season_count = user_data.get('emby_season_count', 0)
-    existing_seasons = user_data.get('existing_seasons', [])
-    tmdb_season_count = user_data.get('tmdb_season_count', len(seasons))
+    tmdb_season_count = len(seasons)
     
     selection_text = f"📺 **电视剧季数选择**\n\n"
     selection_text += f"🎭 **剧名**: {title}\n"
     if year:
         selection_text += f"📅 **年份**: {year}\n"
     
-    # 显示季数对比信息
-    # 计算可选择的季数（排除Emby中已有的）
-    available_seasons = [s for s in seasons if s.get('season_number', 0) > 0 and s.get('season_number', 0) not in existing_seasons]
-    available_count = len(available_seasons)
-    
-    if available_count == 0:
-        # 没有可选择的季数，但仍显示季数信息供用户查看
-        existing_seasons_str = ", ".join([f"第{s}季" for s in sorted(existing_seasons)]) if existing_seasons else "无"
-        
-        selection_text += f"📺 **TMDB总季数**: {tmdb_season_count} 季\n"
-        selection_text += f"📚 **Emby已有**: {emby_season_count} 季 ({existing_seasons_str})\n"
-        selection_text += f"🚫 **无可点播季数**: 所有季数均已在Emby库中\n\n"
-        selection_text += f"💡 **提示**: 请直接在Emby客户端中观看完整剧集\n\n"
-        selection_text += f"📝 **已有季数详情**:\n\n"
-        
-        # 显示已有季数的详细信息
-        for season in seasons[:8]:  # 显示前8季的详细信息
-            season_num = season.get('season_number', 0)
-            episode_count = season.get('episode_count', 0)
-            air_date = season.get('air_date', '')
-            year_info = f" ({air_date[:4]})" if air_date else ""
-            
-            # 所有季数在Emby中都已有
-            if season_num in existing_seasons:
-                status_icon = "📚"  # Emby中已有
-                season_text = f"{status_icon} **第{season_num}季**: {episode_count}集{year_info} (Emby已有)"
-            else:
-                status_icon = "❓"  # 理论上不应该出现，但保持一致性
-                season_text = f"{status_icon} **第{season_num}季**: {episode_count}集{year_info}"
-                
-            selection_text += season_text + "\n"
-        
-        if len(seasons) > 8:
-            selection_text += f"... 还有 {len(seasons) - 8} 季\n"
-        
-        # 显示简化的返回按钮
-        from bot.func_helper.fix_bottons import ikb
-        no_selection_buttons = ikb([
-            [('🔙 返回', 'return_to_search_results')]
-        ])
-        
-        await editMessage(
-            call,
-            selection_text,
-            buttons=no_selection_buttons,
-            parse_mode=enums.ParseMode.MARKDOWN
-        )
-        return
-    
     selection_text += f"📺 **TMDB总季数**: {tmdb_season_count} 季\n"
-    if emby_season_count > 0:
-        existing_seasons_str = ", ".join([f"第{s}季" for s in sorted(existing_seasons)]) if existing_seasons else "无"
-        available_season_numbers = [s.get('season_number', 0) for s in available_seasons]
-        missing_seasons_str = ", ".join([f"第{s}季" for s in sorted(available_season_numbers)]) if available_season_numbers else "无"
-        
-        selection_text += f"📚 **Emby已有**: {emby_season_count} 季 ({existing_seasons_str})\n"
-        selection_text += f"🆕 **可点播**: {available_count} 季 ({missing_seasons_str})\n"
-    else:
-        selection_text += f"📚 **Emby库**: 未收录此剧\n"
-        selection_text += f"🆕 **可点播**: {available_count} 季 (全部季数)\n"
+    selection_text += f"🆕 **可点播**: {tmdb_season_count} 季 (全部季数)\n"
     selection_text += "\n"
     
     if selected_seasons:
@@ -892,11 +686,8 @@ async def show_season_selection(call, tv_series: dict, seasons: list, selected_s
         air_date = season.get('air_date', '')
         year_info = f" ({air_date[:4]})" if air_date else ""
         
-        # 标记已选择的季数和Emby中已有的季数
-        if season_num in existing_seasons:
-            status_icon = "📚"  # Emby中已有，不可选择
-            season_text = f"{status_icon} **第{season_num}季**: {episode_count}集{year_info} (Emby已有)"
-        elif season_num in selected_seasons:
+        # 标记已选择的季数
+        if season_num in selected_seasons:
             status_icon = "✅"  # 已选择
             season_text = f"{status_icon} **第{season_num}季**: {episode_count}集{year_info}"
         else:
@@ -910,10 +701,7 @@ async def show_season_selection(call, tv_series: dict, seasons: list, selected_s
     
     # 添加图例说明
     selection_text += f"\n📋 **图例说明**:\n"
-    selection_text += f"✅ 已选择点播  ⭕ 可选择点播"
-    if emby_season_count > 0:
-        selection_text += f"  📚 Emby已有(不可选)"
-    selection_text += "\n"
+    selection_text += f"✅ 已选择点播  ⭕ 可选择点播\n"
     
     if selected_seasons:
         selection_text += f"\n💡 **提示**: 点击 '✅ 确认选择' 继续，或继续选择其他季数"
@@ -923,7 +711,7 @@ async def show_season_selection(call, tv_series: dict, seasons: list, selected_s
     await editMessage(
         call,
         selection_text,
-        buttons=tmdb_season_selection_ikb(seasons, selected_seasons, emby_season_count, existing_seasons),
+        buttons=tmdb_season_selection_ikb(seasons, selected_seasons, 0, []),  # 传入空的existing_seasons
         parse_mode=enums.ParseMode.MARKDOWN
     )
 
@@ -1009,27 +797,18 @@ async def process_movie_request(call, selected_item: dict):
     )
 
 
-@bot.on_callback_query(filters.regex('^emby_exists_[0-9]+$') & user_in_group_on_filter)
-async def emby_exists_season_info(_, call):
-    """提示用户该季在Emby中已存在"""
-    season_number = int(call.data.split('_')[-1])
-    await callAnswer(call, f'📚 第{season_number}季在Emby库中已收录，无需重复点播', True)
+# Note: emby_exists_season_info function removed as we no longer check Emby restrictions
 
 
 @bot.on_callback_query(filters.regex('^toggle_season_[0-9]+$') & user_in_group_on_filter)
 async def toggle_season_selection(_, call):
-    """切换电视剧季数选择状态（多选）"""
+    """切换电视剧季数选择状态（多选）- 不检查Emby限制"""
     user_data = user_tmdb_data.get(call.from_user.id)
     if not user_data or 'selected_item' not in user_data or 'seasons' not in user_data:
         return await callAnswer(call, '❌ 搜索会话已过期，请重新搜索', True)
     
     # 提取季数编号
     season_number = int(call.data.split('_')[-1])
-    
-    # 检查该季是否在Emby中已存在 - 使用实际的现有季数列表
-    existing_seasons = user_data.get('existing_seasons', [])
-    if season_number in existing_seasons:
-        return await callAnswer(call, f'📚 第{season_number}季在Emby库中已存在，无需点播', True)
     
     # 初始化或获取已选择的季数列表
     if 'selected_seasons' not in user_data:
