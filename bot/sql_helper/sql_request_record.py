@@ -1,15 +1,24 @@
 from sqlalchemy import Column, String, DateTime, BigInteger, Text, Float
 import datetime
+import pytz
 from bot.sql_helper import Base, Session, engine
 from cacheout import Cache
 
+# Beijing timezone for consistent time handling
+BEIJING_TZ = pytz.timezone('Asia/Shanghai')
+
 cache = Cache()
+
+
+def get_beijing_time():
+    """Get current time in Beijing timezone"""
+    return datetime.datetime.now(BEIJING_TZ)
 
 
 class RequestRecord(Base):
     __tablename__ = 'request_records'
     download_id = Column(String(255), primary_key=True, autoincrement=False)
-    tg = Column(BigInteger, nullable=False)
+    tg = Column(BigInteger, nullable=False)  # Telegram user ID for tracking demand requests
     request_name = Column(String(255), nullable=False)
     cost = Column(String(255), nullable=False)
     detail = Column(Text, nullable=False)
@@ -17,9 +26,9 @@ class RequestRecord(Base):
     download_state= Column(String(50), default='pending')  # pending, downloading, completed, failed
     transfer_state = Column(String(50))  # success, failed
     progress = Column(Float, default=0)
-    create_at = Column(DateTime, default=datetime.datetime.utcnow)
-    update_at = Column(DateTime, default=datetime.datetime.utcnow,
-                      onupdate=datetime.datetime.utcnow)
+    create_at = Column(DateTime, default=get_beijing_time)  # Store demands in Beijing time (UTC+8)
+    update_at = Column(DateTime, default=get_beijing_time,
+                      onupdate=get_beijing_time)  # Update timestamps in Beijing time
 
 
 RequestRecord.__table__.create(bind=engine, checkfirst=True)

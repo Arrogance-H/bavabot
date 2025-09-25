@@ -1,12 +1,14 @@
 """
-管理员ME点播请求管理命令
+管理员ME点播请求管理命令 - 仅限管理员和Owner可访问
 demand - 查看和管理ME点播请求，支持状态编辑
+限制：只有管理员(owner、admins)可以使用此命令，群组成员无法访问
+功能：记录用户ID，使用北京时间显示
 """
 
 from pyrogram import filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from bot import bot, prefixes, LOGGER
-from bot.func_helper.filters import admins_on_filter
+from bot.func_helper.filters import admins_filter
 from bot.func_helper.msg_utils import sendMessage, deleteMessage, editMessage, callAnswer, callListen
 from bot.sql_helper.sql_request_record import (
     sql_get_all_request_records,
@@ -15,9 +17,29 @@ from bot.sql_helper.sql_request_record import (
     sql_update_request_status
 )
 from datetime import datetime
+import pytz
 import math
 
+# Beijing timezone for consistent time display
+BEIJING_TZ = pytz.timezone('Asia/Shanghai')
 RECORDS_PER_PAGE = 20
+
+
+def format_beijing_time(utc_time):
+    """Convert UTC time to Beijing time for display"""
+    if not utc_time:
+        return "未知时间"
+    
+    try:
+        # If the time is naive (no timezone), assume it's UTC
+        if utc_time.tzinfo is None:
+            utc_time = pytz.utc.localize(utc_time)
+        
+        # Convert to Beijing time
+        beijing_time = utc_time.astimezone(BEIJING_TZ)
+        return beijing_time.strftime('%m-%d %H:%M')
+    except:
+        return "未知时间"
 
 
 def format_demand_records(current_page=1, current_filter="all"):
@@ -44,18 +66,15 @@ def format_demand_records(current_page=1, current_filter="all"):
         text = f"📋 ME点播请求记录 (第{current_page}/{total_pages}页，共{total_records}条)\n\n"
 
         for record in records:
-            # 格式化时间显示
-            try:
-                time_str = record.create_at.strftime('%m-%d %H:%M')
-            except:
-                time_str = "未知时间"
+            # 格式化北京时间显示
+            time_str = format_beijing_time(record.create_at)
             
-            # ME点播固定费用
-            cost_info = "费用: 10币"
+            # 用户ID信息 - 记录点播用户的Telegram ID
+            user_info = f"用户ID: {record.tg}"
             
             text += f"🎬 {record.request_name}\n"
-            text += f"   {time_str} | {cost_info}\n"
-            text += f"   ID: {record.download_id}\n\n"
+            text += f"   {time_str} | {user_info}\n"
+            text += f"   请求ID: {record.download_id}\n\n"
 
         keyboard = get_demand_records_keyboard(current_page, total_pages, current_filter)
         return text, keyboard
@@ -123,9 +142,14 @@ def get_demand_records_keyboard(current_page, total_pages, current_filter="all")
     return InlineKeyboardMarkup(keyboard)
 
 
-@bot.on_message(filters.command('demand', prefixes) & admins_on_filter)
+@bot.on_message(filters.command('demand', prefixes) & admins_filter)
 async def demand_command(_, msg):
-    """ME点播请求管理命令"""
+    """
+    ME点播请求管理命令 - 仅限管理员和Owner使用
+    
+    权限限制：只有管理员(owner、admins)可以访问，群组成员无法使用
+    功能：查看和管理ME点播请求，记录用户ID，使用北京时间显示
+    """
     try:
         await deleteMessage(msg)
         
@@ -154,7 +178,7 @@ async def demand_command(_, msg):
             
             if success:
                 await sendMessage(msg, f"✅ 删除成功\n\n已删除ME点播请求: `{download_id}`", send=True, chat_id=msg.chat.id)
-                LOGGER.info(f"管理员删除ME点播请求记录: {download_id}")
+                LOGGER.info(f"管理员 {msg.from_user.id} 删除ME点播请求记录: {download_id}")
             else:
                 await sendMessage(msg, f"❌ 删除失败\n\n请求ID不存在或删除出错: `{download_id}`", send=True, chat_id=msg.chat.id)
         
@@ -165,7 +189,7 @@ async def demand_command(_, msg):
                 await sendMessage(msg, "🔍 开始检查ME点播请求在Emby库中的状态...", send=True, chat_id=msg.chat.id)
                 await check_emby_requests()
                 await sendMessage(msg, "✅ Emby库检查完成！如有更新会自动通知用户", send=True, chat_id=msg.chat.id)
-                LOGGER.info(f"管理员手动触发Emby库检查")
+                LOGGER.info(f"管理员 {msg.from_user.id} 手动触发Emby库检查")
             except Exception as e:
                 await sendMessage(msg, f"❌ Emby库检查失败: {str(e)[:100]}", send=True, chat_id=msg.chat.id)
                 LOGGER.error(f"手动Emby库检查失败: {str(e)}")
@@ -186,8 +210,11 @@ async def demand_command(_, msg):
                 "• 点击界面中的'📝 编辑状态'按钮\n"
                 "• 可用状态: pending(待处理), downloading(处理中), completed(已入库)\n\n"
                 "💡 **说明**:\n"
+                "• **仅限管理员和Owner使用**：只有管理员和Owner可以查看和管理请求，群组成员无法访问\n"
                 "• 只显示和管理ME点播系统的请求\n"
-                "• 🎬 标识ME点播请求，固定费用10币\n"
+                "• 🎬 标识ME点播请求\n"
+                "• 显示点播用户的Telegram ID以便追踪\n"
+                "• 时间显示为北京时间(UTC+8)\n"
                 "• 系统使用TMDB ID进行精准匹配和自动状态更新\n"
                 "• 状态更新会在群组中通知\n"
                 "• 删除和编辑操作不可恢复，请谨慎操作"
@@ -195,11 +222,11 @@ async def demand_command(_, msg):
             await sendMessage(msg, help_text, send=True, chat_id=msg.chat.id)
             
     except Exception as e:
-        LOGGER.error(f"处理demand命令时出错: {str(e)}")
+        LOGGER.error(f"处理demand命令时出错 (用户: {msg.from_user.id}): {str(e)}")
         await sendMessage(msg, f"❌ 处理命令时出错: {str(e)[:100]}", send=True, chat_id=msg.chat.id)
 
 
-@bot.on_callback_query(filters.regex(r'^demand_page_(\d+)_(.+)$') & admins_on_filter)
+@bot.on_callback_query(filters.regex(r'^demand_page_(\d+)_(.+)$') & admins_filter)
 async def handle_demand_page(_, call):
     """处理分页请求"""
     try:
@@ -215,7 +242,7 @@ async def handle_demand_page(_, call):
         await callAnswer(call, "❌ 页面切换失败", True)
 
 
-@bot.on_callback_query(filters.regex(r'^demand_filter_(.+)$') & admins_on_filter)
+@bot.on_callback_query(filters.regex(r'^demand_filter_(.+)$') & admins_filter)
 async def handle_demand_filter(_, call):
     """处理筛选请求"""
     try:
@@ -237,7 +264,7 @@ async def handle_demand_filter(_, call):
         await callAnswer(call, "❌ 筛选失败", True)
 
 
-@bot.on_callback_query(filters.regex(r'^demand_refresh_(.+)$') & admins_on_filter)
+@bot.on_callback_query(filters.regex(r'^demand_refresh_(.+)$') & admins_filter)
 async def handle_demand_refresh(_, call):
     """处理刷新请求"""
     try:
@@ -252,7 +279,7 @@ async def handle_demand_refresh(_, call):
         await callAnswer(call, "❌ 刷新失败", True)
 
 
-@bot.on_callback_query(filters.regex(r'^demand_edit_status$') & admins_on_filter)
+@bot.on_callback_query(filters.regex(r'^demand_edit_status$') & admins_filter)
 async def handle_demand_edit_status(_, call):
     """处理状态编辑请求"""
     try:
@@ -307,7 +334,7 @@ async def handle_demand_edit_status(_, call):
             text, keyboard = format_demand_records(1, "all")
             await editMessage(call, text, buttons=keyboard)
             await callAnswer(call, f"✅ 已更新请求 {request_id} 状态为 {new_status}")
-            LOGGER.info(f"管理员更新ME点播请求状态: {request_id} -> {new_status}")
+            LOGGER.info(f"管理员 {call.from_user.id} 更新ME点播请求状态: {request_id} -> {new_status}")
         else:
             await editMessage(call, f"❌ 更新失败，请检查请求ID: {request_id}")
         
