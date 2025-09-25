@@ -440,55 +440,94 @@ async def invite_lv_set(_, call):
 @bot.on_callback_query(filters.regex('preserve_manage') & admins_on_filter)
 async def preserve_manage(_, call):
     """管理员保号方式管理面板"""
-    await callAnswer(call, '🛡️ 进入保号管理')
-    
-    text = f'🛡️ **用户保号方式管理**\n\n'
-    text += f'**功能说明：**\n'
-    text += f'• 查看用户保号方式统计\n'
-    text += f'• 修改指定用户的保号方式\n'
-    text += f'• 重置用户的切换次数\n\n'
-    text += f'**保号方式类型：**\n'
-    text += f'• **活跃保号**: 根据观看活跃度判断，{config.activity_check_days}天无观看将被封禁\n'
-    text += f'• **到期保号**: 根据到期时间判断，到期后自动续期或封禁\n'
-    
-    buttons = preserve_manage_ikb()
-    
-    await editMessage(call, text, buttons)
+    try:
+        await callAnswer(call, '🛡️ 进入保号管理')
+        
+        # Get activity check days with fallback
+        activity_days = getattr(config, 'activity_check_days', 30)
+        
+        text = f'🛡️ **用户保号方式管理**\n\n'
+        text += f'**功能说明：**\n'
+        text += f'• 查看用户保号方式统计\n'
+        text += f'• 修改指定用户的保号方式\n'
+        text += f'• 重置用户的切换次数\n\n'
+        text += f'**保号方式类型：**\n'
+        text += f'• **活跃保号**: 根据观看活跃度判断，{activity_days}天无观看将被封禁\n'
+        text += f'• **到期保号**: 根据到期时间判断，到期后自动续期或封禁\n'
+        
+        buttons = preserve_manage_ikb()
+        
+        await editMessage(call, text, buttons)
+        LOGGER.info(f"【保号管理】管理员 {call.from_user.id} ({call.from_user.first_name}) 进入保号管理面板")
+        
+    except Exception as e:
+        LOGGER.error(f"【保号管理错误】管理员 {call.from_user.id} 访问保号管理时出错: {str(e)}")
+        try:
+            await callAnswer(call, '❌ 保号管理面板加载失败', show_alert=True)
+        except:
+            pass
+        try:
+            await editMessage(call, 
+                f'❌ **保号管理面板加载失败**\n\n'
+                f'错误信息：{str(e)[:100]}...\n\n'
+                f'请联系管理员检查日志', 
+                ikb([[('🔙 返回', 'manage')]])
+            )
+        except:
+            pass
 
 
 @bot.on_callback_query(filters.regex('preserve_stats') & admins_on_filter)
 async def preserve_stats(_, call):
     """显示保号方式统计"""
-    await callAnswer(call, '📊 正在统计保号方式数据...')
-    
-    # 查询所有用户的保号统计
-    with Session() as session:
+    try:
+        await callAnswer(call, '📊 正在统计保号方式数据...')
+        
+        # 查询所有用户的保号统计
+        with Session() as session:
+            try:
+                total_users = session.query(Emby).filter(Emby.embyid.isnot(None)).count()
+                active_users = session.query(Emby).filter(
+                    Emby.embyid.isnot(None), 
+                    Emby.preserve_mode == 'active'
+                ).count()
+                expire_users = session.query(Emby).filter(
+                    Emby.embyid.isnot(None), 
+                    Emby.preserve_mode == 'expire'
+                ).count()
+                switched_users = session.query(Emby).filter(
+                    Emby.embyid.isnot(None), 
+                    Emby.preserve_mode_changed >= 1
+                ).count()
+                
+                if total_users > 0:
+                    text = f'📊 **保号方式统计报告**\n\n'
+                    text += f'👥 **总用户数**: {total_users}\n\n'
+                    text += f'🛡️ **活跃保号**: {active_users} 人 ({active_users/total_users*100:.1f}%)\n'
+                    text += f'⏰ **到期保号**: {expire_users} 人 ({expire_users/total_users*100:.1f}%)\n'
+                    text += f'🔄 **已切换过**: {switched_users} 人 ({switched_users/total_users*100:.1f}%)\n\n'
+                    text += f'📅 **统计时间**: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'
+                else:
+                    text = f'📊 **保号方式统计报告**\n\n'
+                    text += f'暂无用户数据\n\n'
+                    text += f'📅 **统计时间**: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'
+                
+            except Exception as e:
+                text = f'❌ **统计失败**: {str(e)}'
+                LOGGER.error(f"【保号统计错误】数据库查询失败: {str(e)}")
+        
+        await editMessage(call, text, preserve_back_ikb())
+        LOGGER.info(f"【保号统计】管理员 {call.from_user.id} 查看了保号统计")
+        
+    except Exception as e:
+        LOGGER.error(f"【保号统计错误】管理员 {call.from_user.id} 查看统计时出错: {str(e)}")
         try:
-            total_users = session.query(Emby).filter(Emby.embyid.isnot(None)).count()
-            active_users = session.query(Emby).filter(
-                Emby.embyid.isnot(None), 
-                Emby.preserve_mode == 'active'
-            ).count()
-            expire_users = session.query(Emby).filter(
-                Emby.embyid.isnot(None), 
-                Emby.preserve_mode == 'expire'
-            ).count()
-            switched_users = session.query(Emby).filter(
-                Emby.embyid.isnot(None), 
-                Emby.preserve_mode_changed >= 1
-            ).count()
-            
-            text = f'📊 **保号方式统计报告**\n\n'
-            text += f'👥 **总用户数**: {total_users}\n\n'
-            text += f'🛡️ **活跃保号**: {active_users} 人 ({active_users/total_users*100:.1f}%)\n'
-            text += f'⏰ **到期保号**: {expire_users} 人 ({expire_users/total_users*100:.1f}%)\n'
-            text += f'🔄 **已切换过**: {switched_users} 人 ({switched_users/total_users*100:.1f}%)\n\n'
-            text += f'📅 **统计时间**: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'
-            
-        except Exception as e:
-            text = f'❌ **统计失败**: {str(e)}'
-    
-    await editMessage(call, text, preserve_back_ikb())
+            await editMessage(call,
+                f'❌ **统计查询失败**: {str(e)[:100]}...',
+                preserve_back_ikb()
+            )
+        except:
+            pass
 
 
 @bot.on_callback_query(filters.regex('preserve_user_query') & admins_on_filter)
@@ -705,3 +744,57 @@ async def preserve_reset_switch(_, call):
             f"❌ **操作失败**: {str(e)}",
             preserve_retry_reset_ikb()
         )
+
+
+@bot.on_callback_query(filters.regex('preserve_debug') & admins_on_filter)
+async def preserve_debug(_, call):
+    """保号管理权限诊断"""
+    try:
+        await callAnswer(call, '🔧 正在进行权限诊断...')
+        
+        user_id = call.from_user.id
+        user_name = call.from_user.first_name or "未知"
+        
+        # Check admin permissions
+        is_owner = user_id == owner
+        is_admin = user_id in admins
+        is_in_group = user_id in group
+        
+        text = f'🔧 **权限诊断报告**\n\n'
+        text += f'👤 **用户信息**:\n'
+        text += f'   • ID: {user_id}\n'
+        text += f'   • 名称: {user_name}\n\n'
+        text += f'🔑 **权限状态**:\n'
+        text += f'   • Owner权限: {"✅" if is_owner else "❌"}\n'
+        text += f'   • Admin权限: {"✅" if is_admin else "❌"}\n'
+        text += f'   • 群组权限: {"✅" if is_in_group else "❌"}\n\n'
+        
+        # Check configuration
+        text += f'⚙️ **配置信息**:\n'
+        text += f'   • Owner ID: {owner}\n'
+        text += f'   • Admin数量: {len(admins)}\n'
+        text += f'   • 群组数量: {len(group)}\n'
+        text += f'   • Activity检查天数: {getattr(config, "activity_check_days", "未配置")}\n\n'
+        
+        # Check database connection
+        try:
+            with Session() as session:
+                user_count = session.query(Emby).count()
+                text += f'💾 **数据库状态**: ✅ 连接正常 ({user_count} 个用户记录)\n'
+        except Exception as db_error:
+            text += f'💾 **数据库状态**: ❌ 连接失败 ({str(db_error)[:50]}...)\n'
+        
+        text += f'\n📅 **诊断时间**: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'
+        
+        await editMessage(call, text, preserve_back_ikb())
+        LOGGER.info(f"【保号诊断】管理员 {user_id} 执行了权限诊断")
+        
+    except Exception as e:
+        LOGGER.error(f"【保号诊断错误】管理员 {call.from_user.id} 诊断时出错: {str(e)}")
+        try:
+            await editMessage(call,
+                f'❌ **诊断失败**: {str(e)[:100]}...',
+                preserve_back_ikb()
+            )
+        except:
+            pass
