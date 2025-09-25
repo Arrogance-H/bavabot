@@ -1,3 +1,3 @@
-__all__ = ['admin_panel', 'config_panel', 'kk', 'member_panel', 'sched_panel', 'server_panel', 'request_movie_panel', 'tmdb_panel']
+__all__ = ['admin_panel', 'config_panel', 'kk', 'member_panel', 'sched_panel', 'server_panel', 'request_movie_panel', 'tmdb_panel', 'preserve_manage_panel']
 
-from . import admin_panel, config_panel, kk, member_panel, sched_panel, server_panel, request_movie_panel, tmdb_panel
+from . import admin_panel, config_panel, kk, member_panel, sched_panel, server_panel, request_movie_panel, tmdb_panel, preserve_manage_panel

@@ -141,7 +141,7 @@ def preserve_manage_ikb() -> InlineKeyboardMarkup:
     return ikb([
         [('📊 保号统计', 'preserve_stats'), ('🔍 查询用户', 'preserve_user_query')],
         [('⚙️ 修改保号方式', 'preserve_user_modify'), ('🔄 重置切换权限', 'preserve_reset_switch')],
-        [('🔙 返回', 'manage')]
+        [('🔙 返回管理面板', 'manage')]
     ])
 
 
