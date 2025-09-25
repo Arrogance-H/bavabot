@@ -678,11 +678,10 @@ def mp_config_ikb():
     return keyboard
 
 def tmdb_season_selection_ikb(seasons: list, selected_seasons: list = None, emby_season_count: int = 0, existing_seasons: list = None):
-    """TMDB电视剧季数选择按钮 - 支持多选，排除Emby中已有的季数"""
+    """TMDB电视剧季数选择按钮 - 支持多选，不检查Emby限制"""
     if selected_seasons is None:
         selected_seasons = []
-    if existing_seasons is None:
-        existing_seasons = []
+    # existing_seasons parameter ignored as we don't check Emby restrictions
     
     buttons = []
     
@@ -692,27 +691,15 @@ def tmdb_season_selection_ikb(seasons: list, selected_seasons: list = None, emby
         season_num = season.get('season_number', 0)
         episode_count = season.get('episode_count', 0)
         
-        # 检查该季是否在Emby中已存在 - 使用实际的现有季数列表
-        is_in_emby = season_num in existing_seasons
-        
-        if is_in_emby:
-            # Emby中已有的季数，显示为已有状态，不可点击
-            button_text = f"📚 第{season_num}季"
-            if episode_count > 0:
-                button_text += f" ({episode_count}集)"
-            button_text += " 已收录"
-            # 使用特殊回调数据表示不可点击
-            season_buttons.append((button_text, f'emby_exists_{season_num}'))
+        # 所有季数都可选择，不检查Emby状态
+        if season_num in selected_seasons:
+            button_text = f"✅ 第{season_num}季"
         else:
-            # 可选择的季数
-            if season_num in selected_seasons:
-                button_text = f"✅ 第{season_num}季"
-            else:
-                button_text = f"⭕ 第{season_num}季"
-                
-            if episode_count > 0:
-                button_text += f" ({episode_count}集)"
-            season_buttons.append((button_text, f'toggle_season_{season_num}'))
+            button_text = f"⭕ 第{season_num}季"
+            
+        if episode_count > 0:
+            button_text += f" ({episode_count}集)"
+        season_buttons.append((button_text, f'toggle_season_{season_num}'))
     
     # 按每行2个按钮分组
     for i in range(0, len(season_buttons), 2):
