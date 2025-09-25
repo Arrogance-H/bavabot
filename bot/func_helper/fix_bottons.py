@@ -483,8 +483,8 @@ async def cr_kk_ikb(uid, first):
         else:
             keyboard.append(['✨ 赠送资格', f'gift-{uid}'])
         
-        # 添加保号方式信息到显示文本
-        if name != '无账户信息':
+        # 添加保号方式信息到显示文本（白名单用户不显示）
+        if name != '无账户信息' and lv != '白名单':
             preserve_mode_text = mode_name.get(preserve_mode, '未知')
             switch_status = '已切换' if preserve_mode_changed >= 1 else '可切换'
             preserve_info = f"**· 🛡️ 保号方式** | {preserve_mode_text} ({switch_status})\n"
