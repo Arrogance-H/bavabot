@@ -439,16 +439,21 @@ async def cr_kk_ikb(uid, first):
         text += f'**· 🆔 TG** ：[{first}](tg://user?id={uid}) [`{uid}`]\n数据库中没有此ID。ta 还没有私聊过我'
     else:
         name, lv, ex, iv, embyid, pwd2, preserve_mode, preserve_mode_changed = data
+        
+        # 检查是否为白名单用户
+        is_whitelist = lv == '白名单'
+        
         if name != '无账户信息':
             ban = "🌟 解除禁用" if lv == "**已禁用**" else '💢 禁用账户'
             keyboard = [[ban, f'user_ban-{uid}'], ['⚠️ 删除账户', f'closeemby-{uid}']]
             
-            # 添加保号方式管理按钮
-            mode_name = {'active': '活跃保号', 'expire': '到期保号'}
-            current_mode_text = mode_name.get(preserve_mode, '未知')
-            switch_to_mode = 'expire' if preserve_mode == 'active' else 'active'
-            switch_to_text = mode_name.get(switch_to_mode, '未知')
-            keyboard.append([f'🛡️ 切换至{switch_to_text}', f'kk_preserve_switch-{uid}'])
+            # 添加保号方式管理按钮（白名单用户不显示）
+            if not is_whitelist:
+                mode_name = {'active': '活跃保号', 'expire': '到期保号'}
+                current_mode_text = mode_name.get(preserve_mode, '未知')
+                switch_to_mode = 'expire' if preserve_mode == 'active' else 'active'
+                switch_to_text = mode_name.get(switch_to_mode, '未知')
+                keyboard.append([f'🛡️ 切换至{switch_to_text}', f'kk_preserve_switch-{uid}'])
             
             if len(extra_emby_libs) > 0:
                 success, rep = await emby.user(emby_id=embyid)
@@ -483,8 +488,9 @@ async def cr_kk_ikb(uid, first):
         else:
             keyboard.append(['✨ 赠送资格', f'gift-{uid}'])
         
-        # 添加保号方式信息到显示文本
-        if name != '无账户信息':
+        # 添加保号方式信息到显示文本（白名单用户不显示）
+        if name != '无账户信息' and not is_whitelist:
+            mode_name = {'active': '活跃保号', 'expire': '到期保号'}
             preserve_mode_text = mode_name.get(preserve_mode, '未知')
             switch_status = '已切换' if preserve_mode_changed >= 1 else '可切换'
             preserve_info = f"**· 🛡️ 保号方式** | {preserve_mode_text} ({switch_status})\n"
