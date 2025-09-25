@@ -19,7 +19,7 @@ from bot.func_helper.msg_utils import callAnswer, editMessage, sendPhoto, callLi
 from bot.func_helper.utils import open_check, cr_link_one,rn_link_one
 
 
-@bot.on_callback_query(filters.regex('manage') & admins_on_filter)
+@bot.on_callback_query(filters.regex('^manage$') & admins_on_filter)
 async def gm_ikb(_, call):
     await callAnswer(call, '✔️ manage面板')
     stat, all_user, tem, timing = await open_check()
