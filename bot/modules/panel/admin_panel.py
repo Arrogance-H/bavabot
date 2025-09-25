@@ -449,7 +449,7 @@ async def preserve_manage(_, call):
     text += f'• 重置用户的切换次数\n\n'
     text += f'**保号方式类型：**\n'
     text += f'• **活跃保号**: 根据观看活跃度判断，{config.activity_check_days}天无观看将被封禁\n'
-    text += f'• **到期保号**: 根据到期时间判断，到期后自动续期或封禁'
+    text += f'• **到期保号**: 根据到期时间判断，到期后自动续期或封禁\n'
     
     buttons = preserve_manage_ikb()
     
