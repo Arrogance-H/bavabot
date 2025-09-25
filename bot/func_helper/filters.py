@@ -27,12 +27,20 @@ async def admins_on_filter(filt, client, update) -> bool:
     user = update.from_user or update.sender_chat
     uid = user.id
     
+    # Add debug logging for preserve_manage callbacks
+    if hasattr(update, 'data') and 'preserve_manage' in update.data:
+        LOGGER.info(f"【权限检查】用户 {uid} 尝试访问 preserve_manage 功能")
+    
     # Check if user is owner or in admin list
     if uid == owner or uid in admins:
+        if hasattr(update, 'data') and 'preserve_manage' in update.data:
+            LOGGER.info(f"【权限检查】用户 {uid} 通过 owner/admin 权限验证")
         return True
     
     # Check if user ID is explicitly in group list (for special users)
     if uid in group:
+        if hasattr(update, 'data') and 'preserve_manage' in update.data:
+            LOGGER.info(f"【权限检查】用户 {uid} 通过 group 权限验证")
         return True
     
     # Check if user is actually a member of any authorized group
@@ -41,6 +49,8 @@ async def admins_on_filter(filt, client, update) -> bool:
             u = await client.get_chat_member(chat_id=int(i), user_id=uid)
             if u.status in [ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.MEMBER,
                             ChatMemberStatus.OWNER]:
+                if hasattr(update, 'data') and 'preserve_manage' in update.data:
+                    LOGGER.info(f"【权限检查】用户 {uid} 通过群组 {i} 成员权限验证")
                 return True
         except BadRequest as e:
             if e.ID == 'USER_NOT_PARTICIPANT':
@@ -50,6 +60,9 @@ async def admins_on_filter(filt, client, update) -> bool:
                 continue
             else:
                 continue
+    
+    if hasattr(update, 'data') and 'preserve_manage' in update.data:
+        LOGGER.warning(f"【权限检查】用户 {uid} 权限验证失败，无法访问 preserve_manage")
     
     return False
 
