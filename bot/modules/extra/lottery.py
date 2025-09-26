@@ -616,7 +616,7 @@ async def draw_lottery(lottery: Lottery, chat_id: int, message_id: int):
                 if lottery.collection_location:
                     private_msg += f"\n📍 领奖联系： {lottery.collection_location}"
                 
-                private_msg += f"\n\n请及时联系管理员领取奖品！"
+                private_msg += f"\n\n请及时凭中奖消息截图联系管理员领取奖品！"
                 
                 await bot.send_message(winner_id, private_msg)
             except Exception:
