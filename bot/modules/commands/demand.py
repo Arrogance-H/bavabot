@@ -190,23 +190,6 @@ async def demand_command(_, msg):
             text, keyboard = format_demand_records(1, filter_type)
             await sendMessage(msg, text, send=True, chat_id=msg.chat.id, buttons=keyboard)
             
-        elif args[0] == 'del' and len(args) >= 2:
-            # 删除ME点播请求
-            download_id = args[1]
-            if not download_id.startswith('ME'):
-                await sendMessage(msg, f"❌ 只能删除ME点播请求: `{download_id}`", send=True, chat_id=msg.chat.id)
-                return
-                
-            success = sql_delete_request_record(download_id)
-            
-            if success:
-                await sendMessage(msg, f"✅ 删除成功\n\n已删除ME点播请求: `{download_id}`", send=True, chat_id=msg.chat.id)
-                LOGGER.info(f"管理员 {msg.from_user.id} 删除ME点播请求记录: {download_id}")
-            else:
-                await sendMessage(msg, f"❌ 删除失败\n\n请求ID不存在或删除出错: `{download_id}`", send=True, chat_id=msg.chat.id)
-        
-
-        
         elif args[0] == 'notify' and len(args) == 1:
             # 检查已完成的媒体并发送群组通知
             try:
@@ -276,32 +259,6 @@ async def demand_command(_, msg):
                 error_msg = f"❌ 发送群组通知失败: {str(e)[:100]}"
                 await sendMessage(msg, error_msg, send=True, chat_id=msg.chat.id)
                 LOGGER.error(f"[Demand] 发送群组通知失败 (用户: {msg.from_user.id}): {str(e)}")
-        else:
-            # 帮助信息
-            help_text = (
-                "📋 **ME点播请求管理命令使用说明**\n\n"
-                "🔍 **查看请求**:\n"
-                "`/demand` - 查看所有ME点播请求\n\n"
-                "📝 **编辑状态**:\n"
-                "• 点击界面中的'📝 编辑状态'按钮\n"
-                "• 输入影片序号（如：1、2、3...）\n"
-                "• 选择新状态按钮：⏳待处理、🔄处理中、✅已入库\n"
-                "• 或点击🗑️删除请求按钮直接删除\n"
-                "• 状态更新为已入库时会自动发送群组通知\n\n"
-                "`/demand notify` - 检查已完成媒体并发送群组通知\n\n"
-                "💡 **说明**:\n"
-                "• **仅限管理员和Owner使用**：只有管理员和Owner可以查看和管理请求，群组成员无法访问\n"
-                "• 只显示和管理ME点播系统的请求\n"
-                "• 🎬 标识ME点播请求，按点播时间排序并显示序号\n"
-                "• 显示点播用户的Telegram ID以便追踪\n"
-                "• 时间显示为北京时间(UTC+8)\n"
-                "• 手动编辑状态为已入库时会自动发送群组通知（不含入库时间）\n"
-                "• 删除和编辑操作不可恢复，请谨慎操作\n"
-                "• 编辑界面现支持直接删除请求，删除前会显示确认对话框\n"
-                "• notify命令会重新发送已完成媒体的群组通知\n"
-                "• 通过序号选择和状态按钮的方式更便捷地管理请求状态"
-            )
-            await sendMessage(msg, help_text, send=True, chat_id=msg.chat.id)
             
     except Exception as e:
         LOGGER.error(f"处理demand命令时出错 (用户: {msg.from_user.id}): {str(e)}")
