@@ -141,15 +141,18 @@ async def check_emby_requests():
         LOGGER.error(f"[Emby Request Check] 检查任务执行失败: {str(e)}")
 
 
-# 添加定时任务 - 每3小时检查一次
-if emby_url and emby_api:
-    scheduler.add_job(
-        check_emby_requests, 
-        'interval', 
-        hours=3, 
-        id='check_emby_requests',
-        max_instances=1  # 确保不会重复执行
-    )
-    LOGGER.info("[Emby Request Check] 已添加Emby请求检查定时任务 (每3小时执行一次)")
-else:
-    LOGGER.warning("[Emby Request Check] Emby配置未启用，跳过添加定时任务")
+# 自动定时任务已禁用 - 可通过 /demand check 或 /demand scan 手动触发检查
+# 原自动任务: 每3小时检查一次 (现已移除)
+# if emby_url and emby_api:
+#     scheduler.add_job(
+#         check_emby_requests, 
+#         'interval', 
+#         hours=3, 
+#         id='check_emby_requests',
+#         max_instances=1  # 确保不会重复执行
+#     )
+#     LOGGER.info("[Emby Request Check] 已添加Emby请求检查定时任务 (每3小时执行一次)")
+# else:
+#     LOGGER.warning("[Emby Request Check] Emby配置未启用，跳过添加定时任务")
+
+LOGGER.info("[Emby Request Check] 自动定时任务已禁用，请使用 /demand check 或 /demand scan 手动触发检查")
