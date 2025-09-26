@@ -22,7 +22,7 @@ import math
 
 # Beijing timezone for consistent time display
 BEIJING_TZ = pytz.timezone('Asia/Shanghai')
-RECORDS_PER_PAGE = 20
+RECORDS_PER_PAGE = 5
 
 
 def format_beijing_time(utc_time):
@@ -50,31 +50,49 @@ def format_demand_records(current_page=1, current_filter="all"):
             records, has_prev, has_next, total_records = sql_get_all_request_records(page=current_page, limit=RECORDS_PER_PAGE)
             # 过滤只显示ME开头的请求
             records = [r for r in records if r.download_id.startswith('ME')]
-            total_records = len(records) if records else 0
         else:
             records, has_prev, has_next, total_records = sql_get_request_records_by_state(download_state=current_filter, page=current_page, limit=RECORDS_PER_PAGE)
             # 过滤只显示ME开头的请求
             records = [r for r in records if r.download_id.startswith('ME')]
-            total_records = len(records) if records else 0
 
         if not records:
             text = "📋 暂无ME点播请求记录"
             keyboard = get_demand_records_keyboard(1, 1, current_filter)
             return text, keyboard
 
+        # 按点播时间（create_at）排序，最早的在前面
+        records.sort(key=lambda x: x.create_at)
+        
+        total_records = len(records)
         total_pages = max(1, math.ceil(total_records / RECORDS_PER_PAGE))
+        
+        # 计算当前页的记录范围
+        start_idx = (current_page - 1) * RECORDS_PER_PAGE
+        end_idx = start_idx + RECORDS_PER_PAGE
+        page_records = records[start_idx:end_idx]
+        
         text = f"📋 ME点播请求记录 (第{current_page}/{total_pages}页，共{total_records}条)\n\n"
 
-        for record in records:
+        for idx, record in enumerate(page_records):
+            # 计算全局序号（从1开始）
+            global_idx = start_idx + idx + 1
+            
             # 格式化北京时间显示
             time_str = format_beijing_time(record.create_at)
             
             # 用户ID信息 - 记录点播用户的Telegram ID
             user_info = f"用户ID: {record.tg}"
             
-            text += f"🎬 {record.request_name}\n"
-            text += f"   {time_str} | {user_info}\n"
-            text += f"   请求ID: {record.download_id}\n\n"
+            # 状态显示
+            status_emoji = {
+                'pending': '⏳',
+                'downloading': '🔄', 
+                'completed': '✅'
+            }.get(record.download_state, '❓')
+            
+            text += f"#{global_idx} 🎬 {record.request_name}\n"
+            text += f"     {time_str} | {user_info} | {status_emoji}{record.download_state}\n"
+            text += f"     请求ID: {record.download_id}\n\n"
 
         keyboard = get_demand_records_keyboard(current_page, total_pages, current_filter)
         return text, keyboard
@@ -182,86 +200,7 @@ async def demand_command(_, msg):
             else:
                 await sendMessage(msg, f"❌ 删除失败\n\n请求ID不存在或删除出错: `{download_id}`", send=True, chat_id=msg.chat.id)
         
-        elif args[0] == 'check' and len(args) == 1:
-            # 手动触发Emby库检查
-            try:
-                from bot.scheduler.sync_emby_requests import check_emby_requests
-                await sendMessage(msg, "🔍 开始检查ME点播请求在Emby库中的状态...", send=True, chat_id=msg.chat.id)
-                LOGGER.info(f"[Demand] 管理员 {msg.from_user.id} 开始手动触发Emby库检查")
-                
-                await check_emby_requests()
-                
-                await sendMessage(msg, "✅ Emby库检查完成！如有更新会自动通知用户", send=True, chat_id=msg.chat.id)
-                LOGGER.info(f"[Demand] 管理员 {msg.from_user.id} 手动Emby库检查完成")
-            except Exception as e:
-                error_msg = f"❌ Emby库检查失败: {str(e)[:100]}"
-                await sendMessage(msg, error_msg, send=True, chat_id=msg.chat.id)
-                LOGGER.error(f"[Demand] 手动Emby库检查失败 (用户: {msg.from_user.id}): {str(e)}")
-        
-        elif args[0] == 'cancel' and len(args) == 1:
-            # 自动定时任务已被永久禁用
-            try:
-                await sendMessage(msg, "ℹ️ Emby库自动定时检查任务已被系统永久禁用\n\n"
-                                     "📍 当前状态:\n"
-                                     "• 自动检查: 已关闭\n"
-                                     "• 手动检查: 可用 (/demand check 或 /demand scan)\n\n"
-                                     "💡 如需检查Emby库状态，请使用手动命令", send=True, chat_id=msg.chat.id)
-                LOGGER.info(f"[Demand] 管理员 {msg.from_user.id} 查询了定时任务状态 (已永久禁用)")
-                        
-            except Exception as e:
-                error_msg = f"❌ 查询定时任务状态失败: {str(e)[:100]}"
-                await sendMessage(msg, error_msg, send=True, chat_id=msg.chat.id)
-                LOGGER.error(f"[Demand] 查询定时任务状态失败 (用户: {msg.from_user.id}): {str(e)}")
-        
-        elif args[0] == 'scan' and len(args) == 1:
-            # 扫描Emby库并通知用户
-            try:
-                from bot.scheduler.sync_emby_requests import check_emby_requests
-                from bot.sql_helper.sql_request_record import sql_get_request_records_by_state
-                
-                await sendMessage(msg, "🔍 开始扫描Emby库并检查所有ME点播请求状态...", send=True, chat_id=msg.chat.id)
-                LOGGER.info(f"[Demand] 管理员 {msg.from_user.id} 开始扫描Emby库")
-                
-                # 获取统计信息
-                try:
-                    pending_requests, _, _, pending_count = sql_get_request_records_by_state(download_state='pending', limit=1000)
-                    downloading_requests, _, _, downloading_count = sql_get_request_records_by_state(download_state='downloading', limit=1000)
-                    completed_requests, _, _, completed_count = sql_get_request_records_by_state(download_state='completed', limit=1000)
-                    
-                    # 过滤ME点播请求
-                    pending_me = len([r for r in pending_requests if r.download_id.startswith('ME')])
-                    downloading_me = len([r for r in downloading_requests if r.download_id.startswith('ME')])
-                    completed_me = len([r for r in completed_requests if r.download_id.startswith('ME')])
-                    
-                    scan_info = (
-                        f"📊 扫描前统计:\n"
-                        f"⏳ 待处理: {pending_me}\n"
-                        f"🔄 处理中: {downloading_me}\n" 
-                        f"✅ 已入库: {completed_me}\n\n"
-                        f"🔍 正在扫描Emby库..."
-                    )
-                    await sendMessage(msg, scan_info, send=True, chat_id=msg.chat.id)
-                    
-                except Exception as stats_error:
-                    LOGGER.warning(f"[Demand] 获取扫描前统计失败: {str(stats_error)}")
-                
-                # 执行扫描
-                await check_emby_requests()
-                
-                # 发送完成通知
-                success_msg = (
-                    f"✅ Emby库扫描完成！\n\n"
-                    f"📺 已检查所有ME点播请求与Emby库的匹配状态\n"
-                    f"🎉 如有影片已入库，系统已自动更新状态并发送群组通知\n"
-                    f"📋 使用 `/demand` 查看最新状态"
-                )
-                await sendMessage(msg, success_msg, send=True, chat_id=msg.chat.id)
-                LOGGER.info(f"[Demand] 管理员 {msg.from_user.id} Emby库扫描完成")
-                
-            except Exception as e:
-                error_msg = f"❌ Emby库扫描失败: {str(e)[:100]}"
-                await sendMessage(msg, error_msg, send=True, chat_id=msg.chat.id)
-                LOGGER.error(f"[Demand] Emby库扫描失败 (用户: {msg.from_user.id}): {str(e)}")
+
         
         elif args[0] == 'notify' and len(args) == 1:
             # 检查已完成的媒体并发送群组通知
@@ -303,8 +242,7 @@ async def demand_command(_, msg):
                             f"🎬 **影片名称**: {request.request_name}\n"
                             f"📊 **点播状态**: 已入库 ✅\n"
                             f"👤 **ME用户**: {username}\n"
-                            f"📺 影片已可在Emby中观看！\n"
-                            f"🕐 **入库时间**: {format_beijing_time(request.update_at)}"
+                            f"📺 影片已可在Emby中观看！"
                         )
                         
                         # 发送群组通知
@@ -343,28 +281,22 @@ async def demand_command(_, msg):
                 "`/demand completed` - 查看已入库请求\n\n"
                 "🗑️ **删除请求**:\n"
                 "`/demand del 请求ID` - 删除指定ME点播请求\n\n"
-                "🔍 **Emby库管理**:\n"
-                "`/demand check` - 手动检查Emby库并更新请求状态\n"
-                "`/demand scan` - 扫描Emby库并检查所有ME点播状态\n"
-                "`/demand cancel` - 查看定时任务状态 (自动任务已永久禁用)\n"
-                "`/demand notify` - 检查已完成媒体并发送群组通知\n"
-                "⚠️ 自动定时检查已禁用，需手动触发检查\n\n"
                 "📝 **编辑状态**:\n"
                 "• 点击界面中的'📝 编辑状态'按钮\n"
-                "• 可用状态: pending(待处理), downloading(处理中), completed(已入库)\n\n"
+                "• 输入影片序号（如：1、2、3...）\n"
+                "• 选择新状态按钮：⏳待处理、🔄处理中、✅已入库\n"
+                "• 状态更新为已入库时会自动发送群组通知\n\n"
+                "`/demand notify` - 检查已完成媒体并发送群组通知\n\n"
                 "💡 **说明**:\n"
                 "• **仅限管理员和Owner使用**：只有管理员和Owner可以查看和管理请求，群组成员无法访问\n"
                 "• 只显示和管理ME点播系统的请求\n"
-                "• 🎬 标识ME点播请求\n"
+                "• 🎬 标识ME点播请求，按点播时间排序并显示序号\n"
                 "• 显示点播用户的Telegram ID以便追踪\n"
                 "• 时间显示为北京时间(UTC+8)\n"
-                "• 系统使用TMDB ID进行精准匹配和自动状态更新\n"
-                "• 状态更新会在群组中通知\n"
+                "• 手动编辑状态为已入库时会自动发送群组通知（不含入库时间）\n"
                 "• 删除和编辑操作不可恢复，请谨慎操作\n"
-                "• scan命令会提供扫描前后的统计信息\n"
-                "• cancel命令显示定时任务状态 (自动检查已禁用)\n"
                 "• notify命令会重新发送已完成媒体的群组通知\n"
-                "• 所有Emby库检查现在需要手动触发"
+                "• 通过序号选择和状态按钮的方式更便捷地管理请求状态"
             )
             await sendMessage(msg, help_text, send=True, chat_id=msg.chat.id)
             
@@ -428,18 +360,18 @@ async def handle_demand_refresh(_, call):
 
 @bot.on_callback_query(filters.regex(r'^demand_edit_status$') & admins_filter)
 async def handle_demand_edit_status(_, call):
-    """处理状态编辑请求"""
+    """处理状态编辑请求 - 新的序号选择方式"""
     try:
-        await callAnswer(call, "📝 请发送: 请求ID 新状态")
+        await callAnswer(call, "📝 请发送影片序号")
         await editMessage(call, 
             "📝 编辑ME点播请求状态\n\n"
-            "请按以下格式发送消息:\n"
-            "`请求ID 新状态`\n\n"
-            "可用状态: pending, downloading, completed\n\n"
-            "示例: `ME20241201abc123 completed`\n"
-            "取消请发送 /cancel")
+            "请发送要编辑的影片序号（如：1、2、3...）\n\n"
+            "💡 提示：\n"
+            "• 序号对应上方列表中的 #数字\n"
+            "• 发送序号后可选择新状态\n"
+            "• 取消请发送 /cancel")
         
-        # 等待用户输入
+        # 等待用户输入序号
         msg = await callListen(call, 120)
         if msg is False:
             await editMessage(call, "⏰ 操作超时")
@@ -451,43 +383,144 @@ async def handle_demand_edit_status(_, call):
             await editMessage(call, text, buttons=keyboard)
             return
         
-        # 解析输入
-        parts = msg.text.strip().split()
-        if len(parts) != 2:
+        # 解析序号
+        try:
+            sequence_num = int(msg.text.strip())
+            if sequence_num < 1:
+                await msg.delete()
+                await editMessage(call, "❌ 序号必须为正整数")
+                return
+        except ValueError:
             await msg.delete()
-            await editMessage(call, "❌ 格式错误，请按格式: 请求ID 新状态")
+            await editMessage(call, "❌ 请输入有效的序号数字")
             return
         
-        request_id, new_status = parts
-        
-        # 验证是ME点播请求
-        if not request_id.startswith('ME'):
-            await msg.delete()
-            await editMessage(call, f"❌ 只能编辑ME点播请求: {request_id}")
-            return
-        
-        # 验证状态
-        valid_statuses = ['pending', 'downloading', 'completed']
-        if new_status not in valid_statuses:
-            await msg.delete()
-            await editMessage(call, f"❌ 无效状态，可用状态: {', '.join(valid_statuses)}")
-            return
-        
-        # 更新状态
-        success = sql_update_request_status(request_id, new_status)
         await msg.delete()
         
-        if success:
-            text, keyboard = format_demand_records(1, "all")
-            await editMessage(call, text, buttons=keyboard)
-            await callAnswer(call, f"✅ 已更新请求 {request_id} 状态为 {new_status}")
-            LOGGER.info(f"管理员 {call.from_user.id} 更新ME点播请求状态: {request_id} -> {new_status}")
-        else:
-            await editMessage(call, f"❌ 更新失败，请检查请求ID: {request_id}")
+        # 获取所有ME点播请求并按时间排序
+        from bot.sql_helper.sql_request_record import sql_get_all_request_records
+        all_records, _, _, _ = sql_get_all_request_records(page=1, limit=1000)
+        me_records = [r for r in all_records if r.download_id.startswith('ME')]
+        me_records.sort(key=lambda x: x.create_at)
+        
+        # 检查序号是否有效
+        if sequence_num > len(me_records):
+            await editMessage(call, f"❌ 序号超出范围，当前共有 {len(me_records)} 条记录")
+            return
+        
+        # 获取对应的记录
+        selected_record = me_records[sequence_num - 1]
+        
+        # 显示选中的影片和状态选择按钮
+        status_keyboard = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("⏳ 待处理", callback_data=f"demand_set_status_{selected_record.download_id}_pending"),
+                InlineKeyboardButton("🔄 处理中", callback_data=f"demand_set_status_{selected_record.download_id}_downloading")
+            ],
+            [
+                InlineKeyboardButton("✅ 已入库", callback_data=f"demand_set_status_{selected_record.download_id}_completed")
+            ],
+            [
+                InlineKeyboardButton("❌ 取消", callback_data="demand_edit_status_cancel")
+            ]
+        ])
+        
+        current_status_text = {
+            'pending': '⏳ 待处理',
+            'downloading': '🔄 处理中', 
+            'completed': '✅ 已入库'
+        }.get(selected_record.download_state, '❓ 未知')
+        
+        status_text = (
+            f"📝 选择新状态\n\n"
+            f"🎬 **影片**: {selected_record.request_name}\n"
+            f"📊 **当前状态**: {current_status_text}\n"
+            f"🆔 **请求ID**: {selected_record.download_id}\n\n"
+            f"请选择新的状态："
+        )
+        
+        await editMessage(call, status_text, buttons=status_keyboard)
         
     except Exception as e:
         LOGGER.error(f"处理状态编辑失败: {str(e)}")
         await callAnswer(call, "❌ 编辑状态失败", True)
+
+
+@bot.on_callback_query(filters.regex(r'^demand_set_status_(.+)_(.+)$') & admins_filter)
+async def handle_demand_set_status(_, call):
+    """处理状态设置请求"""
+    try:
+        request_id = call.matches[0].group(1)
+        new_status = call.matches[0].group(2)
+        
+        # 更新状态
+        success = sql_update_request_status(request_id, new_status)
+        
+        if success:
+            # 如果状态更新为已入库，发送群组通知
+            if new_status == 'completed':
+                try:
+                    from bot.sql_helper.sql_request_record import sql_get_request_record_by_download_id
+                    from bot.sql_helper.sql_emby import sql_get_emby
+                    from bot import group, bot
+                    
+                    # 获取请求详情
+                    request = sql_get_request_record_by_download_id(request_id)
+                    if request and group and len(group) > 0:
+                        # 获取用户信息
+                        user_info = sql_get_emby(tg=request.tg)
+                        username = user_info.name if user_info else f"用户{request.tg}"
+                        
+                        # 构建通知消息
+                        notification_text = (
+                            f"🎉 **ME点播入库通知**\n\n"
+                            f"🎬 **影片名称**: {request.request_name}\n"
+                            f"📊 **点播状态**: 已入库 ✅\n"
+                            f"👤 **ME用户**: {username}\n"
+                            f"📺 影片已可在Emby中观看！"
+                        )
+                        
+                        # 发送群组通知
+                        await bot.send_message(
+                            chat_id=group[0],
+                            text=notification_text
+                        )
+                        LOGGER.info(f"[Demand] 手动状态更新通知已发送: {request.request_name} (ID: {request_id})")
+                        
+                except Exception as notify_error:
+                    LOGGER.error(f"[Demand] 发送状态更新通知失败 {request_id}: {str(notify_error)}")
+            
+            # 返回主界面
+            text, keyboard = format_demand_records(1, "all")
+            await editMessage(call, text, buttons=keyboard)
+            
+            status_name = {
+                'pending': '待处理',
+                'downloading': '处理中',
+                'completed': '已入库'
+            }.get(new_status, new_status)
+            
+            await callAnswer(call, f"✅ 已更新状态为: {status_name}")
+            LOGGER.info(f"管理员 {call.from_user.id} 更新ME点播请求状态: {request_id} -> {new_status}")
+        else:
+            await editMessage(call, f"❌ 更新失败，请检查请求ID: {request_id}")
+            
+    except Exception as e:
+        LOGGER.error(f"处理状态设置失败: {str(e)}")
+        await callAnswer(call, "❌ 设置状态失败", True)
+
+
+@bot.on_callback_query(filters.regex(r'^demand_edit_status_cancel$') & admins_filter)
+async def handle_demand_edit_status_cancel(_, call):
+    """处理状态编辑取消请求"""
+    try:
+        text, keyboard = format_demand_records(1, "all")
+        await editMessage(call, text, buttons=keyboard)
+        await callAnswer(call, "已取消编辑")
+        
+    except Exception as e:
+        LOGGER.error(f"处理编辑取消失败: {str(e)}")
+        await callAnswer(call, "❌ 取消失败", True)
 
 
 # Aliases for backward compatibility with imports
