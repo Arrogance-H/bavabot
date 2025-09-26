@@ -22,7 +22,7 @@ import math
 
 # Beijing timezone for consistent time display
 BEIJING_TZ = pytz.timezone('Asia/Shanghai')
-RECORDS_PER_PAGE = 20
+RECORDS_PER_PAGE = 5
 
 
 def format_beijing_time(utc_time):
