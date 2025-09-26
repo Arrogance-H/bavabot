@@ -182,86 +182,7 @@ async def demand_command(_, msg):
             else:
                 await sendMessage(msg, f"❌ 删除失败\n\n请求ID不存在或删除出错: `{download_id}`", send=True, chat_id=msg.chat.id)
         
-        elif args[0] == 'check' and len(args) == 1:
-            # 手动触发Emby库检查
-            try:
-                from bot.scheduler.sync_emby_requests import check_emby_requests
-                await sendMessage(msg, "🔍 开始检查ME点播请求在Emby库中的状态...", send=True, chat_id=msg.chat.id)
-                LOGGER.info(f"[Demand] 管理员 {msg.from_user.id} 开始手动触发Emby库检查")
-                
-                await check_emby_requests()
-                
-                await sendMessage(msg, "✅ Emby库检查完成！如有更新会自动通知用户", send=True, chat_id=msg.chat.id)
-                LOGGER.info(f"[Demand] 管理员 {msg.from_user.id} 手动Emby库检查完成")
-            except Exception as e:
-                error_msg = f"❌ Emby库检查失败: {str(e)[:100]}"
-                await sendMessage(msg, error_msg, send=True, chat_id=msg.chat.id)
-                LOGGER.error(f"[Demand] 手动Emby库检查失败 (用户: {msg.from_user.id}): {str(e)}")
-        
-        elif args[0] == 'cancel' and len(args) == 1:
-            # 自动定时任务已被永久禁用
-            try:
-                await sendMessage(msg, "ℹ️ Emby库自动定时检查任务已被系统永久禁用\n\n"
-                                     "📍 当前状态:\n"
-                                     "• 自动检查: 已关闭\n"
-                                     "• 手动检查: 可用 (/demand check 或 /demand scan)\n\n"
-                                     "💡 如需检查Emby库状态，请使用手动命令", send=True, chat_id=msg.chat.id)
-                LOGGER.info(f"[Demand] 管理员 {msg.from_user.id} 查询了定时任务状态 (已永久禁用)")
-                        
-            except Exception as e:
-                error_msg = f"❌ 查询定时任务状态失败: {str(e)[:100]}"
-                await sendMessage(msg, error_msg, send=True, chat_id=msg.chat.id)
-                LOGGER.error(f"[Demand] 查询定时任务状态失败 (用户: {msg.from_user.id}): {str(e)}")
-        
-        elif args[0] == 'scan' and len(args) == 1:
-            # 扫描Emby库并通知用户
-            try:
-                from bot.scheduler.sync_emby_requests import check_emby_requests
-                from bot.sql_helper.sql_request_record import sql_get_request_records_by_state
-                
-                await sendMessage(msg, "🔍 开始扫描Emby库并检查所有ME点播请求状态...", send=True, chat_id=msg.chat.id)
-                LOGGER.info(f"[Demand] 管理员 {msg.from_user.id} 开始扫描Emby库")
-                
-                # 获取统计信息
-                try:
-                    pending_requests, _, _, pending_count = sql_get_request_records_by_state(download_state='pending', limit=1000)
-                    downloading_requests, _, _, downloading_count = sql_get_request_records_by_state(download_state='downloading', limit=1000)
-                    completed_requests, _, _, completed_count = sql_get_request_records_by_state(download_state='completed', limit=1000)
-                    
-                    # 过滤ME点播请求
-                    pending_me = len([r for r in pending_requests if r.download_id.startswith('ME')])
-                    downloading_me = len([r for r in downloading_requests if r.download_id.startswith('ME')])
-                    completed_me = len([r for r in completed_requests if r.download_id.startswith('ME')])
-                    
-                    scan_info = (
-                        f"📊 扫描前统计:\n"
-                        f"⏳ 待处理: {pending_me}\n"
-                        f"🔄 处理中: {downloading_me}\n" 
-                        f"✅ 已入库: {completed_me}\n\n"
-                        f"🔍 正在扫描Emby库..."
-                    )
-                    await sendMessage(msg, scan_info, send=True, chat_id=msg.chat.id)
-                    
-                except Exception as stats_error:
-                    LOGGER.warning(f"[Demand] 获取扫描前统计失败: {str(stats_error)}")
-                
-                # 执行扫描
-                await check_emby_requests()
-                
-                # 发送完成通知
-                success_msg = (
-                    f"✅ Emby库扫描完成！\n\n"
-                    f"📺 已检查所有ME点播请求与Emby库的匹配状态\n"
-                    f"🎉 如有影片已入库，系统已自动更新状态并发送群组通知\n"
-                    f"📋 使用 `/demand` 查看最新状态"
-                )
-                await sendMessage(msg, success_msg, send=True, chat_id=msg.chat.id)
-                LOGGER.info(f"[Demand] 管理员 {msg.from_user.id} Emby库扫描完成")
-                
-            except Exception as e:
-                error_msg = f"❌ Emby库扫描失败: {str(e)[:100]}"
-                await sendMessage(msg, error_msg, send=True, chat_id=msg.chat.id)
-                LOGGER.error(f"[Demand] Emby库扫描失败 (用户: {msg.from_user.id}): {str(e)}")
+
         
         elif args[0] == 'notify' and len(args) == 1:
             # 检查已完成的媒体并发送群组通知
@@ -343,28 +264,21 @@ async def demand_command(_, msg):
                 "`/demand completed` - 查看已入库请求\n\n"
                 "🗑️ **删除请求**:\n"
                 "`/demand del 请求ID` - 删除指定ME点播请求\n\n"
-                "🔍 **Emby库管理**:\n"
-                "`/demand check` - 手动检查Emby库并更新请求状态\n"
-                "`/demand scan` - 扫描Emby库并检查所有ME点播状态\n"
-                "`/demand cancel` - 查看定时任务状态 (自动任务已永久禁用)\n"
-                "`/demand notify` - 检查已完成媒体并发送群组通知\n"
-                "⚠️ 自动定时检查已禁用，需手动触发检查\n\n"
                 "📝 **编辑状态**:\n"
                 "• 点击界面中的'📝 编辑状态'按钮\n"
-                "• 可用状态: pending(待处理), downloading(处理中), completed(已入库)\n\n"
+                "• 可用状态: pending(待处理), downloading(处理中), completed(已入库)\n"
+                "• 状态更新为已入库时会自动发送群组通知\n\n"
+                "`/demand notify` - 检查已完成媒体并发送群组通知\n\n"
                 "💡 **说明**:\n"
                 "• **仅限管理员和Owner使用**：只有管理员和Owner可以查看和管理请求，群组成员无法访问\n"
                 "• 只显示和管理ME点播系统的请求\n"
                 "• 🎬 标识ME点播请求\n"
                 "• 显示点播用户的Telegram ID以便追踪\n"
                 "• 时间显示为北京时间(UTC+8)\n"
-                "• 系统使用TMDB ID进行精准匹配和自动状态更新\n"
-                "• 状态更新会在群组中通知\n"
+                "• 手动编辑状态为已入库时会自动发送群组通知\n"
                 "• 删除和编辑操作不可恢复，请谨慎操作\n"
-                "• scan命令会提供扫描前后的统计信息\n"
-                "• cancel命令显示定时任务状态 (自动检查已禁用)\n"
                 "• notify命令会重新发送已完成媒体的群组通知\n"
-                "• 所有Emby库检查现在需要手动触发"
+                "• 管理员可通过编辑状态功能更便捷地管理请求状态"
             )
             await sendMessage(msg, help_text, send=True, chat_id=msg.chat.id)
             
@@ -478,6 +392,40 @@ async def handle_demand_edit_status(_, call):
         await msg.delete()
         
         if success:
+            # 如果状态更新为已入库，发送群组通知
+            if new_status == 'completed':
+                try:
+                    from bot.sql_helper.sql_request_record import sql_get_request_record_by_download_id
+                    from bot.sql_helper.sql_emby import sql_get_emby
+                    from bot import group, bot
+                    
+                    # 获取请求详情
+                    request = sql_get_request_record_by_download_id(request_id)
+                    if request and group and len(group) > 0:
+                        # 获取用户信息
+                        user_info = sql_get_emby(tg=request.tg)
+                        username = user_info.name if user_info else f"用户{request.tg}"
+                        
+                        # 构建通知消息
+                        notification_text = (
+                            f"🎉 **ME点播入库通知**\n\n"
+                            f"🎬 **影片名称**: {request.request_name}\n"
+                            f"📊 **点播状态**: 已入库 ✅\n"
+                            f"👤 **ME用户**: {username}\n"
+                            f"📺 影片已可在Emby中观看！\n"
+                            f"🕐 **入库时间**: {format_beijing_time(request.update_at)}"
+                        )
+                        
+                        # 发送群组通知
+                        await bot.send_message(
+                            chat_id=group[0],
+                            text=notification_text
+                        )
+                        LOGGER.info(f"[Demand] 手动状态更新通知已发送: {request.request_name} (ID: {request_id})")
+                        
+                except Exception as notify_error:
+                    LOGGER.error(f"[Demand] 发送状态更新通知失败 {request_id}: {str(notify_error)}")
+            
             text, keyboard = format_demand_records(1, "all")
             await editMessage(call, text, buttons=keyboard)
             await callAnswer(call, f"✅ 已更新请求 {request_id} 状态为 {new_status}")
