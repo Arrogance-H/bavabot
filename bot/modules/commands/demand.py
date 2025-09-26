@@ -14,9 +14,10 @@ from bot.sql_helper.sql_request_record import (
     sql_get_all_request_records,
     sql_get_request_records_by_state, 
     sql_delete_request_record,
-    sql_update_request_status
+    sql_update_request_status,
+    sql_get_request_record_by_download_id
 )
-from datetime import datetime
+from bot.sql_helper.sql_emby import sql_get_emby
 import pytz
 import math
 
@@ -193,8 +194,6 @@ async def demand_command(_, msg):
         elif args[0] == 'notify' and len(args) == 1:
             # 检查已完成的媒体并发送群组通知
             try:
-                from bot.sql_helper.sql_request_record import sql_get_request_records_by_state
-                from bot.sql_helper.sql_emby import sql_get_emby
                 from bot import group, bot
                 
                 LOGGER.info(f"[Demand] 管理员 {msg.from_user.id} 开始检查已完成媒体并发送通知")
@@ -358,7 +357,6 @@ async def handle_demand_edit_status(_, call):
         await msg.delete()
         
         # 获取所有ME点播请求并按时间排序
-        from bot.sql_helper.sql_request_record import sql_get_all_request_records
         all_records, _, _, _ = sql_get_all_request_records(page=1, limit=1000)
         me_records = [r for r in all_records if r.download_id.startswith('ME')]
         me_records.sort(key=lambda x: x.create_at)
@@ -423,8 +421,6 @@ async def handle_demand_set_status(_, call):
             # 如果状态更新为已入库，发送群组通知
             if new_status == 'completed':
                 try:
-                    from bot.sql_helper.sql_request_record import sql_get_request_record_by_download_id
-                    from bot.sql_helper.sql_emby import sql_get_emby
                     from bot import group, bot
                     
                     # 获取请求详情
@@ -480,7 +476,6 @@ async def handle_demand_delete_confirm(_, call):
         request_id = call.matches[0].group(1)
         
         # 获取请求详情以显示确认信息
-        from bot.sql_helper.sql_request_record import sql_get_request_record_by_download_id
         request = sql_get_request_record_by_download_id(request_id)
         
         if not request:
