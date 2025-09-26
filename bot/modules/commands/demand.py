@@ -379,9 +379,7 @@ async def handle_demand_edit_status(_, call):
                 InlineKeyboardButton("✅ 已入库", callback_data=f"demand_set_status_{selected_record.download_id}_completed")
             ],
             [
-                InlineKeyboardButton("🗑️ 删除请求", callback_data=f"demand_delete_confirm_{selected_record.download_id}")
-            ],
-            [
+                InlineKeyboardButton("🗑️ 删除请求", callback_data=f"demand_delete_confirm_{selected_record.download_id}"),
                 InlineKeyboardButton("❌ 取消", callback_data="demand_edit_status_cancel")
             ]
         ])
