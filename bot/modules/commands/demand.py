@@ -290,6 +290,7 @@ async def demand_command(_, msg):
                 "• 点击界面中的'📝 编辑状态'按钮\n"
                 "• 输入影片序号（如：1、2、3...）\n"
                 "• 选择新状态按钮：⏳待处理、🔄处理中、✅已入库\n"
+                "• 或点击🗑️删除请求按钮直接删除\n"
                 "• 状态更新为已入库时会自动发送群组通知\n\n"
                 "`/demand notify` - 检查已完成媒体并发送群组通知\n\n"
                 "💡 **说明**:\n"
@@ -300,6 +301,7 @@ async def demand_command(_, msg):
                 "• 时间显示为北京时间(UTC+8)\n"
                 "• 手动编辑状态为已入库时会自动发送群组通知（不含入库时间）\n"
                 "• 删除和编辑操作不可恢复，请谨慎操作\n"
+                "• 编辑界面现支持直接删除请求，删除前会显示确认对话框\n"
                 "• notify命令会重新发送已完成媒体的群组通知\n"
                 "• 通过序号选择和状态按钮的方式更便捷地管理请求状态"
             )
@@ -426,6 +428,9 @@ async def handle_demand_edit_status(_, call):
                 InlineKeyboardButton("✅ 已入库", callback_data=f"demand_set_status_{selected_record.download_id}_completed")
             ],
             [
+                InlineKeyboardButton("🗑️ 删除请求", callback_data=f"demand_delete_confirm_{selected_record.download_id}")
+            ],
+            [
                 InlineKeyboardButton("❌ 取消", callback_data="demand_edit_status_cancel")
             ]
         ])
@@ -513,6 +518,70 @@ async def handle_demand_set_status(_, call):
     except Exception as e:
         LOGGER.error(f"处理状态设置失败: {str(e)}")
         await callAnswer(call, "❌ 设置状态失败", True)
+
+
+@bot.on_callback_query(filters.regex(r'^demand_delete_confirm_(.+)$') & admins_filter)
+async def handle_demand_delete_confirm(_, call):
+    """处理删除确认请求"""
+    try:
+        request_id = call.matches[0].group(1)
+        
+        # 获取请求详情以显示确认信息
+        from bot.sql_helper.sql_request_record import sql_get_request_record_by_download_id
+        request = sql_get_request_record_by_download_id(request_id)
+        
+        if not request:
+            await editMessage(call, f"❌ 请求不存在: {request_id}")
+            return
+        
+        # 显示删除确认界面
+        confirm_keyboard = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("🗑️ 确认删除", callback_data=f"demand_delete_execute_{request_id}")
+            ],
+            [
+                InlineKeyboardButton("❌ 取消", callback_data="demand_edit_status_cancel")
+            ]
+        ])
+        
+        confirm_text = (
+            f"⚠️ **确认删除ME点播请求**\n\n"
+            f"🎬 **影片**: {request.request_name}\n"
+            f"🆔 **请求ID**: {request.download_id}\n"
+            f"👤 **用户ID**: {request.tg}\n\n"
+            f"⚠️ **警告**: 删除操作不可恢复！\n"
+            f"确定要删除这个请求吗？"
+        )
+        
+        await editMessage(call, confirm_text, buttons=confirm_keyboard)
+        await callAnswer(call, "请确认删除操作")
+        
+    except Exception as e:
+        LOGGER.error(f"处理删除确认失败: {str(e)}")
+        await callAnswer(call, "❌ 删除确认失败", True)
+
+
+@bot.on_callback_query(filters.regex(r'^demand_delete_execute_(.+)$') & admins_filter)
+async def handle_demand_delete_execute(_, call):
+    """执行删除操作"""
+    try:
+        request_id = call.matches[0].group(1)
+        
+        # 执行删除
+        success = sql_delete_request_record(request_id)
+        
+        if success:
+            # 返回主界面
+            text, keyboard = format_demand_records(1, "all")
+            await editMessage(call, text, buttons=keyboard)
+            await callAnswer(call, "✅ 删除成功")
+            LOGGER.info(f"管理员 {call.from_user.id} 删除ME点播请求: {request_id}")
+        else:
+            await editMessage(call, f"❌ 删除失败，请求ID不存在: {request_id}")
+            
+    except Exception as e:
+        LOGGER.error(f"执行删除操作失败: {str(e)}")
+        await callAnswer(call, "❌ 删除失败", True)
 
 
 @bot.on_callback_query(filters.regex(r'^demand_edit_status_cancel$') & admins_filter)
