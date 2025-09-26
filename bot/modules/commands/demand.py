@@ -199,26 +199,19 @@ async def demand_command(_, msg):
                 LOGGER.error(f"[Demand] 手动Emby库检查失败 (用户: {msg.from_user.id}): {str(e)}")
         
         elif args[0] == 'cancel' and len(args) == 1:
-            # 取消Emby库相关的定时任务
+            # 自动定时任务已被永久禁用
             try:
-                from bot.func_helper.scheduler import scheduler
-                
-                # 尝试移除Emby请求检查定时任务
-                try:
-                    scheduler.remove_job('check_emby_requests')
-                    LOGGER.info(f"[Demand] 管理员 {msg.from_user.id} 取消了Emby库定时检查任务")
-                    await sendMessage(msg, "✅ 已取消Emby库定时检查任务", send=True, chat_id=msg.chat.id)
-                except Exception as remove_error:
-                    if "does not exist" in str(remove_error) or "No job" in str(remove_error):
-                        await sendMessage(msg, "⚠️ Emby库定时检查任务未运行或已被取消", send=True, chat_id=msg.chat.id)
-                        LOGGER.warning(f"[Demand] Emby库定时任务不存在或已取消 (用户: {msg.from_user.id})")
-                    else:
-                        raise remove_error
+                await sendMessage(msg, "ℹ️ Emby库自动定时检查任务已被系统永久禁用\n\n"
+                                     "📍 当前状态:\n"
+                                     "• 自动检查: 已关闭\n"
+                                     "• 手动检查: 可用 (/demand check 或 /demand scan)\n\n"
+                                     "💡 如需检查Emby库状态，请使用手动命令", send=True, chat_id=msg.chat.id)
+                LOGGER.info(f"[Demand] 管理员 {msg.from_user.id} 查询了定时任务状态 (已永久禁用)")
                         
             except Exception as e:
-                error_msg = f"❌ 取消定时任务失败: {str(e)[:100]}"
+                error_msg = f"❌ 查询定时任务状态失败: {str(e)[:100]}"
                 await sendMessage(msg, error_msg, send=True, chat_id=msg.chat.id)
-                LOGGER.error(f"[Demand] 取消Emby库定时任务失败 (用户: {msg.from_user.id}): {str(e)}")
+                LOGGER.error(f"[Demand] 查询定时任务状态失败 (用户: {msg.from_user.id}): {str(e)}")
         
         elif args[0] == 'scan' and len(args) == 1:
             # 扫描Emby库并通知用户
@@ -353,9 +346,9 @@ async def demand_command(_, msg):
                 "🔍 **Emby库管理**:\n"
                 "`/demand check` - 手动检查Emby库并更新请求状态\n"
                 "`/demand scan` - 扫描Emby库并检查所有ME点播状态\n"
-                "`/demand cancel` - 取消Emby库相关的定时任务\n"
+                "`/demand cancel` - 查看定时任务状态 (自动任务已永久禁用)\n"
                 "`/demand notify` - 检查已完成媒体并发送群组通知\n"
-                "⏰ 系统每3小时自动检查，使用TMDB ID精准匹配\n\n"
+                "⚠️ 自动定时检查已禁用，需手动触发检查\n\n"
                 "📝 **编辑状态**:\n"
                 "• 点击界面中的'📝 编辑状态'按钮\n"
                 "• 可用状态: pending(待处理), downloading(处理中), completed(已入库)\n\n"
@@ -369,8 +362,9 @@ async def demand_command(_, msg):
                 "• 状态更新会在群组中通知\n"
                 "• 删除和编辑操作不可恢复，请谨慎操作\n"
                 "• scan命令会提供扫描前后的统计信息\n"
-                "• cancel命令会停止自动定时检查\n"
-                "• notify命令会重新发送已完成媒体的群组通知"
+                "• cancel命令显示定时任务状态 (自动检查已禁用)\n"
+                "• notify命令会重新发送已完成媒体的群组通知\n"
+                "• 所有Emby库检查现在需要手动触发"
             )
             await sendMessage(msg, help_text, send=True, chat_id=msg.chat.id)
             
