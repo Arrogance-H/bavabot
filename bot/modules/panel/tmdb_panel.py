@@ -10,7 +10,7 @@ from bot.func_helper.msg_utils import callAnswer, editMessage, sendMessage, send
 from bot.func_helper.filters import user_in_group_on_filter
 from bot.func_helper.fix_bottons import tmdb_main_ikb, tmdb_search_result_list_ikb, tmdb_search_result_ikb, back_members_ikb, tmdb_season_selection_ikb
 from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby
-from bot.sql_helper.sql_request_record import sql_add_request_record, sql_check_existing_request_by_title
+from bot.sql_helper.sql_request_record import sql_add_request_record, sql_check_existing_request_by_title, get_beijing_time
 from bot.func_helper.tmdb import tmdb_service
 from bot.func_helper.emby import emby
 from bot.func_helper.utils import judge_admins
@@ -1001,7 +1001,7 @@ async def confirm_multi_season_request(_, call):
             season_number = season_info.get('season_number', 0)
             
             # 生成唯一的请求ID
-            request_id = f"ME{datetime.datetime.now().strftime('%Y%m%d')}{str(uuid.uuid4())[:8]}"
+            request_id = f"ME{get_beijing_time().strftime('%Y%m%d')}{str(uuid.uuid4())[:8]}"
             
             # 创建请求标题 - 包含季数信息
             tv_title = selected_item.get('title', '未知')
@@ -1025,7 +1025,7 @@ async def confirm_multi_season_request(_, call):
                 f"集数: {season_info.get('episode_count', '未知')}集\n"
                 f"年份: {selected_item.get('year', '未知')}\n"
                 f"TMDB评分: {selected_item.get('vote_average', 0)}/10\n"
-                f"请求时间: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+                f"请求时间: {get_beijing_time().strftime('%Y-%m-%d %H:%M:%S')}\n"
                 f"TMDB ID: {selected_item.get('id', '未知')}"
             )
             
@@ -1067,7 +1067,7 @@ async def confirm_multi_season_request(_, call):
                 f"**选择季数**: {len(successful_requests)} 季\n"
                 f"**季数详情**:\n{season_details}\n\n"
                 f"**TMDB ID**: {selected_item.get('id', '未知')}\n"
-                f"⏰ **请求时间**: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                f"⏰ **请求时间**: {get_beijing_time().strftime('%Y-%m-%d %H:%M:%S')}"
             )
             
         elif successful_requests and failed_requests:
@@ -1103,7 +1103,7 @@ async def confirm_multi_season_request(_, call):
                     f"**失败季数**: {failed_list}\n\n"
                     f"**成功季数详情**:\n{season_details}\n\n"
                     f"**TMDB ID**: {selected_item.get('id', '未知')}\n"
-                    f"⏰ **请求时间**: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                    f"⏰ **请求时间**: {get_beijing_time().strftime('%Y-%m-%d %H:%M:%S')}"
                 )
             else:
                 admin_notification = None
@@ -1252,7 +1252,7 @@ async def confirm_season_request(_, call):
             return
         
         # 生成唯一的请求ID
-        request_id = f"ME{datetime.datetime.now().strftime('%Y%m%d')}{str(uuid.uuid4())[:8]}"
+        request_id = f"ME{get_beijing_time().strftime('%Y%m%d')}{str(uuid.uuid4())[:8]}"
         
         # 创建请求标题 - 包含季数信息
         tv_title = selected_item.get('title', '未知')
@@ -1284,7 +1284,7 @@ async def confirm_season_request(_, call):
             f"集数: {selected_season.get('episode_count', '未知')}集\n"
             f"年份: {selected_item.get('year', '未知')}\n"
             f"TMDB评分: {selected_item.get('vote_average', 0)}/10\n"
-            f"请求时间: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"请求时间: {get_beijing_time().strftime('%Y-%m-%d %H:%M:%S')}\n"
             f"TMDB ID: {selected_item.get('id', '未知')}"
         )
         
@@ -1329,7 +1329,7 @@ async def confirm_season_request(_, call):
                 f"**TMDB评分**: {selected_item.get('vote_average', 0):.1f}/10\n"
                 f"**请求ID**: `{request_id}`\n"
                 f"**TMDB ID**: {selected_item.get('id', '未知')}\n\n"
-                f"⏰ **请求时间**: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                f"⏰ **请求时间**: {get_beijing_time().strftime('%Y-%m-%d %H:%M:%S')}"
             )
             
             # 发送给owner
@@ -1415,7 +1415,7 @@ async def confirm_me_request(_, call):
             return
         
         # 生成唯一的请求ID
-        request_id = f"ME{datetime.datetime.now().strftime('%Y%m%d')}{str(uuid.uuid4())[:8]}"
+        request_id = f"ME{get_beijing_time().strftime('%Y%m%d')}{str(uuid.uuid4())[:8]}"
         
         # 创建请求记录
         request_title = f"{selected_item.get('title', '未知')} ({selected_item.get('year', '未知')})"
@@ -1429,7 +1429,7 @@ async def confirm_me_request(_, call):
             f"类型: {selected_item.get('media_type_cn', '未知')}\n"
             f"年份: {selected_item.get('year', '未知')}\n"
             f"TMDB评分: {selected_item.get('vote_average', 0)}/10\n"
-            f"请求时间: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"请求时间: {get_beijing_time().strftime('%Y-%m-%d %H:%M:%S')}\n"
             f"TMDB ID: {selected_item.get('id', '未知')}"
         )
         
@@ -1472,7 +1472,7 @@ async def confirm_me_request(_, call):
                 f"**TMDB评分**: {selected_item.get('vote_average', 0):.1f}/10\n"
                 f"**请求ID**: `{request_id}`\n"
                 f"**TMDB ID**: {selected_item.get('id', '未知')}\n\n"
-                f"⏰ **请求时间**: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                f"⏰ **请求时间**: {get_beijing_time().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
                 f"📝 **简介**: {selected_item.get('overview', '暂无简介')[:200]}{'...' if len(selected_item.get('overview', '')) > 200 else ''}"
             )
             
