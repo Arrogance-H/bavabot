@@ -281,11 +281,7 @@ async def demand_command(_, msg):
             help_text = (
                 "📋 **ME点播请求管理命令使用说明**\n\n"
                 "🔍 **查看请求**:\n"
-                "`/demand` - 查看所有ME点播请求\n"
-                "`/demand pending` - 查看待处理请求\n"
-                "`/demand completed` - 查看已入库请求\n\n"
-                "🗑️ **删除请求**:\n"
-                "`/demand del 请求ID` - 删除指定ME点播请求\n\n"
+                "`/demand` - 查看所有ME点播请求\n\n"
                 "📝 **编辑状态**:\n"
                 "• 点击界面中的'📝 编辑状态'按钮\n"
                 "• 输入影片序号（如：1、2、3...）\n"
