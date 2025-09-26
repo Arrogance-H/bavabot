@@ -45,15 +45,15 @@ def format_beijing_time(utc_time):
 def format_demand_records(current_page=1, current_filter="all"):
     """格式化ME点播请求记录显示"""
     try:
-        # 获取记录 - 只显示ME点播请求
+        # 获取记录 - 首先获取所有ME点播请求，然后在代码中处理分页
         if current_filter == "all":
-            records, has_prev, has_next, total_records = sql_get_all_request_records(page=current_page, limit=RECORDS_PER_PAGE)
+            all_records, _, _, _ = sql_get_all_request_records(page=1, limit=1000)  # Get more records
             # 过滤只显示ME开头的请求
-            records = [r for r in records if r.download_id.startswith('ME')]
+            records = [r for r in all_records if r.download_id.startswith('ME')]
         else:
-            records, has_prev, has_next, total_records = sql_get_request_records_by_state(download_state=current_filter, page=current_page, limit=RECORDS_PER_PAGE)
+            all_records, _, _, _ = sql_get_request_records_by_state(download_state=current_filter, page=1, limit=1000)
             # 过滤只显示ME开头的请求
-            records = [r for r in records if r.download_id.startswith('ME')]
+            records = [r for r in all_records if r.download_id.startswith('ME')]
 
         if not records:
             text = "📋 暂无ME点播请求记录"
@@ -65,6 +65,12 @@ def format_demand_records(current_page=1, current_filter="all"):
         
         total_records = len(records)
         total_pages = max(1, math.ceil(total_records / RECORDS_PER_PAGE))
+        
+        # 验证当前页是否有效
+        if current_page > total_pages:
+            current_page = total_pages
+        if current_page < 1:
+            current_page = 1
         
         # 计算当前页的记录范围
         start_idx = (current_page - 1) * RECORDS_PER_PAGE
@@ -137,19 +143,18 @@ def get_demand_records_keyboard(current_page, total_pages, current_filter="all")
     if current_page > 1:
         page_row.append(InlineKeyboardButton("⬅️ 上页", callback_data=f"demand_page_{current_page-1}_{current_filter}"))
     
-    page_row.append(InlineKeyboardButton("🔄 刷新", callback_data=f"demand_refresh_{current_filter}"))
-    
     if current_page < total_pages:
         page_row.append(InlineKeyboardButton("下页 ➡️", callback_data=f"demand_page_{current_page+1}_{current_filter}"))
     
     if page_row:
         keyboard.append(page_row)
     
-    # 状态编辑按钮行
-    edit_row = [
+    # 刷新和编辑状态按钮行 - 合并到同一行
+    action_row = [
+        InlineKeyboardButton("🔄 刷新", callback_data=f"demand_refresh_{current_filter}"),
         InlineKeyboardButton("📝 编辑状态", callback_data="demand_edit_status")
     ]
-    keyboard.append(edit_row)
+    keyboard.append(action_row)
     
     # 取消按钮行
     cancel_row = [
