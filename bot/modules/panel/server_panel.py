@@ -36,7 +36,7 @@ async def server(_, call):
     line = ''
     if data.lv == 'b':
         line = f'{emby_line}'
-    elif data.lv == 'a':
+    elif data.lv in ['a', 'm']:
         line = f'{emby_line}'
         if emby_whitelist_line:
             line += f'\n{emby_whitelist_line}'

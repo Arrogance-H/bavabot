@@ -368,7 +368,8 @@ def cr_renew_ikb():
         'a': '白名单',
         'b': '普通用户',
         'c': '已禁用用户',
-        'd': '无账号用户'
+        'd': '无账号用户',
+        'm': 'M尊享'
     }.get(_open.invite_lv, '未知')
     keyboard = InlineKeyboard(row_width=2)
     keyboard.add(InlineButton(f'{checkin} 每日签到', f'set_renew-checkin'),
@@ -384,6 +385,7 @@ def invite_lv_ikb():
     keyboard = ikb([
         [('🅰️ 白名单', 'set_invite_lv-a'), ('🅱️ 普通用户', 'set_invite_lv-b')],
         [('©️ 已禁用用户', 'set_invite_lv-c'), ('🅳️ 无账号用户', 'set_invite_lv-d')],
+        [('Ⓜ️ M尊享', 'set_invite_lv-m')],
         [('🔙 返回', 'set_renew')]
     ])
     return keyboard

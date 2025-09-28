@@ -32,10 +32,10 @@ async def download_media(_, call):
     emby_user = sql_get_emby(tg=call.from_user.id)
     if not emby_user:
         return await editMessage(call, '⚠️ 数据库没有你，请重新 /start录入')
-    if emby_user.lv is None or emby_user.lv not in ['a', 'b']:
+    if emby_user.lv is None or emby_user.lv not in ['a', 'b', 'm']:
         return await editMessage(call, '🫡 您没有权限使用此功能', buttons=re_download_center_ikb)
-    if not judge_admins(emby_user.tg) and moviepilot.lv == 'a' and emby_user.lv != 'a':
-        return await editMessage(call, '🫡 您没有权限使用此功能，仅限白名单用户可用', buttons=re_download_center_ikb)
+    if not judge_admins(emby_user.tg) and moviepilot.lv == 'a' and emby_user.lv not in ['a', 'm']:
+        return await editMessage(call, '🫡 您没有权限使用此功能，仅限白名单和M尊享用户可用', buttons=re_download_center_ikb)
 
     await asyncio.gather(callAnswer(call, f'🔍 请输入你想求的资源名称'))
     await editMessage(call,

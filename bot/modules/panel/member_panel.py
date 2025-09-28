@@ -15,7 +15,7 @@ from bot import bot, LOGGER, _open, emby_line, sakura_b, ranks, group, extra_emb
 from pyrogram import filters
 from bot.func_helper.emby import emby
 from bot.func_helper.filters import user_in_group_on_filter
-from bot.func_helper.utils import members_info, tem_adduser, cr_link_one, judge_admins, tem_deluser, pwd_create
+from bot.func_helper.utils import members_info, tem_adduser, cr_link_one, judge_admins, tem_deluser, pwd_create, compare_user_level
 from bot.func_helper.fix_bottons import members_ikb, back_members_ikb, re_create_ikb, del_me_ikb, re_delme_ikb, \
     re_reset_ikb, re_changetg_ikb, emby_block_ikb, user_emby_block_ikb, user_emby_unblock_ikb, re_exchange_b_ikb, \
     store_ikb, re_bindtg_ikb, close_it_ikb, store_query_page, re_born_ikb, send_changetg_ikb, favorites_page_ikb, \
@@ -652,9 +652,9 @@ async def do_store_whitelist(_, call):
             return
         if not e.embyid or not e.name:
             return await callAnswer(call, '❌ 未查询到账户，不许乱点！', True)
-        if e.iv < _open.whitelist_cost or e.lv == 'a':
+        if e.iv < _open.whitelist_cost or e.lv in ['a', 'm']:
             return await callAnswer(call,
-                                    f'🏪 兑换规则：\n当前兑换白名单需要 {_open.whitelist_cost} {sakura_b}，已有白名单无法再次消费。勉励',
+                                    f'🏪 兑换规则：\n当前兑换白名单需要 {_open.whitelist_cost} {sakura_b}，已有白名单或更高等级无法再次消费。勉励',
                                     True)
         await callAnswer(call, f'🏪 您已满足 {_open.whitelist_cost} {sakura_b}要求', True)
         sql_update_emby(Emby.tg == call.from_user.id, lv='a', iv=e.iv - _open.whitelist_cost)
@@ -672,9 +672,9 @@ async def do_store_invite(_, call):
         e = sql_get_emby(tg=call.from_user.id)
         if not e:
             return
-        # 用户等级为 a（白名单） b(普通用户) c(已禁用) d（未注册用户）
-        # 比如当 _open.invite_lv 设置为 d 时，用户等级为 小于等于d 的用户可以兑换，否则无法兑换
-        if e.lv > _open.invite_lv:
+        # 用户等级为 m（M尊享）> a（白名单）> b(普通用户) > c(已禁用) > d（未注册用户）
+        # 比如当 _open.invite_lv 设置为 d 时，用户等级为 m、a、b、c、d 的用户可以兑换，否则无法兑换
+        if not compare_user_level(e.lv, _open.invite_lv):
             return await callAnswer(call, '❌ 账号等级不足，无法兑换', True)
         if e.iv < _open.invite_cost:
             return await callAnswer(call,
@@ -737,9 +737,9 @@ async def switch_preserve_mode(_, call):
     if not e or not e.embyid:
         return await callAnswer(call, '⚠️ 您还没有账户，无法切换保号方式', True)
     
-    # 检查是否为白名单用户
-    if e.lv == 'a':
-        return await callAnswer(call, '⚠️ 白名单用户无需保号，无法切换保号方式', True)
+    # 检查是否为白名单或M尊享用户
+    if e.lv in ['a', 'm']:
+        return await callAnswer(call, '⚠️ 白名单用户和M尊享用户无需保号，无法切换保号方式', True)
     
     # 检查是否已经切换过
     if getattr(e, 'preserve_mode_changed', 0) >= 1:
