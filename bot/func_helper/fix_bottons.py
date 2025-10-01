@@ -443,11 +443,11 @@ async def cr_kk_ikb(uid, first):
     else:
         name, lv, ex, iv, embyid, pwd2, preserve_mode, preserve_mode_changed = data
         if name != '无账户信息':
-            ban = "🌟 解除禁用" if lv == "**已禁用**" else '💢 禁用账户'
+            ban = "🌟 解除禁用" if lv == "已禁用" else '💢 禁用账户'
             keyboard = [[ban, f'user_ban-{uid}'], ['⚠️ 删除账户', f'closeemby-{uid}']]
             
-            # 添加保号方式管理按钮（白名单用户不显示）
-            if lv != '白名单':  # 白名单用户不显示保号切换按钮
+            # 添加保号方式管理按钮（白名单和M尊享用户不显示）
+            if lv not in ['白名单', 'M尊享']:  # 白名单和M尊享用户不显示保号切换按钮
                 mode_name = {'active': '活跃保号', 'expire': '到期保号'}
                 current_mode_text = mode_name.get(preserve_mode, '未知')
                 switch_to_mode = 'expire' if preserve_mode == 'active' else 'active'
@@ -487,8 +487,8 @@ async def cr_kk_ikb(uid, first):
         else:
             keyboard.append(['✨ 赠送资格', f'gift-{uid}'])
         
-        # 添加保号方式信息到显示文本（白名单用户不显示）
-        if name != '无账户信息' and lv != '白名单':
+        # 添加保号方式信息到显示文本（白名单和M尊享用户不显示）
+        if name != '无账户信息' and lv not in ['白名单', 'M尊享']:
             mode_name = {'active': '活跃保号', 'expire': '到期保号'}
             preserve_mode_text = mode_name.get(preserve_mode, '未知')
             switch_status = '已切换' if preserve_mode_changed >= 1 else '可切换'

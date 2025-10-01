@@ -63,7 +63,13 @@ async def members_info(tg=None, name=None):
         pwd2 = data.pwd2
         embyid = data.embyid
         iv = data.iv
-        lv_dict = {'a': '白名单', 'b': '**正常**', 'c': '**已禁用**', 'd': '未注册'}  # , 'e': '**21天未活跃/无信息**'
+        lv_dict = {
+            'm': 'M尊享',
+            'a': '白名单',
+            'b': '普通用户',
+            'c': '已禁用',
+            'd': '未注册'
+        }
         lv = lv_dict.get(data.lv, '未知')
         
         # 获取保号方式信息
@@ -72,11 +78,11 @@ async def members_info(tg=None, name=None):
         
         # Update ex display logic based on user's preserve_mode instead of global schedall settings
         # This implements preserve mode specific logic for displaying expiration information:
-        # - whitelist users: show infinity symbol
+        # - M尊享 and whitelist users: show infinity symbol
         # - 'expire' mode: shows formatted expiration date (到期保号)
         # - 'active' mode: shows activity warning message (活跃保号) 
         # - no account: shows default message
-        if lv == '白名单':
+        if lv in ['白名单', 'M尊享']:
             ex = '+ ∞'
         elif name != '无账户信息':
             if preserve_mode == 'expire':

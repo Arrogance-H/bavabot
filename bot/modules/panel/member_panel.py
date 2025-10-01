@@ -106,13 +106,13 @@ async def members(_, call):
     await callAnswer(call, f"✅ 用户界面")
     name, lv, ex, iv, embyid, pwd2, preserve_mode, preserve_mode_changed = data
     
-    # 检查是否为白名单用户
-    is_whitelist = lv == '白名单'
+    # 检查是否为白名单或M尊享用户
+    is_premium = lv in ['白名单', 'M尊享']
     
-    # 保号方式显示（白名单用户不显示）
+    # 保号方式显示（白名单和M尊享用户不显示）
     preserve_info = ""
     can_switch = False
-    if not is_whitelist:
+    if not is_premium:
         preserve_mode_text = '活跃保号' if preserve_mode == 'active' else '到期保号'
         can_switch = preserve_mode_changed == 0
         preserve_info = f"**· 🛡️ 保号方式** | {preserve_mode_text}" + (" (可切换)" if can_switch else " (已切换)") + "\n"
@@ -124,7 +124,7 @@ async def members(_, call):
            f"**· 💠 账号名称** | [{name}](tg://user?id={call.from_user.id})\n" \
            f"**· 🚨 到期时间** | {ex}"
     
-    # 只有非白名单用户才添加保号信息
+    # 只有非白名单和非M尊享用户才添加保号信息
     if preserve_info:
         text += f"\n{preserve_info.rstrip()}"
     
@@ -132,8 +132,8 @@ async def members(_, call):
         is_admin = judge_admins(call.from_user.id)
         await editMessage(call, text, members_ikb(is_admin, False))
     else:
-        # 白名单用户不显示保号切换按钮
-        can_switch_preserve = can_switch and not is_whitelist
+        # 白名单和M尊享用户不显示保号切换按钮
+        can_switch_preserve = can_switch and not is_premium
         await editMessage(call, text, members_ikb(account=True, can_switch_preserve=can_switch_preserve))
 
 

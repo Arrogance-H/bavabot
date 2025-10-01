@@ -112,9 +112,21 @@ async def uun_info(_, msg, name = None):
         a = ''
 
     # Use consistent preserve mode logic for expiration display
+    lv_dict = {
+        'm': 'M尊享',
+        'a': '白名单',
+        'b': '普通用户',
+        'c': '已禁用',
+        'd': '未注册'
+    }
+    lv_name = lv_dict.get(e.lv, '未知')
+    
     if e.name:
         preserve_mode = getattr(e, 'preserve_mode', 'active')
-        if preserve_mode == 'expire':
+        # M尊享 and whitelist users show infinity
+        if e.lv in ['m', 'a']:
+            ex = '+ ∞'
+        elif preserve_mode == 'expire':
             # For 'expire' mode (到期保号), show the formatted expiration date
             ex = e.ex.strftime("%Y-%m-%d %H:%M:%S") if e.ex else '无账户信息'
         elif preserve_mode == 'active':
@@ -127,7 +139,7 @@ async def uun_info(_, msg, name = None):
         ex = e.ex or '无账户信息'
     text += f"▎ 查询返回\n" \
             f"**· 🍉 账户名称** | {e.name}\n{a}" \
-            f"**· 🍓 当前状态** | {e.lv}\n" \
+            f"**· 🍓 当前状态** | {lv_name}\n" \
             f"**· 🍒 创建时间** | {e.cr}\n" \
             f"**· 🚨 到期时间** | **{ex}**\n"
 
