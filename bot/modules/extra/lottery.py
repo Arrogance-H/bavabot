@@ -23,6 +23,7 @@ from bot.func_helper.filters import user_in_group_on_filter
 from bot.func_helper.msg_utils import sendMessage, sendPhoto, callAnswer, editMessage
 from bot.func_helper.utils import judge_admins, pwd_create
 from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby
+from bot.func_helper.scheduler import scheduler
 
 # 存储活跃的抽奖活动
 active_lotteries: Dict[str, 'Lottery'] = {}
@@ -37,6 +38,36 @@ async def lottery_setup_filter(_, __, message):
     return message.from_user and message.from_user.id in lottery_setup_sessions
 
 lottery_setup_filter = filters.create(lottery_setup_filter)
+
+
+def parse_time_input(time_str: str) -> Optional[datetime]:
+    """解析时间输入，支持绝对时间和相对时间"""
+    time_str = time_str.strip()
+    
+    # 尝试解析相对时间（例如：30m, 2h, 1d）
+    if time_str[-1] in ['m', 'h', 'd']:
+        try:
+            amount = int(time_str[:-1])
+            unit = time_str[-1]
+            
+            if unit == 'm':  # 分钟
+                return datetime.now() + timedelta(minutes=amount)
+            elif unit == 'h':  # 小时
+                return datetime.now() + timedelta(hours=amount)
+            elif unit == 'd':  # 天
+                return datetime.now() + timedelta(days=amount)
+        except ValueError:
+            pass
+    
+    # 尝试解析绝对时间
+    # 支持格式：2024-12-31 23:59, 2024-12-31 23:59:59
+    for fmt in ['%Y-%m-%d %H:%M', '%Y-%m-%d %H:%M:%S']:
+        try:
+            return datetime.strptime(time_str, fmt)
+        except ValueError:
+            continue
+    
+    return None
 
 
 class Prize:
@@ -208,6 +239,30 @@ async def handle_lottery_setup(_, msg: Message):
         except ValueError:
             await sendMessage(msg, "❌ 请输入有效的数字：")
     
+    elif setup.step == "target_participants_with_time":
+        try:
+            target = int(text)
+            if target < 1:
+                return await sendMessage(msg, "❌ 参与人数必须大于0，请重新输入：")
+            setup.lottery.target_participants = target
+            setup.step = "draw_time"
+            await sendMessage(msg, "✅ 自动开奖人数已设置\n\n请输入自动开奖时间：\n\n格式示例：\n• 2024-12-31 23:59（绝对时间）\n• 30m（30分钟后）\n• 2h（2小时后）\n• 1d（1天后）")
+        except ValueError:
+            await sendMessage(msg, "❌ 请输入有效的数字：")
+    
+    elif setup.step == "draw_time":
+        draw_time = parse_time_input(text)
+        if draw_time is None:
+            return await sendMessage(msg, "❌ 时间格式错误，请重新输入：\n\n格式示例：\n• 2024-12-31 23:59（绝对时间）\n• 30m（30分钟后）\n• 2h（2小时后）\n• 1d（1天后）")
+        
+        if draw_time <= datetime.now():
+            return await sendMessage(msg, "❌ 开奖时间必须是未来时间，请重新输入：")
+        
+        setup.lottery.draw_time = draw_time
+        setup.step = "prizes"
+        time_str = draw_time.strftime('%Y-%m-%d %H:%M:%S')
+        await sendMessage(msg, f"✅ 自动开奖时间已设置为：{time_str}\n\n请输入奖品信息，格式：奖品名称 数量\n例如：iPhone 1\n输入 /done 完成设置")
+    
     elif setup.step == "prizes":
         if text == "/done":
             if not setup.lottery.prizes:
@@ -319,8 +374,27 @@ async def handle_lottery_setup_callback(_, call: CallbackQuery):
     
     elif data == "lottery_setup_draw_auto":
         setup.lottery.draw_type = "auto"
+        setup.step = "auto_draw_method"
+        
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("👥 按参与人数", "lottery_setup_auto_participants")],
+            [InlineKeyboardButton("⏰ 按时间", "lottery_setup_auto_time")],
+            [InlineKeyboardButton("🔀 两者都设置", "lottery_setup_auto_both")]
+        ])
+        
+        await editMessage(call, "✅ 已设置为自动开奖\n\n请选择自动开奖触发方式：", buttons=keyboard)
+    
+    elif data == "lottery_setup_auto_participants":
         setup.step = "target_participants"
-        await editMessage(call, "✅ 已设置为自动开奖\n\n请输入触发开奖的参与人数：")
+        await editMessage(call, "✅ 已选择按参与人数触发\n\n请输入触发开奖的参与人数：")
+    
+    elif data == "lottery_setup_auto_time":
+        setup.step = "draw_time"
+        await editMessage(call, "✅ 已选择按时间触发\n\n请输入自动开奖时间：\n\n格式示例：\n• 2024-12-31 23:59（绝对时间）\n• 30m（30分钟后）\n• 2h（2小时后）\n• 1d（1天后）")
+    
+    elif data == "lottery_setup_auto_both":
+        setup.step = "target_participants_with_time"
+        await editMessage(call, "✅ 已选择同时设置人数和时间\n\n请输入触发开奖的参与人数：")
 
 
 async def finish_lottery_setup(msg: Message, setup: LotterySetup):
@@ -331,6 +405,20 @@ async def finish_lottery_setup(msg: Message, setup: LotterySetup):
     
     # 保存抽奖
     active_lotteries[lottery.id] = lottery
+    
+    # 如果设置了自动开奖时间，添加定时任务
+    if lottery.draw_type == "auto" and lottery.draw_time:
+        job_id = f"lottery_auto_draw_{lottery.id}"
+        try:
+            scheduler.add_job(
+                scheduled_auto_draw,
+                'date',
+                run_date=lottery.draw_time,
+                args=[lottery.id],
+                id=job_id
+            )
+        except Exception as e:
+            await sendMessage(msg, f"⚠️ 定时任务添加失败：{str(e)}\n抽奖仍会创建，但不会自动开奖")
     
     # 清理设置会话
     del lottery_setup_sessions[msg.from_user.id]
@@ -386,10 +474,20 @@ def format_lottery_message(lottery: Lottery) -> str:
         "d_only": "🔰 ME未注册用户"
     }
     
-    draw_type_text = {
-        "manual": "👤 手动开奖",
-        "auto": f"🤖 自动开奖（{lottery.target_participants}人）"
-    }
+    # 构建开奖方式文本
+    if lottery.draw_type == "manual":
+        draw_type_text = "👤 手动开奖"
+    else:  # auto
+        draw_conditions = []
+        if lottery.target_participants > 0:
+            draw_conditions.append(f"参与人数达到 {lottery.target_participants} 人")
+        if lottery.draw_time:
+            draw_conditions.append(f"到达 {lottery.draw_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        
+        if draw_conditions:
+            draw_type_text = f"🤖 自动开奖（{' 或 '.join(draw_conditions)}）"
+        else:
+            draw_type_text = "🤖 自动开奖"
     
     prizes_text = "\n".join([f"• {prize.name} x{prize.quantity}" for prize in lottery.prizes])
     
@@ -408,7 +506,7 @@ def format_lottery_message(lottery: Lottery) -> str:
 {prizes_text}
 
 👥 参与条件：\n{participation_text}\n
-🎯 开奖方式：{draw_type_text[lottery.draw_type]}"""
+🎯 开奖方式：{draw_type_text}"""
 
     if lottery.collection_location:
         text += f"\n📍 领奖联系人: \n{lottery.collection_location}"
@@ -474,8 +572,9 @@ async def join_lottery(_, call: CallbackQuery):
     except Exception:
         pass  # 如果无法发送私信则忽略
     
-    # 检查是否需要自动开奖
+    # 检查是否需要自动开奖（基于参与人数）
     if (lottery.draw_type == "auto" and 
+        lottery.target_participants > 0 and
         len(lottery.participants) >= lottery.target_participants):
         await auto_draw_lottery(lottery, call.message.chat.id, call.message.id)
     else:
@@ -533,6 +632,23 @@ async def manual_draw_lottery(_, call: CallbackQuery):
 async def auto_draw_lottery(lottery: Lottery, chat_id: int, message_id: int):
     """自动开奖"""
     await draw_lottery(lottery, chat_id, message_id)
+
+
+async def scheduled_auto_draw(lottery_id: str):
+    """定时自动开奖"""
+    if lottery_id not in active_lotteries:
+        return  # 抽奖已结束或不存在
+    
+    lottery = active_lotteries[lottery_id]
+    
+    # 找到第一个群组消息进行开奖
+    if hasattr(lottery, 'group_messages') and lottery.group_messages:
+        first_group_id = list(lottery.group_messages.keys())[0]
+        first_msg_id = lottery.group_messages[first_group_id]
+        await draw_lottery(lottery, first_group_id, first_msg_id)
+    else:
+        # 如果没有群组消息，只能从active_lotteries中移除
+        del active_lotteries[lottery_id]
 
 
 async def draw_lottery(lottery: Lottery, chat_id: int, message_id: int):
@@ -644,6 +760,14 @@ async def draw_lottery(lottery: Lottery, chat_id: int, message_id: int):
                 except Exception:
                     pass  # 忽略发送失败
     
+    # 移除定时任务（如果存在）
+    if lottery.draw_type == "auto" and lottery.draw_time:
+        job_id = f"lottery_auto_draw_{lottery.id}"
+        try:
+            scheduler.remove_job(job_id)
+        except Exception:
+            pass  # 任务可能已经执行或不存在
+    
     # 移除抽奖
     del active_lotteries[lottery.id]
     
@@ -748,6 +872,14 @@ async def handle_terminate_lottery(_, call: CallbackQuery):
                     await bot.send_message(group_id, termination_text)
                 except Exception:
                     pass
+    
+    # 移除定时任务（如果存在）
+    if lottery.draw_type == "auto" and lottery.draw_time:
+        job_id = f"lottery_auto_draw_{lottery.id}"
+        try:
+            scheduler.remove_job(job_id)
+        except Exception:
+            pass  # 任务可能已经执行或不存在
     
     # 移除抽奖
     del active_lotteries[lottery_id]
