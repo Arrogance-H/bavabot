@@ -59,7 +59,7 @@ async def tmdb_main_handler(_, call):
     emby_user = sql_get_emby(tg=call.from_user.id)
     if not emby_user:
         return await editMessage(call, '⚠️ 数据库没有你，请重新 /start录入')
-    if emby_user.lv is None or emby_user.lv not in ['a', 'b']:
+    if emby_user.lv is None or emby_user.lv not in ['a', 'b', 'm']:
         return await editMessage(call, '🫡 您没有权限使用此功能', buttons=back_members_ikb)
 
     await callAnswer(call, '🍿 ME点播')
@@ -81,7 +81,7 @@ async def tmdb_search_handler(_, call):
     emby_user = sql_get_emby(tg=call.from_user.id)
     if not emby_user:
         return await editMessage(call, '⚠️ 数据库没有你，请重新 /start录入')
-    if emby_user.lv is None or emby_user.lv not in ['a', 'b']:
+    if emby_user.lv is None or emby_user.lv not in ['a', 'b', 'm']:
         return await editMessage(call, '🫡 您没有权限使用此功能', buttons=back_members_ikb)
 
     await callAnswer(call, '🔍 开始搜索')
@@ -600,7 +600,7 @@ async def me_request_movie(_, call):
     emby_user = sql_get_emby(tg=call.from_user.id)
     if not emby_user:
         return await editMessage(call, '⚠️ 数据库没有你，请重新 /start录入')
-    if emby_user.lv is None or emby_user.lv not in ['a', 'b']:
+    if emby_user.lv is None or emby_user.lv not in ['a', 'b', 'm']:
         return await editMessage(call, '🫡 您没有权限使用此功能', buttons=tmdb_main_ikb)
 
     user_data = user_tmdb_data.get(call.from_user.id)

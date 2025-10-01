@@ -25,12 +25,12 @@ async def gm_ikb(_, call):
     stat, all_user, tem, timing = await open_check()
     stat = "True" if stat else "False"
     timing = 'Turn off' if timing == 0 else str(timing) + ' min'
-    tg, emby, white = sql_count_emby()
+    tg, emby, white, m_premium = sql_count_emby()
     gm_text = f'⚙️ 欢迎您，亲爱的管理员 {call.from_user.first_name}\n\n' \
               f'· ®️ 注册状态 | **{stat}**\n' \
               f'· ⏳ 定时注册 | **{timing}**\n' \
               f'· 🎫 总注册限制 | **{all_user}**\n'\
-              f'· 🎟️ 已注册人数 | **{emby}** • WL **{white}**\n' \
+              f'· 🎟️ 已注册人数 | **{emby}** • WL **{white}** • M **{m_premium}**\n' \
               f'· 🤖 bot使用人数 | {tg}'
 
     await editMessage(call, gm_text, buttons=gm_ikb_content)
@@ -42,7 +42,7 @@ async def open_menu(_, call):
     await callAnswer(call, '®️ register面板')
     # [开关，注册总数，定时注册] 此间只对emby表中tg用户进行统计
     stat, all_user, tem, timing = await open_check()
-    tg, emby, white = sql_count_emby()
+    tg, emby, white, m_premium = sql_count_emby()
     openstats = '✅' if stat else '❎'  # 三元运算
     timingstats = '❎' if timing == 0 else '✅'
     text = f'⚙ **注册状态设置**：\n\n- 自由注册即定量方式，定时注册既定时又定量，将自动转发消息至群组，再次点击按钮可提前结束并报告。\n' \
@@ -59,7 +59,7 @@ async def open_stats(_, call):
     if timing != 0:
         return await callAnswer(call, "🔴 目前正在运行定时注册。\n无法调用，请再次点击，【定时注册】关闭状态", True)
 
-    tg, emby, white = sql_count_emby()
+    tg, emby, white, m_premium = sql_count_emby()
     if stat:
         _open.stat = False
         save_config()
@@ -117,7 +117,7 @@ async def open_timing(_, call):
         except ValueError:
             await editMessage(call, "🚫 请检查数字填写是否正确。\n`[时长min] [总人数]`", buttons=back_open_menu_ikb)
         else:
-            tg, emby, white = sql_count_emby()
+            tg, emby, white, m_premium = sql_count_emby()
             sur = _open.all_user - emby
             await asyncio.gather(sendPhoto(call, photo=bot_photo,
                                            caption=f'🫧 管理员 {call.from_user.first_name} 已开启 **定时注册**\n\n'
