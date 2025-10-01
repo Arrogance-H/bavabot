@@ -143,8 +143,8 @@ async def pro_m(_, msg):
     if sql_update_emby(Emby.tg == uid, lv='m'):
         sign_name = f'{msg.sender_chat.title}' if msg.sender_chat else f'[{msg.from_user.first_name}](tg://user?id={msg.from_user.id})'
         await asyncio.gather(deleteMessage(msg), sendMessage(msg,
-                                                             f"**{random.choice(Yulv.load_yulv().wh_msg)}**\n\n"
-                                                             f"🎉 恭喜 [{first.first_name}](tg://user?id={uid}) 获得 {sign_name} 签出的M尊享."))
+                                                             f"**{random.choice(Yulv.load_yulv().m_msg)}**\n\n"
+                                                             f"恭喜 [{first.first_name}](tg://user?id={uid}) 荣升为 M 尊享用户！获得 {sign_name} 签出的M尊享."))
     else:
         return await sendMessage(msg, '⚠️ 数据库执行错误')
     LOGGER.info(f"【admin】：{msg.from_user.id} 新更新 M尊享 {first.first_name}-{uid}")
