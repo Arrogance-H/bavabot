@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-数据库迁移脚本 - 添加保号方式相关字段 (手动模式)
-Database Migration Script - Add preservation mode fields (Manual Mode)
+数据库迁移脚本 - 添加保号方式及M欢迎相关字段 (手动模式)
+Database Migration Script - Add preservation mode and M-welcome fields (Manual Mode)
 
 注意：此脚本用于非 Docker 环境。Docker 用户无需手动运行此脚本，
 因为 Docker 模式下会自动执行数据库迁移。
@@ -9,8 +9,8 @@ Database Migration Script - Add preservation mode fields (Manual Mode)
 Note: This script is for non-Docker environments. Docker users don't need 
 to run this script manually as Docker mode performs automatic migration.
 
-这个脚本用于安全地向现有的 emby 表添加新的保号方式字段
-This script safely adds new preservation mode fields to the existing emby table
+这个脚本用于安全地向现有的 emby 表添加新的字段
+This script safely adds new fields to the existing emby table
 """
 
 import sys
@@ -43,7 +43,7 @@ try:
     
     def migrate_preserve_mode_fields():
         """
-        安全地添加保号方式字段到 emby 表
+        安全地添加保号方式及M欢迎字段到 emby 表
         """
         try:
             # 创建新的引擎连接 (不依赖现有的 Base)
@@ -68,7 +68,7 @@ try:
                     logger.info("📋 emby 表不存在，将由 SQLAlchemy 自动创建")
                     return True
                 
-                logger.info("✅ emby 表存在，检查保号方式字段...")
+                logger.info("✅ emby 表存在，检查字段...")
                 
                 # 检查 preserve_mode 字段
                 result = conn.execute(text("""
@@ -91,6 +91,17 @@ try:
                 """), {"db_name": db_name})
                 
                 preserve_mode_changed_exists = result.fetchone()[0] > 0
+                
+                # 检查 m_welcome_date 字段
+                result = conn.execute(text("""
+                    SELECT COUNT(*) as count 
+                    FROM information_schema.columns 
+                    WHERE table_schema = :db_name 
+                    AND table_name = 'emby' 
+                    AND column_name = 'm_welcome_date'
+                """), {"db_name": db_name})
+                
+                m_welcome_date_exists = result.fetchone()[0] > 0
                 
                 # 添加缺失的字段
                 if not preserve_mode_exists:
@@ -117,6 +128,18 @@ try:
                 else:
                     logger.info("✅ preserve_mode_changed 字段已存在")
                 
+                if not m_welcome_date_exists:
+                    logger.info("➕ 添加 m_welcome_date 字段...")
+                    conn.execute(text("""
+                        ALTER TABLE emby 
+                        ADD COLUMN m_welcome_date DATETIME DEFAULT NULL 
+                        COMMENT 'M尊享用户最后欢迎日期时间'
+                    """))
+                    conn.commit()
+                    logger.info("✅ m_welcome_date 字段添加成功")
+                else:
+                    logger.info("✅ m_welcome_date 字段已存在")
+                
                 # 确保现有记录有默认值
                 if not preserve_mode_exists or not preserve_mode_changed_exists:
                     logger.info("🔄 更新现有记录的默认值...")
@@ -133,7 +156,7 @@ try:
                     conn.commit()
                     logger.info("✅ 现有记录默认值更新完成")
                 
-                logger.info("🎉 保号方式字段迁移完成！")
+                logger.info("🎉 字段迁移完成！")
                 return True
                 
         except Exception as e:
@@ -142,8 +165,8 @@ try:
     
     if __name__ == "__main__":
         print("=" * 60)
-        print("BavaBot 保号方式数据库迁移工具 (手动模式)")
-        print("BavaBot Preservation Mode Database Migration Tool (Manual Mode)")
+        print("BavaBot 数据库迁移工具 (手动模式)")
+        print("BavaBot Database Migration Tool (Manual Mode)")
         print("=" * 60)
         print()
         
@@ -155,12 +178,13 @@ try:
         if success:
             print()
             print("🎉 迁移完成！")
-            print("✅ 数据库已准备好支持保号方式功能")
+            print("✅ 数据库已准备好支持新功能")
             print("✅ Bot 现在可以正常运行")
             print()
             print("📋 新增字段说明:")
             print("• preserve_mode: 用户保号方式 ('active'=活跃保号, 'expire'=到期保号)")
             print("• preserve_mode_changed: 是否已切换过 (0=未切换, 1=已切换)")
+            print("• m_welcome_date: M尊享用户最后欢迎日期时间")
             print()
             print("🐳 Docker 用户提示：")
             print("如果您使用 Docker 部署，下次可以直接启动容器，")
