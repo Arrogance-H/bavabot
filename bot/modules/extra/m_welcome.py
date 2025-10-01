@@ -1,7 +1,9 @@
 import datetime
+import random
 from bot import bot
 from pyrogram import filters
 from bot.sql_helper.sql_emby import sql_get_emby
+from bot.schemas import Yulv
 
 # 记录当天已欢迎的 M尊享用户
 m_first_speak = {}
@@ -23,4 +25,4 @@ async def welcome_m_user(_, msg):
     if not e or e.lv != 'm':
         return  # 只欢迎M尊享
     if is_first_speak_today(msg.from_user.id):
-        await msg.reply("🎉 欢迎尊贵的M尊享用户首次发言！")
+        await msg.reply(random.choice(Yulv.load_yulv().m_welcome))
