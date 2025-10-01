@@ -765,6 +765,8 @@ class Embyservice(metaclass=Singleton):
             
             sql_parts.extend([
                 "GROUP BY name",
+                # 按播放次数排序，播放次数相同时按播放时长排序
+                # Sorting by play count first (as shown in display), then by duration as tiebreaker
                 "ORDER BY play_count DESC, total_duarion DESC",
                 f"LIMIT {int(limit)}"  # 确保limit是整数
             ])
