@@ -1,17 +1,9 @@
 import datetime
+import random
 from bot import bot
 from pyrogram import filters
-from bot.sql_helper.sql_emby import sql_get_emby
-
-# 记录当天已欢迎的 M尊享用户
-m_first_speak = {}
-
-def is_first_speak_today(user_id):
-    today = datetime.date.today().isoformat()
-    if m_first_speak.get(user_id) == today:
-        return False
-    m_first_speak[user_id] = today
-    return True
+from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby
+from bot.schemas import Yulv
 
 @bot.on_message(filters.group)
 async def welcome_m_user(_, msg):
@@ -22,5 +14,21 @@ async def welcome_m_user(_, msg):
     e = sql_get_emby(tg=msg.from_user.id)
     if not e or e.lv != 'm':
         return  # 只欢迎M尊享
-    if is_first_speak_today(msg.from_user.id):
-        await msg.reply("🎉 欢迎尊贵的M尊享用户首次发言！")
+    
+    # 检查是否今天已经欢迎过
+    today = datetime.date.today()
+    if e.m_welcome_date and e.m_welcome_date.date() == today:
+        return  # 今天已经欢迎过了
+    
+    # 更新欢迎日期到数据库
+    sql_update_emby(Emby.tg == msg.from_user.id, m_welcome_date=datetime.datetime.now())
+    
+    # 获取用户昵称
+    user_name = msg.from_user.first_name
+    
+    # 随机选择欢迎语并替换昵称占位符
+    welcome_msg = random.choice(Yulv.load_yulv().m_welcome)
+    # 如果消息中包含 {name} 占位符，则替换为用户昵称
+    welcome_msg = welcome_msg.replace("{name}", user_name)
+    
+    await msg.reply(welcome_msg)

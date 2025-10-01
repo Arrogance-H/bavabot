@@ -23,7 +23,7 @@ Base.metadata.bind = engine
 
 def auto_migrate_preserve_mode_fields():
     """
-    自动迁移保号方式字段（Docker模式下使用）
+    自动迁移保号方式字段和M欢迎字段（Docker模式下使用）
     """
     try:
         with engine.connect() as conn:
@@ -69,6 +69,27 @@ def auto_migrate_preserve_mode_fields():
                 conn.commit()
                 logger.info("✅ preserve_mode_changed 字段自动添加成功")
             
+            # 检查是否需要添加 m_welcome_date 字段
+            result = conn.execute(text("""
+                SELECT COUNT(*) as count 
+                FROM information_schema.columns 
+                WHERE table_schema = :db_name 
+                AND table_name = 'emby' 
+                AND column_name = 'm_welcome_date'
+            """), {"db_name": db_name})
+            
+            m_welcome_date_exists = result.fetchone()[0] > 0
+            
+            if not m_welcome_date_exists:
+                logger.info("➕ 自动添加 m_welcome_date 字段...")
+                conn.execute(text("""
+                    ALTER TABLE emby 
+                    ADD COLUMN m_welcome_date DATETIME DEFAULT NULL 
+                    COMMENT 'M尊享用户最后欢迎日期时间'
+                """))
+                conn.commit()
+                logger.info("✅ m_welcome_date 字段自动添加成功")
+            
             # 确保现有记录有默认值
             if not preserve_mode_exists or not preserve_mode_changed_exists:
                 logger.info("🔄 更新现有记录的默认值...")
@@ -86,19 +107,19 @@ def auto_migrate_preserve_mode_fields():
                 logger.info("✅ 现有记录默认值更新完成")
                 
     except Exception as e:
-        logger.error(f"❌ 保号方式字段自动迁移失败: {e}")
+        logger.error(f"❌ 字段自动迁移失败: {e}")
 
 # 先创建所有表（如果不存在）
 try:
     Base.metadata.create_all(bind=engine, checkfirst=True)
     logger.info("✅ 数据库表结构检查完成")
     
-    # Docker模式下自动处理保号方式字段迁移
+    # Docker模式下自动处理字段迁移
     docker_mode = os.getenv('DOCKER_MODE', '0') == '1'
     if docker_mode:
         logger.info("🐳 Docker模式检测到，执行自动数据库迁移...")
         auto_migrate_preserve_mode_fields()
-        logger.info("✅ Docker模式下保号方式字段自动迁移完成")
+        logger.info("✅ Docker模式下字段自动迁移完成")
     
 except Exception as e:
     logger.error(f"❌ 数据库初始化失败: {e}")
