@@ -217,6 +217,7 @@ class Config(BaseModel):
 
 class Yulv(BaseModel):
     wh_msg: List[str]
+    m_msg: List[str]
     red_bag: List[str]
     m_welcome: List[str]
 
