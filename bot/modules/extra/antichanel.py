@@ -8,7 +8,7 @@ import asyncio
 
 from pyrogram import filters
 
-from bot import bot, prefixes, w_anti_channel_ids, LOGGER, save_config, config
+from bot import bot, prefixes, w_anti_channel_ids, LOGGER, save_config, config, group
 from bot.func_helper.filters import admins_on_filter
 
 
@@ -65,7 +65,7 @@ custom_chat_filter = filters.create(
            message: True if message.sender_chat.id != message.chat.id and message.sender_chat.id not in w_anti_channel_ids else False)
 
 
-@bot.on_message(custom_message_filter & custom_chat_filter & filters.group)
+@bot.on_message(custom_message_filter & custom_chat_filter & filters.chat(group) & filters.group)
 async def fuxx_pitao(_, msg):
     # 如果开启了狙杀皮套人功能
     # if config.fuxx_pitao:
