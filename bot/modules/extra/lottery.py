@@ -572,8 +572,9 @@ async def join_lottery(_, call: CallbackQuery):
     except Exception:
         pass  # 如果无法发送私信则忽略
     
-    # 检查是否需要自动开奖
+    # 检查是否需要自动开奖（基于参与人数）
     if (lottery.draw_type == "auto" and 
+        lottery.target_participants > 0 and
         len(lottery.participants) >= lottery.target_participants):
         await auto_draw_lottery(lottery, call.message.chat.id, call.message.id)
     else:
