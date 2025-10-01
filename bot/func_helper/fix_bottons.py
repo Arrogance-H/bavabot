@@ -368,7 +368,8 @@ def cr_renew_ikb():
         'a': '白名单',
         'b': '普通用户',
         'c': '已禁用用户',
-        'd': '无账号用户'
+        'd': '无账号用户',
+        'm': 'M尊享'
     }.get(_open.invite_lv, '未知')
     keyboard = InlineKeyboard(row_width=2)
     keyboard.add(InlineButton(f'{checkin} 每日签到', f'set_renew-checkin'),
@@ -384,6 +385,7 @@ def invite_lv_ikb():
     keyboard = ikb([
         [('🅰️ 白名单', 'set_invite_lv-a'), ('🅱️ 普通用户', 'set_invite_lv-b')],
         [('©️ 已禁用用户', 'set_invite_lv-c'), ('🅳️ 无账号用户', 'set_invite_lv-d')],
+        [('Ⓜ️ M尊享', 'set_invite_lv-m')],
         [('🔙 返回', 'set_renew')]
     ])
     return keyboard
@@ -403,6 +405,7 @@ def config_preparation() -> InlineKeyboardMarkup:
         [[('📄 导出日志', 'log_out'), ('📌 设置探针', 'set_tz')],
          [('🎬 显/隐指定库', 'set_block'), (f'{fuxx_pt} 皮套人过滤功能', 'set_fuxx_pitao')],
          [('💠 普通用户线路', 'set_line'),('🌟 白名单线路', 'set_whitelist_line')],
+         [('Ⓜ️ M尊享线路', 'set_m_line')],
          [(f'{leave_ban} 退群封禁', 'leave_ban'), (f'{uplays} 观影奖励结算', 'set_uplays')],
          [(f'{auto_up} 自动更新bot', 'set_update'), (f'{mp_set} Moviepilot点播', 'set_mp')],
          [(f'{red_envelope_status} 红包', 'set_red_envelope_status'), (f'{allow_private} 专属红包', 'set_red_envelope_allow_private')],
@@ -440,11 +443,11 @@ async def cr_kk_ikb(uid, first):
     else:
         name, lv, ex, iv, embyid, pwd2, preserve_mode, preserve_mode_changed = data
         if name != '无账户信息':
-            ban = "🌟 解除禁用" if lv == "**已禁用**" else '💢 禁用账户'
+            ban = "🌟 解除禁用" if lv == "已禁用" else '💢 禁用账户'
             keyboard = [[ban, f'user_ban-{uid}'], ['⚠️ 删除账户', f'closeemby-{uid}']]
             
-            # 添加保号方式管理按钮（白名单用户不显示）
-            if lv != '白名单':  # 白名单用户不显示保号切换按钮
+            # 添加保号方式管理按钮（白名单和M尊享用户不显示）
+            if lv not in ['白名单', 'M尊享']:  # 白名单和M尊享用户不显示保号切换按钮
                 mode_name = {'active': '活跃保号', 'expire': '到期保号'}
                 current_mode_text = mode_name.get(preserve_mode, '未知')
                 switch_to_mode = 'expire' if preserve_mode == 'active' else 'active'
@@ -484,8 +487,8 @@ async def cr_kk_ikb(uid, first):
         else:
             keyboard.append(['✨ 赠送资格', f'gift-{uid}'])
         
-        # 添加保号方式信息到显示文本（白名单用户不显示）
-        if name != '无账户信息' and lv != '白名单':
+        # 添加保号方式信息到显示文本（白名单和M尊享用户不显示）
+        if name != '无账户信息' and lv not in ['白名单', 'M尊享']:
             mode_name = {'active': '活跃保号', 'expire': '到期保号'}
             preserve_mode_text = mode_name.get(preserve_mode, '未知')
             switch_status = '已切换' if preserve_mode_changed >= 1 else '可切换'

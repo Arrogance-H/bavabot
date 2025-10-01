@@ -255,9 +255,9 @@ async def kk_preserve_switch(_, call):
     if not e or not e.embyid:
         return await editMessage(call, f'💢 用户没有账户，无法切换保号方式。', timer=60)
     
-    # 检查是否为白名单用户，白名单用户无需保号
-    if e.lv == 'a':
-        return await editMessage(call, f'⚠️ 该用户为白名单用户，无需保号，无法切换保号方式。', timer=60)
+    # 检查是否为白名单或M尊享用户，这些用户无需保号
+    if e.lv in ['a', 'm']:
+        return await editMessage(call, f'⚠️ 该用户为白名单或M尊享用户，无需保号，无法切换保号方式。', timer=60)
     
     # 获取当前保号方式并切换
     current_mode = getattr(e, 'preserve_mode', 'active')

@@ -1,7 +1,7 @@
 """
 对用户的等级调整
 使得其能够成为管理员
-或者白名单，免除到期机制.
+或者白名单、M尊享，免除到期机制.
 """
 import random
 import asyncio
@@ -120,3 +120,56 @@ async def rev_user(_, msg):
     else:
         return await sendMessage(msg, '⚠️ 数据库执行错误')
     LOGGER.info(f"【admin】：{msg.from_user.id} 新移除 白名单 {first.first_name}-{uid}")
+
+
+# 增加M尊享
+@bot.on_message(filters.command('prom', prefixes=prefixes) & admins_on_filter)
+async def pro_m(_, msg):
+    if msg.reply_to_message is None:
+        try:
+            uid = int(msg.text.split()[1])
+            first = await bot.get_chat(uid)
+        except (IndexError, KeyError, BadRequest):
+            await deleteMessage(msg)
+            return await sendMessage(msg,
+                                     '**请先给我一个正确的id！**\n输入格式为：/prom [tgid]或**命令回复想要授权的人**',
+                                     timer=60)
+    else:
+        uid = msg.reply_to_message.from_user.id
+        first = await bot.get_chat(uid)
+    e = sql_get_emby(tg=uid)
+    if e is None or e.embyid is None:
+        return await sendMessage(msg, f'[ta](tg://user?id={uid}) 还没有emby账户无法操作！请先注册')
+    if sql_update_emby(Emby.tg == uid, lv='m'):
+        sign_name = f'{msg.sender_chat.title}' if msg.sender_chat else f'[{msg.from_user.first_name}](tg://user?id={msg.from_user.id})'
+        await asyncio.gather(deleteMessage(msg), sendMessage(msg,
+                                                             f"**{random.choice(Yulv.load_yulv().wh_msg)}**\n\n"
+                                                             f"🎉 恭喜 [{first.first_name}](tg://user?id={uid}) 获得 {sign_name} 签出的M尊享."))
+    else:
+        return await sendMessage(msg, '⚠️ 数据库执行错误')
+    LOGGER.info(f"【admin】：{msg.from_user.id} 新更新 M尊享 {first.first_name}-{uid}")
+
+
+# 减少M尊享
+@bot.on_message(filters.command('revm', prefixes=prefixes) & admins_on_filter)
+async def rev_m(_, msg):
+    if msg.reply_to_message is None:
+        try:
+            uid = int(msg.text.split()[1])
+            first = await bot.get_chat(uid)
+        except (IndexError, KeyError, BadRequest):
+            await deleteMessage(msg)
+            return await msg.reply(
+                '**请先给我一个正确的id！**\n输入格式为：/revm [tgid]或**命令回复想要取消授权的人**')
+
+    else:
+        uid = msg.reply_to_message.from_user.id
+        first = await bot.get_chat(uid)
+    if sql_update_emby(Emby.tg == uid, lv='b'):
+        sign_name = f'{msg.sender_chat.title}' if msg.sender_chat else f'[{msg.from_user.first_name}](tg://user?id={msg.from_user.id})'
+        await asyncio.gather(sendMessage(msg,
+                                         f"🤖 很遗憾 [{first.first_name}](tg://user?id={uid}) 被 {sign_name} 移出M尊享."),
+                             deleteMessage(msg))
+    else:
+        return await sendMessage(msg, '⚠️ 数据库执行错误')
+    LOGGER.info(f"【admin】：{msg.from_user.id} 新移除 M尊享 {first.first_name}-{uid}")

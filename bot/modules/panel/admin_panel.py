@@ -417,7 +417,7 @@ async def invite_lv_set(_, call):
         if method.startswith('set_invite_lv-'):
             # 当选择具体等级时
             level = method.split('-')[1]
-            if level in ['a', 'b', 'c', 'd']:
+            if level in ['a', 'b', 'c', 'd', 'm']:
                 _open.invite_lv = level
                 save_config()
                 await callAnswer(call, f'✅ 已设置邀请等级为 {level}', show_alert=True)
@@ -429,7 +429,8 @@ async def invite_lv_set(_, call):
             "🅰️ - 白名单可使用\n"
             "🅱️ - 注册用户可使用\n" 
             "©️ - 已禁用用户可使用\n"
-            "🅳️ - 无账号用户可使用",
+            "🅳️ - 无账号用户可使用\n"
+            "Ⓜ️ - M尊享可使用",
             buttons=invite_lv_ikb())
         return
     except IndexError:

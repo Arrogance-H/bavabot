@@ -27,8 +27,20 @@ ME_REQUEST_COSTS = {
     'tv': 10      # 电视剧10币(每季)
 }
 
-def calculate_me_request_cost(media_type: str) -> int:
-    """计算ME点播请求费用"""
+def calculate_me_request_cost(media_type: str, user_level: str = None) -> int:
+    """计算ME点播请求费用
+    
+    Args:
+        media_type: 媒体类型 (movie/tv)
+        user_level: 用户等级，M尊享用户免费
+    
+    Returns:
+        费用金额
+    """
+    # M尊享用户免费
+    if user_level == 'm':
+        return 0
+    
     if media_type.lower() in ['movie', '电影']:
         return ME_REQUEST_COSTS['movie']
     elif media_type.lower() in ['tv', 'series', '电视剧', '剧集']:
@@ -658,6 +670,10 @@ async def show_season_selection(call, tv_series: dict, seasons: list, selected_s
     """显示电视剧季数选择界面 - 支持多选（不检查Emby限制）"""
     if selected_seasons is None:
         selected_seasons = []
+    
+    # 获取用户信息以确定费用
+    emby_user = sql_get_emby(tg=call.from_user.id)
+    user_lv = emby_user.lv if emby_user else None
         
     title = tv_series.get("title", "未知电视剧")
     year = tv_series.get("year", "未知")
@@ -674,7 +690,7 @@ async def show_season_selection(call, tv_series: dict, seasons: list, selected_s
     selection_text += "\n"
     
     if selected_seasons:
-        total_cost = len(selected_seasons) * calculate_me_request_cost('tv')
+        total_cost = len(selected_seasons) * calculate_me_request_cost('tv', user_lv)
         selection_text += f"✅ **已选择**: {len(selected_seasons)} 季\n"
         selection_text += f"💰 **总费用**: {total_cost} {sakura_b}\n\n"
     
@@ -762,7 +778,7 @@ async def process_movie_request(call, selected_item: dict):
     
     # 计算费用
     media_type = selected_item.get('media_type', 'movie')
-    cost = calculate_me_request_cost(media_type)
+    cost = calculate_me_request_cost(media_type, emby_user.lv)
     
     # 检查用户余额
     if cost > emby_user.iv:
@@ -878,7 +894,7 @@ async def show_multi_season_confirmation(call, tv_series: dict, selected_seasons
         return
     
     season_count = len(selected_seasons)
-    cost_per_season = calculate_me_request_cost('tv')
+    cost_per_season = calculate_me_request_cost('tv', emby_user.lv)
     total_cost = season_count * cost_per_season
     
     # 检查用户余额
@@ -969,7 +985,7 @@ async def confirm_multi_season_request(_, call):
             return
             
         # 计算总费用
-        cost_per_season = calculate_me_request_cost('tv')
+        cost_per_season = calculate_me_request_cost('tv', emby_user.lv)
         total_cost = len(selected_seasons_info) * cost_per_season
         
         # 再次检查余额（防止并发问题）
@@ -1176,7 +1192,7 @@ async def show_season_confirmation(call, tv_series: dict, season: dict):
     season_number = season.get('season_number', 0)
     episode_count = season.get('episode_count', 0)
     air_date = season.get('air_date', '')
-    cost = calculate_me_request_cost('tv')  # 电视剧每季10币
+    cost = calculate_me_request_cost('tv', emby_user.lv)  # 电视剧每季费用
     
     # 检查用户余额
     if cost > emby_user.iv:
@@ -1239,7 +1255,7 @@ async def confirm_season_request(_, call):
             return
             
         # 计算费用
-        cost = calculate_me_request_cost('tv')  # 电视剧每季10币
+        cost = calculate_me_request_cost('tv', emby_user.lv)  # 电视剧每季费用
         
         # 再次检查余额（防止并发问题）
         if cost > emby_user.iv:
@@ -1402,7 +1418,7 @@ async def confirm_me_request(_, call):
             
         # 计算费用
         media_type = selected_item.get('media_type', 'movie')
-        cost = calculate_me_request_cost(media_type)
+        cost = calculate_me_request_cost(media_type, emby_user.lv)
         
         # 再次检查余额（防止并发问题）
         if cost > emby_user.iv:

@@ -20,6 +20,31 @@ def judge_admins(uid):
         return True
 
 
+def compare_user_level(user_level, required_level):
+    """
+    比较用户等级是否满足要求
+    等级层次：m（M尊享）> a（白名单）> b（普通用户）> c（已禁用用户）> d（未注册用户）
+    
+    :param user_level: 用户的等级
+    :param required_level: 所需的最低等级
+    :return: True 如果用户等级满足要求，False 否则
+    """
+    # 定义等级优先级，数字越小优先级越高
+    level_priority = {
+        'm': 0,  # M尊享 - 最高级
+        'a': 1,  # 白名单
+        'b': 2,  # 普通用户  
+        'c': 3,  # 已禁用用户
+        'd': 4   # 无账号用户 - 最低级
+    }
+    
+    user_priority = level_priority.get(user_level, 999)  # 未知等级设为最低
+    required_priority = level_priority.get(required_level, 999)
+    
+    # 用户等级优先级小于等于所需等级优先级时，满足要求
+    return user_priority <= required_priority
+
+
 # @cache.memoize(ttl=60)
 async def members_info(tg=None, name=None):
     """
@@ -38,7 +63,13 @@ async def members_info(tg=None, name=None):
         pwd2 = data.pwd2
         embyid = data.embyid
         iv = data.iv
-        lv_dict = {'a': '白名单', 'b': '**正常**', 'c': '**已禁用**', 'd': '未注册'}  # , 'e': '**21天未活跃/无信息**'
+        lv_dict = {
+            'm': 'M尊享',
+            'a': '白名单',
+            'b': '普通用户',
+            'c': '已禁用',
+            'd': '未注册'
+        }
         lv = lv_dict.get(data.lv, '未知')
         
         # 获取保号方式信息
@@ -47,11 +78,11 @@ async def members_info(tg=None, name=None):
         
         # Update ex display logic based on user's preserve_mode instead of global schedall settings
         # This implements preserve mode specific logic for displaying expiration information:
-        # - whitelist users: show infinity symbol
+        # - M尊享 and whitelist users: show infinity symbol
         # - 'expire' mode: shows formatted expiration date (到期保号)
         # - 'active' mode: shows activity warning message (活跃保号) 
         # - no account: shows default message
-        if lv == '白名单':
+        if lv in ['白名单', 'M尊享']:
             ex = '+ ∞'
         elif name != '无账户信息':
             if preserve_mode == 'expire':

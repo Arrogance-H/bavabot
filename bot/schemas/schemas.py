@@ -185,6 +185,8 @@ class Config(BaseModel):
     freeze_days: int = 5
     # 白名单用户专属的emby线路
     emby_whitelist_line: Optional[str] = None
+    # M尊享用户专属的emby线路
+    emby_m_line: Optional[str] = None
     # 被拦截的user-agent模式列表
     blocked_clients: Optional[List[str]] = None
     # 是否在检测到可疑客户端时终止会话
