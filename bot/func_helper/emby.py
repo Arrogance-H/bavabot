@@ -765,7 +765,7 @@ class Embyservice(metaclass=Singleton):
             
             sql_parts.extend([
                 "GROUP BY name",
-                "ORDER BY total_duarion DESC",
+                "ORDER BY play_count DESC, total_duarion DESC",
                 f"LIMIT {int(limit)}"  # 确保limit是整数
             ])
             
