@@ -3,7 +3,7 @@ from pyrogram import filters
 from bot import bot, bot_name
 from bot.func_helper.filters import admins_on_filter
 from bot.func_helper.msg_utils import editMessage
-from bot.func_helper.fix_bottons import whitelist_page_ikb, normaluser_page_ikb,devices_page_ikb 
+from bot.func_helper.fix_bottons import whitelist_page_ikb, normaluser_page_ikb, devices_page_ikb, mpremium_page_ikb
 from bot.sql_helper.sql_emby import get_all_emby, Emby
 from bot.func_helper.msg_utils import callAnswer
 import math
@@ -20,6 +20,20 @@ async def list_whitelist(_, call):
     keyboard = await whitelist_page_ikb(total_pages, page)
 
     await editMessage(call, text, buttons=keyboard)
+
+@bot.on_callback_query(filters.regex('^mpremium$') & admins_on_filter)
+async def list_mpremium(_, call):
+    await callAnswer(call, '🔍 M尊享用户列表')
+    page = 1
+    mpremium_users = get_all_emby(Emby.lv == 'm')
+    total_users = len(mpremium_users)
+    total_pages = math.ceil(total_users / 20)
+
+    text = await create_mpremium_text(mpremium_users, page)
+    keyboard = await mpremium_page_ikb(total_pages, page)
+
+    await editMessage(call, text, buttons=keyboard)
+
 @bot.on_callback_query(filters.regex('^normaluser$') & admins_on_filter)
 async def list_normaluser(_, call):
     await callAnswer(call, '🔍 普通用户列表')
@@ -46,6 +60,19 @@ async def whitelist_page(_, call):
 
     await editMessage(call, text, buttons=keyboard)
 
+@bot.on_callback_query(filters.regex('^mpremium:') & admins_on_filter)
+async def mpremium_page(_, call):
+    page = int(call.data.split(':')[1])
+    await callAnswer(call, f'🔍 打开第{page}页')
+    mpremium_users = get_all_emby(Emby.lv == 'm')
+    total_users = len(mpremium_users)
+    total_pages = math.ceil(total_users / 20)
+
+    text = await create_mpremium_text(mpremium_users, page)
+    keyboard = await mpremium_page_ikb(total_pages, page)
+
+    await editMessage(call, text, buttons=keyboard)
+
 @bot.on_callback_query(filters.regex('^normaluser:') & admins_on_filter)
 async def normaluser_page(_, call):
     page = int(call.data.split(':')[1])
@@ -63,6 +90,15 @@ async def create_whitelist_text(users, page):
     start = (page - 1) * 20
     end = start + 20
     text = "**白名单用户列表**\n\n"
+    for user in users[start:end]:
+        text += f"TGID: `{user.tg}` | Emby用户名: [{user.name}](tg://user?id={user.tg})\n"
+    text += f"第 {page} 页,共 {math.ceil(len(users) / 20)} 页, 共 {len(users)} 人"
+    return text
+
+async def create_mpremium_text(users, page):
+    start = (page - 1) * 20
+    end = start + 20
+    text = "**M尊享用户列表**\n\n"
     for user in users[start:end]:
         text += f"TGID: `{user.tg}` | Emby用户名: [{user.name}](tg://user?id={user.tg})\n"
     text += f"第 {page} 页,共 {math.ceil(len(users) / 20)} 页, 共 {len(users)} 人"
