@@ -4,7 +4,7 @@
 """
 from datetime import datetime, timezone, timedelta
 from pyrogram import filters
-from bot import bot, emby_line, emby_whitelist_line
+from bot import bot, emby_line, emby_whitelist_line, emby_m_line
 from bot.func_helper.emby import emby
 from bot.func_helper.filters import user_in_group_on_filter
 from bot.sql_helper.sql_emby import sql_get_emby
@@ -36,10 +36,16 @@ async def server(_, call):
     line = ''
     if data.lv == 'b':
         line = f'{emby_line}'
-    elif data.lv in ['a', 'm']:
+    elif data.lv == 'a':
         line = f'{emby_line}'
         if emby_whitelist_line:
             line += f'\n{emby_whitelist_line}'
+    elif data.lv == 'm':
+        line = f'{emby_line}'
+        if emby_whitelist_line:
+            line += f'\n{emby_whitelist_line}'
+        if emby_m_line:
+            line += f'\n{emby_m_line}'
     else:
         line = ' - **无权查看**'
     try:
