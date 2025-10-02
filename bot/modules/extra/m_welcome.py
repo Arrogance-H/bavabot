@@ -1,8 +1,7 @@
-import datetime
 import random
 from bot import bot, group, LOGGER
 from pyrogram import filters
-from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby
+from bot.sql_helper.sql_emby import sql_get_emby
 from bot.schemas import Yulv
 
 @bot.on_message(filters.chat(group) & filters.group)
@@ -14,14 +13,6 @@ async def welcome_m_user(_, msg):
     e = sql_get_emby(tg=msg.from_user.id)
     if not e or e.lv != 'm':
         return  # 只欢迎M尊享
-    
-    # 检查是否今天已经欢迎过
-    today = datetime.date.today()
-    if e.m_welcome_date and e.m_welcome_date.date() == today:
-        return  # 今天已经欢迎过了
-    
-    # 更新欢迎日期到数据库
-    sql_update_emby(Emby.tg == msg.from_user.id, m_welcome_date=datetime.datetime.now())
     
     # 获取用户昵称
     user_name = msg.from_user.first_name
