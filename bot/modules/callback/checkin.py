@@ -613,8 +613,7 @@ async def end_multiplayer_f1_game(game_id):
                 await bot.edit_message_text(
                     chat_id=chat_id,
                     message_id=message_id,
-                    text="🎮 **多人F1竞速赛**\n\n⏳ 正在计算结果...",
-                    parse_mode=enums.ParseMode.MARKDOWN
+                    text="🎮 **多人F1竞速赛**\n\n⏳ 正在计算结果..."
                 )
             except Exception:
                 # 如果编辑失败，继续尝试显示最终结果
@@ -627,8 +626,7 @@ async def end_multiplayer_f1_game(game_id):
             await bot.edit_message_text(
                 chat_id=chat_id,
                 message_id=message_id,
-                text=result_text,
-                parse_mode=enums.ParseMode.MARKDOWN
+                text=result_text
             )
             
             # 60秒后删除结果消息
