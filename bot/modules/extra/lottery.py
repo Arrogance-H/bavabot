@@ -542,7 +542,7 @@ async def join_lottery(_, call: CallbackQuery):
     
     # 检查参与条件
     if lottery.participation_type == "emby":
-        if not e or e.lv not in ['a', 'b']:
+        if not e or e.lv not in ['a', 'b','m']:
             return await callAnswer(call, "❌ 您需要有ME账号才能参与此抽奖", True)
     
     elif lottery.participation_type == "d_only":
