@@ -70,9 +70,9 @@ Regular user messages are invisible to the bot.
 
 3. **测试功能 / Test Feature**
    
-   让M等级用户在群组中发送消息，bot应该会回复欢迎消息（每天仅一次）
+   让M等级用户在群组中发送消息，bot应该会回复欢迎消息（每次发言都会响应）
    
-   Have an M-tier user send a message in the group, bot should reply with welcome message (once per day)
+   Have an M-tier user send a message in the group, bot should reply with welcome message (on every message)
 
 ## 技术细节 / Technical Details
 
@@ -110,11 +110,7 @@ async def welcome_m_user(_, msg):
    - 用户数据库中的 `lv` 字段必须为 `'m'`
    - User's `lv` field in database must be `'m'`
 
-3. **检查欢迎日期 / Check Welcome Date**
-   - 每个用户每天只会被欢迎一次
-   - Each user is welcomed only once per day
-
-4. **查看日志 / Check Logs**
+3. **查看日志 / Check Logs**
    - 寻找 `【M尊享欢迎】` 日志条目
    - Look for `【M尊享欢迎】` log entries
 
