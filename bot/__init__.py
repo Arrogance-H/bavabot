@@ -77,7 +77,8 @@ user_p = [
     BotCommand("myinfo", "[用户] 查看状态"),
     BotCommand("count", "[用户] 媒体库数量"),
     BotCommand("red", "[用户/禁言] 发红包"),
-    BotCommand("srank", "[用户/禁言] 查看计分")]
+    BotCommand("srank", "[用户/禁言] 查看计分"),
+    BotCommand("f1", "[群组] 发起多人F1竞速游戏")]
     # Hunt game commands removed
 
 # 取消 BotCommand("exchange", "[私聊] 使用注册码")
@@ -94,6 +95,8 @@ admin_p = user_p + [
     BotCommand("rmemby", "删除用户[包括非tg] [管理]"),
     BotCommand("prouser", "增加白名单 [管理]"),
     BotCommand("revuser", "减少白名单 [管理]"),
+    BotCommand("prom", "增加M尊享 [管理]"),
+    BotCommand("revm", "移除M尊享 [管理]"),
     BotCommand("rev_white_channel", "移除皮套人白名单 [管理]"),
     BotCommand("white_channel", "添加皮套人白名单 [管理]"),
     BotCommand("unban_channel", "解封皮套人 [管理]"),
