@@ -1,11 +1,11 @@
 import datetime
 import random
-from bot import bot
+from bot import bot, group, LOGGER
 from pyrogram import filters
 from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby
 from bot.schemas import Yulv
 
-@bot.on_message(filters.group)
+@bot.on_message(filters.chat(group) & filters.group)
 async def welcome_m_user(_, msg):
     # 只处理真实用户
     if not msg.from_user:
@@ -31,4 +31,5 @@ async def welcome_m_user(_, msg):
     # 如果消息中包含 {name} 占位符，则替换为用户昵称
     welcome_msg = welcome_msg.replace("{name}", user_name)
     
+    LOGGER.info(f"【M尊享欢迎】- 欢迎M尊享用户 {user_name} (ID: {msg.from_user.id})")
     await msg.reply(welcome_msg)
