@@ -5,7 +5,7 @@ from pyrogram import filters
 from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby
 from bot.schemas import Yulv
 
-@bot.on_message(filters.chat(group) & filters.group)
+@bot.on_message(filters.chat(group) & filters.group & filters.text)
 async def welcome_m_user(_, msg):
     # 只处理真实用户
     if not msg.from_user:
