@@ -529,6 +529,16 @@ async def handle_multiplayer_f1_click(_, call):
     await callAnswer(call, f'⚡ 第{clicks}次点击！', False)
 
 
+async def delete_message_after_delay(chat_id, message_id, delay_seconds):
+    """延迟删除消息"""
+    try:
+        await asyncio.sleep(delay_seconds)
+        await bot.delete_messages(chat_id=chat_id, message_ids=message_id)
+    except Exception:
+        # 如果删除失败（例如消息已被删除），忽略错误
+        pass
+
+
 async def end_multiplayer_f1_game(game_id):
     """结束多人F1游戏并发放奖励"""
     if game_id not in multiplayer_f1_games:
@@ -610,11 +620,14 @@ async def end_multiplayer_f1_game(game_id):
         
         # 发送新的游戏结果消息
         if chat_id:
-            await bot.send_message(
+            result_msg = await bot.send_message(
                 chat_id=chat_id,
                 text=result_text,
                 parse_mode="Markdown"
             )
+            # 60秒后删除结果消息
+            if result_msg:
+                asyncio.create_task(delete_message_after_delay(chat_id, result_msg.id, 60))
     except Exception as e:
         # 如果发送失败，记录但不影响游戏清理
         pass
