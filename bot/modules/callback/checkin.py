@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 from pyrogram import filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-from bot import bot, _open, sakura_b, prefixes, group
+from bot import bot, _open, sakura_b, prefixes, group, LOGGER
 from bot.func_helper.filters import user_in_group_on_filter
 from bot.func_helper.msg_utils import callAnswer, sendMessage, deleteMessage, editMessage
 from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby
@@ -601,36 +601,41 @@ async def end_multiplayer_f1_game(game_id):
             f"🎯 总奖池: {total_prize} {sakura_b}"
         )
     
-    # 删除游戏进行中的消息并发送新的结果消息
+    # 在原有消息上编辑以显示游戏结果
     try:
         # 从游戏数据获取chat_id和message_id
         chat_id = game['chat_id']
         message_id = game['message_id']
         
-        # 先删除游戏进行中的消息
         if chat_id and message_id:
+            # 先显示结果计算中，确保游戏已完全中止
             try:
-                await bot.delete_messages(
+                await bot.edit_message_text(
                     chat_id=chat_id,
-                    message_ids=message_id
+                    message_id=message_id,
+                    text="🎮 **多人F1竞速赛**\n\n⏳ 正在计算结果...",
+                    parse_mode="Markdown"
                 )
             except Exception:
-                # 如果删除失败，继续发送结果消息
+                # 如果编辑失败，继续尝试显示最终结果
                 pass
-        
-        # 发送新的游戏结果消息
-        if chat_id:
-            result_msg = await bot.send_message(
+            
+            # 等待3秒确保游戏完全停止
+            await asyncio.sleep(3)
+            
+            # 编辑消息显示最终结果
+            await bot.edit_message_text(
                 chat_id=chat_id,
+                message_id=message_id,
                 text=result_text,
                 parse_mode="Markdown"
             )
+            
             # 60秒后删除结果消息
-            if result_msg:
-                asyncio.create_task(delete_message_after_delay(chat_id, result_msg.id, 60))
+            asyncio.create_task(delete_message_after_delay(chat_id, message_id, 60))
     except Exception as e:
         # 如果发送失败，记录但不影响游戏清理
-        pass
+        LOGGER.error(f"【F1多人游戏】发送游戏结果失败 - game_id: {game_id}, error: {e}")
     
     # 清理游戏数据
     del multiplayer_f1_games[game_id]
