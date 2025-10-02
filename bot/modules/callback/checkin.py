@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 from pyrogram import filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-from bot import bot, _open, sakura_b, prefixes, group
+from bot import bot, _open, sakura_b, prefixes, group, LOGGER
 from bot.func_helper.filters import user_in_group_on_filter
 from bot.func_helper.msg_utils import callAnswer, sendMessage, deleteMessage, editMessage
 from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby
@@ -630,7 +630,7 @@ async def end_multiplayer_f1_game(game_id):
                 asyncio.create_task(delete_message_after_delay(chat_id, result_msg.id, 60))
     except Exception as e:
         # 如果发送失败，记录但不影响游戏清理
-        pass
+        LOGGER.error(f"【F1多人游戏】发送游戏结果失败 - game_id: {game_id}, error: {e}")
     
     # 清理游戏数据
     del multiplayer_f1_games[game_id]
