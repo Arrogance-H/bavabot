@@ -486,8 +486,7 @@ async def start_multiplayer_f1_game(_, call):
     text = (
         f"🎮 **多人F1竞速赛 - 进行中**\n\n"
         f"⚡ 疯狂点击你的按钮加速吧！\n"
-        f"⏰ 剩余时间: 5秒\n\n"
-        f"📊 实时排名:\n"
+        f"⏰ 剩余时间: 5秒"
     )
     
     await editMessage(call, text, buttons=buttons)
@@ -528,39 +527,6 @@ async def handle_multiplayer_f1_click(_, call):
     clicks = game['participants'][target_user_id]['clicks']
     
     await callAnswer(call, f'⚡ 第{clicks}次点击！', False)
-    
-    # 更新排行榜显示（不频繁更新消息，避免限流）
-    try:
-        # 创建按钮
-        buttons_rows = []
-        for pid, pdata in game['participants'].items():
-            buttons_rows.append([
-                InlineKeyboardButton(f"⚡ {pdata['name']}", f"f1_click_{game_id}_{pid}")
-            ])
-        buttons = InlineKeyboardMarkup(buttons_rows)
-        
-        # 排序参与者
-        sorted_participants = sorted(
-            game['participants'].items(),
-            key=lambda x: x[1]['clicks'],
-            reverse=True
-        )
-        
-        ranking = '\n'.join([
-            f"{i+1}. {p[1]['name']}: {p[1]['clicks']} 次"
-            for i, p in enumerate(sorted_participants)
-        ])
-        
-        text = (
-            f"🎮 **多人F1竞速赛 - 进行中**\n\n"
-            f"⚡ 疯狂点击你的按钮加速吧！\n\n"
-            f"📊 实时排名:\n{ranking}"
-        )
-        
-        await editMessage(call, text, buttons=buttons)
-    except Exception:
-        # 忽略更新失败，可能是点击太快
-        pass
 
 
 async def end_multiplayer_f1_game(game_id):
@@ -635,14 +601,16 @@ async def end_multiplayer_f1_game(game_id):
             await bot.edit_message_text(
                 chat_id=chat_id,
                 message_id=message_id,
-                text=result_text
+                text=result_text,
+                parse_mode="Markdown"
             )
     except Exception as e:
         # 如果更新失败，尝试发送新消息
         try:
             await bot.send_message(
                 chat_id=game['chat_id'],
-                text=result_text
+                text=result_text,
+                parse_mode="Markdown"
             )
         except Exception:
             pass
