@@ -497,11 +497,15 @@ async def start_multiplayer_f1_game(_, call):
     await end_multiplayer_f1_game(game_id)
 
 
-@bot.on_callback_query(filters.regex(r'f1_click_([^_]+)_(\d+)'))
+@bot.on_callback_query(filters.regex(r'f1_click_(.+)_(\d+)$'))
 async def handle_multiplayer_f1_click(_, call):
     """处理多人F1游戏的点击"""
-    game_id = call.matches[0].group(1)
-    target_user_id = int(call.matches[0].group(2))
+    match = call.matches[0]
+    full_match = match.group(0)  # f1_click_{game_id}_{user_id}
+    # Extract game_id and user_id by splitting from the right
+    parts = full_match.split('_')
+    target_user_id = int(parts[-1])
+    game_id = '_'.join(parts[2:-1])  # Skip 'f1', 'click' and last part (user_id)
     
     if game_id not in multiplayer_f1_games:
         await callAnswer(call, '❌ 游戏不存在或已结束', True)
