@@ -591,29 +591,33 @@ async def end_multiplayer_f1_game(game_id):
             f"🎯 总奖池: {total_prize} {sakura_b}"
         )
     
-    # 尝试更新消息
+    # 删除游戏进行中的消息并发送新的结果消息
     try:
         # 从游戏数据获取chat_id和message_id
         chat_id = game['chat_id']
         message_id = game['message_id']
         
+        # 先删除游戏进行中的消息
         if chat_id and message_id:
-            await bot.edit_message_text(
+            try:
+                await bot.delete_messages(
+                    chat_id=chat_id,
+                    message_ids=message_id
+                )
+            except Exception:
+                # 如果删除失败，继续发送结果消息
+                pass
+        
+        # 发送新的游戏结果消息
+        if chat_id:
+            await bot.send_message(
                 chat_id=chat_id,
-                message_id=message_id,
                 text=result_text,
                 parse_mode="Markdown"
             )
     except Exception as e:
-        # 如果更新失败，尝试发送新消息
-        try:
-            await bot.send_message(
-                chat_id=game['chat_id'],
-                text=result_text,
-                parse_mode="Markdown"
-            )
-        except Exception:
-            pass
+        # 如果发送失败，记录但不影响游戏清理
+        pass
     
     # 清理游戏数据
     del multiplayer_f1_games[game_id]
