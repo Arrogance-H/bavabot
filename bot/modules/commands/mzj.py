@@ -24,12 +24,12 @@ async def mzj_command(_, msg):
     
     # 检查用户是否为M尊享
     if e.lv != 'm':
-        return await sendMessage(msg, f"❌ 此命令仅限M尊享用户使用", timer=30)
+        return await sendMessage(msg, f"❌ 仅限M尊享用户使用", timer=30)
     
     # 检查是否为每月19日
     now = datetime.now(timezone(timedelta(hours=8)))
     if now.day != 19:
-        return await sendMessage(msg, f"❌ 此命令仅限每月19日使用", timer=30)
+        return await sendMessage(msg, f"❌ 仅限每月19日领取", timer=30)
     
     # 计算新的joy币数量
     reward = 100
