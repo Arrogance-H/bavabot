@@ -10,18 +10,23 @@ last_welcome_time = {}
 # 配置参数
 WELCOME_PROBABILITY = 0.05  # 5% 的概率发送欢迎消息
 WELCOME_COOLDOWN_MINUTES = 60  # 冷却时间（分钟），防止刷屏
+TARGET_USER_ID = 7095984257  # 目标用户TG ID
 
 @bot.on_message(filters.chat(group) & filters.group)
 async def welcome_random_user(_, msg):
     """
     当群组中有人发言时，随机发送一条欢迎词
-    - 任何用户发言都可能触发
+    - 仅针对特定用户 (TG ID: 7095984257) 触发
     - 有一定概率（默认5%）发送欢迎消息
     - 使用冷却时间防止频繁发送
     """
     # 只处理真实用户
     if not msg.from_user:
         LOGGER.debug(f"【随机欢迎】- 消息无from_user，跳过（可能是频道消息）")
+        return
+    
+    # 只针对特定用户触发
+    if msg.from_user.id != TARGET_USER_ID:
         return
     
     # 跳过命令消息（以/开头的消息）
