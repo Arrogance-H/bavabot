@@ -9,15 +9,25 @@ from bot.schemas import Yulv
 async def welcome_m_user(_, msg):
     # 只处理真实用户
     if not msg.from_user:
+        LOGGER.debug(f"【M尊享欢迎】- 消息无from_user，跳过（可能是频道消息）")
         return
+    
+    LOGGER.debug(f"【M尊享欢迎】- 收到用户 {msg.from_user.first_name} (ID: {msg.from_user.id}) 的消息")
+    
     # 查数据库等级
     e = sql_get_emby(tg=msg.from_user.id)
-    if not e or e.lv != 'm':
+    if not e:
+        LOGGER.debug(f"【M尊享欢迎】- 用户 {msg.from_user.first_name} (ID: {msg.from_user.id}) 不在数据库中")
+        return
+    
+    if e.lv != 'm':
+        LOGGER.debug(f"【M尊享欢迎】- 用户 {msg.from_user.first_name} (ID: {msg.from_user.id}) 等级为 {e.lv}，不是M尊享")
         return  # 只欢迎M尊享
     
     # 检查是否今天已经欢迎过
     today = datetime.date.today()
     if e.m_welcome_date and e.m_welcome_date.date() == today:
+        LOGGER.debug(f"【M尊享欢迎】- 用户 {msg.from_user.first_name} (ID: {msg.from_user.id}) 今天已经欢迎过了")
         return  # 今天已经欢迎过了
     
     # 更新欢迎日期到数据库
