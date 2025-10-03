@@ -17,9 +17,9 @@ log_format = "{time:YYYY-MM-DD HH:mm:ss.SSS ZZ} | {name} | {level} | {message}"
 log_config = {
     "sink": log_filename,
     "format": log_format,  # 显示时区信息
-    "level": "INFO",
+    "level": "DEBUG",
     "rotation": "00:00",  # rotation：一种条件，指示何时应关闭当前记录的文件并开始新的文件。
-    "retention": "30 days"  # retention ：过滤旧文件的指令，在循环或程序结束期间会删除旧文件。
+    "retention": "7 days"  # retention ：过滤旧文件的指令，在循环或程序结束期间会删除旧文件。
 }
 logger.add(**log_config)
 
