@@ -1,5 +1,13 @@
 # M尊享欢迎功能调试指南 / M-Tier Welcome Debug Guide
 
+> **⚠️ 注意 / Notice**: 此文档描述的是旧版本的M尊享专属欢迎功能。该功能已被重构为随机欢迎功能。
+> 
+> **⚠️ Notice**: This document describes the old M-tier exclusive welcome feature. This feature has been refactored into a random welcome feature.
+> 
+> **📖 请查看新文档 / Please see new documentation**: [M_WELCOME_REFACTOR.md](./M_WELCOME_REFACTOR.md)
+
+---
+
 ## 问题描述 / Problem Description
 
 如果M尊享用户发言后没有收到欢迎消息，且日志中没有任何相关记录，现在可以通过新增的调试日志来排查问题。

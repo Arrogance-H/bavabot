@@ -1,5 +1,13 @@
 # M尊享欢迎功能修复说明 / M-Tier Welcome Feature Fix
 
+> **⚠️ 注意 / Notice**: 此文档描述的是旧版本的M尊享专属欢迎功能。该功能已被重构为随机欢迎功能。
+> 
+> **⚠️ Notice**: This document describes the old M-tier exclusive welcome feature. This feature has been refactored into a random welcome feature.
+> 
+> **📖 请查看新文档 / Please see new documentation**: [M_WELCOME_REFACTOR.md](./M_WELCOME_REFACTOR.md)
+
+---
+
 ## 问题 / Issue
 
 Bot无法读取群组中用户的发言，导致M尊享用户欢迎词功能无法实现。
