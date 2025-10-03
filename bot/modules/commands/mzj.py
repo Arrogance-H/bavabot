@@ -1,6 +1,7 @@
 """
 mzj命令 - 用户领取100joy币
 """
+from datetime import datetime, timezone, timedelta
 from pyrogram import filters
 from bot import bot, prefixes, LOGGER, sakura_b
 from bot.func_helper.msg_utils import sendMessage, deleteMessage
@@ -12,7 +13,7 @@ from bot.schemas import MAX_INT_VALUE
 @bot.on_message(filters.command('mzj', prefixes=prefixes))
 async def mzj_command(_, msg):
     """
-    mzj命令 - M尊享用户可以使用此命令领取100joy币
+    mzj命令 - M尊享用户可以在每月19日使用此命令领取100joy币
     """
     user_id = msg.from_user.id
     
@@ -24,6 +25,11 @@ async def mzj_command(_, msg):
     # 检查用户是否为M尊享
     if e.lv != 'm':
         return await sendMessage(msg, f"❌ 此命令仅限M尊享用户使用", timer=30)
+    
+    # 检查是否为每月19日
+    now = datetime.now(timezone(timedelta(hours=8)))
+    if now.day != 19:
+        return await sendMessage(msg, f"❌ 此命令仅限每月19日使用", timer=30)
     
     # 计算新的joy币数量
     reward = 100
