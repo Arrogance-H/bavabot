@@ -73,18 +73,18 @@ The `m_welcome.py` module now outputs debug logs in the following cases:
 【M尊享欢迎】- 测试模式：用户 张三 (ID: 123456789) 发送了测试消息
 【M尊享欢迎】- 欢迎M尊享用户 张三 (ID: 123456789)
 ```
-**说明**：M用户发送"test"消息时触发测试模式，会跳过每日欢迎限制，立即发送欢迎消息
+**说明**：任何在数据库中的用户发送"test"消息时触发测试模式，会跳过每日欢迎限制和等级检查，立即发送欢迎消息
 
-**Info**: When M-tier user sends "test" message, test mode is triggered, bypassing the daily welcome limit and sending welcome message immediately
+**Info**: When any user in the database sends "test" message, test mode is triggered, bypassing the daily welcome limit and level check, sending welcome message immediately
 
 ## 测试功能 / Test Feature
 
-为了方便测试M尊享欢迎功能是否正常工作，现在M等级用户可以通过发送 **"test"** 消息来触发欢迎消息，即使今天已经被欢迎过也会再次发送。
+为了方便测试M尊享欢迎功能是否正常工作，现在所有在数据库中的用户都可以通过发送 **"test"** 消息来触发欢迎消息，即使今天已经被欢迎过也会再次发送。
 
-To test if the M-tier welcome feature is working, M-level users can now send **"test"** message to trigger the welcome message, even if they have already been welcomed today.
+To test if the M-tier welcome feature is working, all users in the database can now send **"test"** message to trigger the welcome message, even if they have already been welcomed today.
 
 **使用方法 / Usage:**
-1. 确保用户等级为 'm' / Ensure user level is 'm'
+1. 确保用户在数据库中（任意等级） / Ensure user is in the database (any level)
 2. 在群组中发送消息 "test" / Send message "test" in the group
 3. Bot将立即回复欢迎消息 / Bot will immediately reply with welcome message
 4. 此测试不会更新数据库中的欢迎日期 / This test will not update the welcome date in database

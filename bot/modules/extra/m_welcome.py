@@ -14,18 +14,19 @@ async def welcome_m_user(_, msg):
     
     LOGGER.debug(f"【M尊享欢迎】- 收到用户 {msg.from_user.first_name} (ID: {msg.from_user.id}) 的消息")
     
+    # 检查是否是测试消息
+    is_test = msg.text and msg.text.strip().lower() == "test"
+    
     # 查数据库等级
     e = sql_get_emby(tg=msg.from_user.id)
     if not e:
         LOGGER.debug(f"【M尊享欢迎】- 用户 {msg.from_user.first_name} (ID: {msg.from_user.id}) 不在数据库中")
         return
     
-    if e.lv != 'm':
+    # 如果不是测试消息，只欢迎M尊享用户
+    if not is_test and e.lv != 'm':
         LOGGER.debug(f"【M尊享欢迎】- 用户 {msg.from_user.first_name} (ID: {msg.from_user.id}) 等级为 {e.lv}，不是M尊享")
         return  # 只欢迎M尊享
-    
-    # 检查是否是测试消息
-    is_test = msg.text and msg.text.strip().lower() == "test"
     
     # 检查是否今天已经欢迎过（测试消息跳过此检查）
     if not is_test:
