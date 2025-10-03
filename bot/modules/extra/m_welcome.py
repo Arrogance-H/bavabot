@@ -17,19 +17,22 @@ async def welcome_m_user(_, msg):
     # 检查是否是测试消息
     is_test = msg.text and msg.text.strip().lower() == "test"
     
-    # 查数据库等级
-    e = sql_get_emby(tg=msg.from_user.id)
-    if not e:
-        LOGGER.debug(f"【M尊享欢迎】- 用户 {msg.from_user.first_name} (ID: {msg.from_user.id}) 不在数据库中")
-        return
-    
-    # 如果不是测试消息，只欢迎M尊享用户
-    if not is_test and e.lv != 'm':
-        LOGGER.debug(f"【M尊享欢迎】- 用户 {msg.from_user.first_name} (ID: {msg.from_user.id}) 等级为 {e.lv}，不是M尊享")
-        return  # 只欢迎M尊享
-    
-    # 检查是否今天已经欢迎过（测试消息跳过此检查）
-    if not is_test:
+    # 如果是测试消息，跳过所有检查，直接发送欢迎消息
+    if is_test:
+        LOGGER.info(f"【M尊享欢迎】- 测试模式：用户 {msg.from_user.first_name} (ID: {msg.from_user.id}) 发送了测试消息")
+    else:
+        # 非测试消息，需要检查数据库和用户等级
+        e = sql_get_emby(tg=msg.from_user.id)
+        if not e:
+            LOGGER.debug(f"【M尊享欢迎】- 用户 {msg.from_user.first_name} (ID: {msg.from_user.id}) 不在数据库中")
+            return
+        
+        # 只欢迎M尊享用户
+        if e.lv != 'm':
+            LOGGER.debug(f"【M尊享欢迎】- 用户 {msg.from_user.first_name} (ID: {msg.from_user.id}) 等级为 {e.lv}，不是M尊享")
+            return  # 只欢迎M尊享
+        
+        # 检查是否今天已经欢迎过
         today = datetime.date.today()
         if e.m_welcome_date and e.m_welcome_date.date() == today:
             LOGGER.debug(f"【M尊享欢迎】- 用户 {msg.from_user.first_name} (ID: {msg.from_user.id}) 今天已经欢迎过了")
@@ -37,8 +40,6 @@ async def welcome_m_user(_, msg):
         
         # 更新欢迎日期到数据库
         sql_update_emby(Emby.tg == msg.from_user.id, m_welcome_date=datetime.datetime.now())
-    else:
-        LOGGER.info(f"【M尊享欢迎】- 测试模式：用户 {msg.from_user.first_name} (ID: {msg.from_user.id}) 发送了测试消息")
     
     # 获取用户昵称
     user_name = msg.from_user.first_name
