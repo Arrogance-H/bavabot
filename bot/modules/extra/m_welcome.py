@@ -2,52 +2,55 @@ import datetime
 import random
 from bot import bot, group, LOGGER
 from pyrogram import filters
-from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby
 from bot.schemas import Yulv
 
+# 全局变量记录上次发送欢迎消息的时间（每个群组独立）
+last_welcome_time = {}
+
+# 配置参数
+WELCOME_PROBABILITY = 0.05  # 5% 的概率发送欢迎消息
+WELCOME_COOLDOWN_MINUTES = 60  # 冷却时间（分钟），防止刷屏
+
 @bot.on_message(filters.chat(group) & filters.group)
-async def welcome_m_user(_, msg):
+async def welcome_random_user(_, msg):
+    """
+    当群组中有人发言时，随机发送一条欢迎词
+    - 任何用户发言都可能触发
+    - 有一定概率（默认5%）发送欢迎消息
+    - 使用冷却时间防止频繁发送
+    """
     # 只处理真实用户
     if not msg.from_user:
-        LOGGER.debug(f"【M尊享欢迎】- 消息无from_user，跳过（可能是频道消息）")
+        LOGGER.debug(f"【随机欢迎】- 消息无from_user，跳过（可能是频道消息）")
         return
     
-    LOGGER.debug(f"【M尊享欢迎】- 收到用户 {msg.from_user.first_name} (ID: {msg.from_user.id}) 的消息")
+    # 跳过命令消息（以/开头的消息）
+    if msg.text and msg.text.startswith('/'):
+        return
     
-    # 检查是否是测试消息
-    is_test = msg.text and msg.text.strip().lower() == "test"
+    chat_id = msg.chat.id
+    current_time = datetime.datetime.now()
     
-    # 如果是测试消息，跳过所有检查，直接发送欢迎消息
-    if is_test:
-        LOGGER.info(f"【M尊享欢迎】- 测试模式：用户 {msg.from_user.first_name} (ID: {msg.from_user.id}) 发送了测试消息")
-    else:
-        # 非测试消息，需要检查数据库和用户等级
-        e = sql_get_emby(tg=msg.from_user.id)
-        if not e:
-            LOGGER.debug(f"【M尊享欢迎】- 用户 {msg.from_user.first_name} (ID: {msg.from_user.id}) 不在数据库中")
+    # 检查冷却时间
+    if chat_id in last_welcome_time:
+        time_diff = (current_time - last_welcome_time[chat_id]).total_seconds() / 60
+        if time_diff < WELCOME_COOLDOWN_MINUTES:
+            LOGGER.debug(f"【随机欢迎】- 群组 {chat_id} 在冷却时间内，距离上次欢迎 {time_diff:.1f} 分钟")
             return
-        
-        # 只欢迎M尊享用户
-        if e.lv != 'm':
-            LOGGER.debug(f"【M尊享欢迎】- 用户 {msg.from_user.first_name} (ID: {msg.from_user.id}) 等级为 {e.lv}，不是M尊享")
-            return  # 只欢迎M尊享
-        
-        # 检查是否今天已经欢迎过
-        today = datetime.date.today()
-        if e.m_welcome_date and e.m_welcome_date.date() == today:
-            LOGGER.debug(f"【M尊享欢迎】- 用户 {msg.from_user.first_name} (ID: {msg.from_user.id}) 今天已经欢迎过了")
-            return  # 今天已经欢迎过了
-        
-        # 更新欢迎日期到数据库
-        sql_update_emby(Emby.tg == msg.from_user.id, m_welcome_date=datetime.datetime.now())
+    
+    # 随机概率判断是否发送欢迎消息
+    if random.random() > WELCOME_PROBABILITY:
+        return
     
     # 获取用户昵称
     user_name = msg.from_user.first_name
     
     # 随机选择欢迎语并替换昵称占位符
     welcome_msg = random.choice(Yulv.load_yulv().m_welcome)
-    # 如果消息中包含 {name} 占位符，则替换为用户昵称
     welcome_msg = welcome_msg.replace("{name}", user_name)
     
-    LOGGER.info(f"【M尊享欢迎】- 欢迎M尊享用户 {user_name} (ID: {msg.from_user.id})")
+    # 更新最后欢迎时间
+    last_welcome_time[chat_id] = current_time
+    
+    LOGGER.info(f"【随机欢迎】- 在群组 {chat_id} 向用户 {user_name} (ID: {msg.from_user.id}) 发送欢迎消息")
     await msg.reply(welcome_msg)
