@@ -78,7 +78,8 @@ user_p = [
     BotCommand("count", "[用户] 媒体库数量"),
     BotCommand("red", "[用户/禁言] 发红包"),
     BotCommand("srank", "[用户/禁言] 查看计分"),
-    BotCommand("f1", "[群组] 发起多人F1竞速游戏")]
+    BotCommand("f1", "[用户] 发起多人F1竞速游戏"),
+    BotCommand("mzj", "[M尊享] M尊享赠礼")]
     # Hunt game commands removed
 
 # 取消 BotCommand("exchange", "[私聊] 使用注册码")
