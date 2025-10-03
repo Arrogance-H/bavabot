@@ -24,14 +24,20 @@ async def welcome_m_user(_, msg):
         LOGGER.debug(f"【M尊享欢迎】- 用户 {msg.from_user.first_name} (ID: {msg.from_user.id}) 等级为 {e.lv}，不是M尊享")
         return  # 只欢迎M尊享
     
-    # 检查是否今天已经欢迎过
-    today = datetime.date.today()
-    if e.m_welcome_date and e.m_welcome_date.date() == today:
-        LOGGER.debug(f"【M尊享欢迎】- 用户 {msg.from_user.first_name} (ID: {msg.from_user.id}) 今天已经欢迎过了")
-        return  # 今天已经欢迎过了
+    # 检查是否是测试消息
+    is_test = msg.text and msg.text.strip().lower() == "test"
     
-    # 更新欢迎日期到数据库
-    sql_update_emby(Emby.tg == msg.from_user.id, m_welcome_date=datetime.datetime.now())
+    # 检查是否今天已经欢迎过（测试消息跳过此检查）
+    if not is_test:
+        today = datetime.date.today()
+        if e.m_welcome_date and e.m_welcome_date.date() == today:
+            LOGGER.debug(f"【M尊享欢迎】- 用户 {msg.from_user.first_name} (ID: {msg.from_user.id}) 今天已经欢迎过了")
+            return  # 今天已经欢迎过了
+        
+        # 更新欢迎日期到数据库
+        sql_update_emby(Emby.tg == msg.from_user.id, m_welcome_date=datetime.datetime.now())
+    else:
+        LOGGER.info(f"【M尊享欢迎】- 测试模式：用户 {msg.from_user.first_name} (ID: {msg.from_user.id}) 发送了测试消息")
     
     # 获取用户昵称
     user_name = msg.from_user.first_name
