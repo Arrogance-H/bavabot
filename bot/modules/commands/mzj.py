@@ -12,7 +12,7 @@ from bot.schemas import MAX_INT_VALUE
 @bot.on_message(filters.command('mzj', prefixes=prefixes))
 async def mzj_command(_, msg):
     """
-    mzj命令 - 用户可以使用此命令领取100joy币
+    mzj命令 - M尊享用户可以使用此命令领取100joy币
     """
     user_id = msg.from_user.id
     
@@ -20,6 +20,10 @@ async def mzj_command(_, msg):
     e = sql_get_emby(tg=user_id)
     if not e:
         return await sendMessage(msg, f"数据库中没有你的信息。请先私聊我 /start", buttons=group_f, timer=30)
+    
+    # 检查用户是否为M尊享
+    if e.lv != 'm':
+        return await sendMessage(msg, f"❌ 此命令仅限M尊享用户使用", timer=30)
     
     # 计算新的joy币数量
     reward = 100
