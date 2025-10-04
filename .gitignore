@@ -15,4 +15,4 @@ log
 bot-env
 
 # Analysis scripts (one-time use)
-hunt_probability_analysis.py
+hunt_probability_analysis.pyconfig.json
