@@ -113,31 +113,21 @@ def get_demand_records_keyboard(current_page, total_pages, current_filter="all")
     """生成请求记录的键盘"""
     keyboard = []
     
-    # 筛选按钮行 - 分为两行显示
+    # 筛选按钮行
     filter_buttons = [
         ("📋 全部", "all"),
         ("⏳ 待处理", "pending"),
-        ("🔄 处理中", "downloading"),
         ("✅ 已入库", "completed")
     ]
     
-    # 第一行：全部、待处理
-    filter_row1 = []
-    for text, filter_type in filter_buttons[:2]:
+    # 筛选按钮行
+    filter_row = []
+    for text, filter_type in filter_buttons:
         callback_data = f"demand_filter_{filter_type}"
         if filter_type == current_filter:
             text = f"• {text} •"  # 当前选中的筛选项
-        filter_row1.append(InlineKeyboardButton(text, callback_data=callback_data))
-    keyboard.append(filter_row1)
-    
-    # 第二行：处理中、已入库
-    filter_row2 = []
-    for text, filter_type in filter_buttons[2:]:
-        callback_data = f"demand_filter_{filter_type}"
-        if filter_type == current_filter:
-            text = f"• {text} •"  # 当前选中的筛选项
-        filter_row2.append(InlineKeyboardButton(text, callback_data=callback_data))
-    keyboard.append(filter_row2)
+        filter_row.append(InlineKeyboardButton(text, callback_data=callback_data))
+    keyboard.append(filter_row)
     
     # 分页按钮行
     page_row = []
@@ -292,7 +282,6 @@ async def handle_demand_filter(_, call):
         filter_names = {
             "all": "全部",
             "pending": "待处理",
-            "downloading": "处理中",
             "completed": "已入库"
         }
         await callAnswer(call, f"已筛选: {filter_names.get(filter_type, filter_type)}")
@@ -372,11 +361,10 @@ async def handle_demand_edit_status(_, call):
         # 显示选中的影片和状态选择按钮
         status_keyboard = InlineKeyboardMarkup([
             [
-                InlineKeyboardButton("⏳ 待处理", callback_data=f"demand_set_status_{selected_record.download_id}_pending"),
-                InlineKeyboardButton("🔄 处理中", callback_data=f"demand_set_status_{selected_record.download_id}_downloading")
+                InlineKeyboardButton("⏳ 待处理", callback_data=f"demand_set_status_{selected_record.download_id}_pending")
             ],
             [
-                InlineKeyboardButton("✅ 已入库", callback_data=f"demand_set_status_{selected_record.download_id}_completed")
+                InlineKeyboardButton("📽️ 已入库(删除)", callback_data=f"demand_set_transferred_{selected_record.download_id}")
             ],
             [
                 InlineKeyboardButton("🗑️ 删除请求", callback_data=f"demand_delete_confirm_{selected_record.download_id}"),
@@ -416,45 +404,12 @@ async def handle_demand_set_status(_, call):
         success = sql_update_request_status(request_id, new_status)
         
         if success:
-            # 如果状态更新为已入库，发送群组通知
-            if new_status == 'completed':
-                try:
-                    from bot import group, bot
-                    
-                    # 获取请求详情
-                    request = sql_get_request_record_by_download_id(request_id)
-                    if request and group and len(group) > 0:
-                        # 获取用户信息
-                        user_info = sql_get_emby(tg=request.tg)
-                        username = user_info.name if user_info else f"用户{request.tg}"
-                        
-                        # 构建通知消息
-                        notification_text = (
-                            f"🎉 **ME点播入库通知**\n\n"
-                            f"🎬 **影片名称**: {request.request_name}\n"
-                            f"📊 **点播状态**: 已入库 ✅\n"
-                            f"👤 **ME用户**: {username}\n"
-                            f"📺 影片已可在Emby中观看！"
-                        )
-                        
-                        # 发送群组通知
-                        await bot.send_message(
-                            chat_id=group[0],
-                            text=notification_text
-                        )
-                        LOGGER.info(f"[Demand] 手动状态更新通知已发送: {request.request_name} (ID: {request_id})")
-                        
-                except Exception as notify_error:
-                    LOGGER.error(f"[Demand] 发送状态更新通知失败 {request_id}: {str(notify_error)}")
-            
             # 返回主界面
             text, keyboard = format_demand_records(1, "all")
             await editMessage(call, text, buttons=keyboard)
             
             status_name = {
-                'pending': '待处理',
-                'downloading': '处理中',
-                'completed': '已入库'
+                'pending': '待处理'
             }.get(new_status, new_status)
             
             await callAnswer(call, f"✅ 已更新状态为: {status_name}")
@@ -465,6 +420,64 @@ async def handle_demand_set_status(_, call):
     except Exception as e:
         LOGGER.error(f"处理状态设置失败: {str(e)}")
         await callAnswer(call, "❌ 设置状态失败", True)
+
+
+@bot.on_callback_query(filters.regex(r'^demand_set_transferred_(.+)$') & admins_filter)
+async def handle_demand_set_transferred(_, call):
+    """处理已入库(删除)请求 - 标记为已入库并删除记录"""
+    try:
+        request_id = call.matches[0].group(1)
+        
+        # 获取请求详情
+        request = sql_get_request_record_by_download_id(request_id)
+        
+        if not request:
+            await editMessage(call, f"❌ 请求不存在: {request_id}")
+            return
+        
+        # 发送群组通知
+        try:
+            from bot import group, bot
+            
+            if group and len(group) > 0:
+                # 获取用户信息
+                user_info = sql_get_emby(tg=request.tg)
+                username = user_info.name if user_info else f"用户{request.tg}"
+                
+                # 构建通知消息
+                notification_text = (
+                    f"🎉 **ME点播入库通知**\n\n"
+                    f"🎬 **影片名称**: {request.request_name}\n"
+                    f"📊 **点播状态**: 已入库 📽️\n"
+                    f"👤 **ME用户**: {username}\n"
+                    f"📺 影片已可在Emby中观看！"
+                )
+                
+                # 发送群组通知
+                await bot.send_message(
+                    chat_id=group[0],
+                    text=notification_text
+                )
+                LOGGER.info(f"[Demand] 已入库通知已发送: {request.request_name} (ID: {request_id})")
+                
+        except Exception as notify_error:
+            LOGGER.error(f"[Demand] 发送已入库通知失败 {request_id}: {str(notify_error)}")
+        
+        # 删除请求记录
+        success = sql_delete_request_record(request_id)
+        
+        if success:
+            # 返回主界面
+            text, keyboard = format_demand_records(1, "all")
+            await editMessage(call, text, buttons=keyboard)
+            await callAnswer(call, "✅ 已标记为已入库并删除记录")
+            LOGGER.info(f"管理员 {call.from_user.id} 标记ME点播请求为已入库并删除: {request_id}")
+        else:
+            await editMessage(call, f"❌ 删除失败，请求ID不存在: {request_id}")
+            
+    except Exception as e:
+        LOGGER.error(f"处理已入库(删除)操作失败: {str(e)}")
+        await callAnswer(call, "❌ 操作失败", True)
 
 
 @bot.on_callback_query(filters.regex(r'^demand_delete_confirm_(.+)$') & admins_filter)
