@@ -376,7 +376,10 @@ async def handle_demand_edit_status(_, call):
                 InlineKeyboardButton("🔄 处理中", callback_data=f"demand_set_status_{selected_record.download_id}_downloading")
             ],
             [
-                InlineKeyboardButton("✅ 已入库", callback_data=f"demand_set_status_{selected_record.download_id}_completed")
+                InlineKeyboardButton("✅ 下载完成", callback_data=f"demand_set_status_{selected_record.download_id}_completed")
+            ],
+            [
+                InlineKeyboardButton("📽️ 已入库(删除)", callback_data=f"demand_set_transferred_{selected_record.download_id}")
             ],
             [
                 InlineKeyboardButton("🗑️ 删除请求", callback_data=f"demand_delete_confirm_{selected_record.download_id}"),
@@ -432,9 +435,9 @@ async def handle_demand_set_status(_, call):
                         notification_text = (
                             f"🎉 **ME点播入库通知**\n\n"
                             f"🎬 **影片名称**: {request.request_name}\n"
-                            f"📊 **点播状态**: 已入库 ✅\n"
+                            f"📊 **点播状态**: 下载完成 ✅\n"
                             f"👤 **ME用户**: {username}\n"
-                            f"📺 影片已可在Emby中观看！"
+                            f"📺 影片已下载完成！"
                         )
                         
                         # 发送群组通知
@@ -454,7 +457,7 @@ async def handle_demand_set_status(_, call):
             status_name = {
                 'pending': '待处理',
                 'downloading': '处理中',
-                'completed': '已入库'
+                'completed': '下载完成'
             }.get(new_status, new_status)
             
             await callAnswer(call, f"✅ 已更新状态为: {status_name}")
@@ -465,6 +468,64 @@ async def handle_demand_set_status(_, call):
     except Exception as e:
         LOGGER.error(f"处理状态设置失败: {str(e)}")
         await callAnswer(call, "❌ 设置状态失败", True)
+
+
+@bot.on_callback_query(filters.regex(r'^demand_set_transferred_(.+)$') & admins_filter)
+async def handle_demand_set_transferred(_, call):
+    """处理已入库(删除)请求 - 标记为已入库并删除记录"""
+    try:
+        request_id = call.matches[0].group(1)
+        
+        # 获取请求详情
+        request = sql_get_request_record_by_download_id(request_id)
+        
+        if not request:
+            await editMessage(call, f"❌ 请求不存在: {request_id}")
+            return
+        
+        # 发送群组通知
+        try:
+            from bot import group, bot
+            
+            if group and len(group) > 0:
+                # 获取用户信息
+                user_info = sql_get_emby(tg=request.tg)
+                username = user_info.name if user_info else f"用户{request.tg}"
+                
+                # 构建通知消息
+                notification_text = (
+                    f"🎉 **ME点播入库通知**\n\n"
+                    f"🎬 **影片名称**: {request.request_name}\n"
+                    f"📊 **点播状态**: 已入库 📽️\n"
+                    f"👤 **ME用户**: {username}\n"
+                    f"📺 影片已可在Emby中观看！"
+                )
+                
+                # 发送群组通知
+                await bot.send_message(
+                    chat_id=group[0],
+                    text=notification_text
+                )
+                LOGGER.info(f"[Demand] 已入库通知已发送: {request.request_name} (ID: {request_id})")
+                
+        except Exception as notify_error:
+            LOGGER.error(f"[Demand] 发送已入库通知失败 {request_id}: {str(notify_error)}")
+        
+        # 删除请求记录
+        success = sql_delete_request_record(request_id)
+        
+        if success:
+            # 返回主界面
+            text, keyboard = format_demand_records(1, "all")
+            await editMessage(call, text, buttons=keyboard)
+            await callAnswer(call, "✅ 已标记为已入库并删除记录")
+            LOGGER.info(f"管理员 {call.from_user.id} 标记ME点播请求为已入库并删除: {request_id}")
+        else:
+            await editMessage(call, f"❌ 删除失败，请求ID不存在: {request_id}")
+            
+    except Exception as e:
+        LOGGER.error(f"处理已入库(删除)操作失败: {str(e)}")
+        await callAnswer(call, "❌ 操作失败", True)
 
 
 @bot.on_callback_query(filters.regex(r'^demand_delete_confirm_(.+)$') & admins_filter)
