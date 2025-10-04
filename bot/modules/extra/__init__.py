@@ -3,3 +3,4 @@ from .antichanel import allow_pitao, un_fukk_pitao, fuxx_pitao, remove_pitao
 from .red_envelope import *
 from .lottery import *
 from .test_reply import test_reply_handler
+from .m_welcome import welcome_m_user
