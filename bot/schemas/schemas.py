@@ -198,6 +198,8 @@ class Config(BaseModel):
     auto_update: AutoUpdate = Field(default_factory=AutoUpdate)
     red_envelope: RedEnvelope = Field(default_factory=RedEnvelope)
     api: API = Field(default_factory=API)
+    # M尊享用户列表 (Telegram user IDs)
+    m_users: Optional[List[int]] = []
 
     def __init__(self, **data):
         super().__init__(**data)

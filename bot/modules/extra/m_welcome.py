@@ -1,46 +1,61 @@
+"""
+M尊享用户欢迎功能
+当M等级用户在群组中发言时自动发送欢迎消息（每天仅一次）
+使用配置文件中的m_users列表，无需数据库查询
+"""
 import datetime
 import random
-from bot import bot, group, LOGGER
+from bot import bot, group, m_users, LOGGER
 from pyrogram import filters
-from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby
 from bot.schemas import Yulv
 
-@bot.on_message(filters.chat(group) & filters.group)
+# 使用缓存来记录今天已经欢迎过的用户
+# 格式: {user_id: date}
+_welcomed_today = {}
+
+
+@bot.on_message(filters.chat(group) & filters.group & filters.text, group=1)
 async def welcome_m_user(_, msg):
+    """
+    M尊享用户欢迎处理器
+    - 使用 group=1 确保在其他handler之后执行
+    - 使用 filters.text 仅处理文本消息，提高性能
+    - 使用配置文件m_users列表，无需数据库查询
+    """
     # 只处理真实用户
     if not msg.from_user:
-        LOGGER.debug(f"【M尊享欢迎】- 消息无from_user，跳过（可能是频道消息）")
         return
     
-    LOGGER.debug(f"【M尊享欢迎】- 收到用户 {msg.from_user.first_name} (ID: {msg.from_user.id}) 的消息")
+    user_id = msg.from_user.id
     
-    # 检查数据库和用户等级
-    e = sql_get_emby(tg=msg.from_user.id)
-    if not e:
-        LOGGER.debug(f"【M尊享欢迎】- 用户 {msg.from_user.first_name} (ID: {msg.from_user.id}) 不在数据库中")
+    # 测试模式：允许任何用户发送"test"来测试功能
+    if msg.text and msg.text.strip().lower() == "test":
+        LOGGER.info(f"【M尊享欢迎】- 测试模式：用户 {msg.from_user.first_name} (ID: {user_id}) 发送了测试消息")
+        user_name = msg.from_user.first_name
+        welcome_msg = random.choice(Yulv.load_yulv().m_welcome)
+        welcome_msg = welcome_msg.replace("{name}", user_name)
+        await msg.reply(welcome_msg)
         return
     
-    # 只欢迎M尊享用户
-    if e.lv != 'm':
-        LOGGER.debug(f"【M尊享欢迎】- 用户 {msg.from_user.first_name} (ID: {msg.from_user.id}) 等级为 {e.lv}，不是M尊享")
+    # 检查用户是否在M尊享列表中
+    if user_id not in m_users:
         return
     
     # 检查是否今天已经欢迎过
     today = datetime.date.today()
-    if e.m_welcome_date and e.m_welcome_date.date() == today:
-        LOGGER.debug(f"【M尊享欢迎】- 用户 {msg.from_user.first_name} (ID: {msg.from_user.id}) 今天已经欢迎过了")
+    if user_id in _welcomed_today and _welcomed_today[user_id] == today:
+        LOGGER.debug(f"【M尊享欢迎】- 用户 {msg.from_user.first_name} (ID: {user_id}) 今天已经欢迎过了")
         return
     
-    # 更新欢迎日期到数据库
-    sql_update_emby(Emby.tg == msg.from_user.id, m_welcome_date=datetime.datetime.now())
+    # 记录今天已经欢迎过
+    _welcomed_today[user_id] = today
     
     # 获取用户昵称
     user_name = msg.from_user.first_name
     
     # 随机选择欢迎语并替换昵称占位符
     welcome_msg = random.choice(Yulv.load_yulv().m_welcome)
-    # 如果消息中包含 {name} 占位符，则替换为用户昵称
     welcome_msg = welcome_msg.replace("{name}", user_name)
     
-    LOGGER.info(f"【M尊享欢迎】- 欢迎M尊享用户 {user_name} (ID: {msg.from_user.id})")
+    LOGGER.info(f"【M尊享欢迎】- 欢迎M尊享用户 {user_name} (ID: {user_id})")
     await msg.reply(welcome_msg)

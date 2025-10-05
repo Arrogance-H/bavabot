@@ -66,6 +66,7 @@ moviepilot = config.moviepilot
 tmdb = config.tmdb
 auto_update = config.auto_update
 api = config.api
+m_users = config.m_users
 save_config()
 
 LOGGER.info("配置文件加载完毕")
