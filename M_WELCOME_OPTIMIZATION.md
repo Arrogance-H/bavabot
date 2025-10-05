@@ -2,9 +2,9 @@
 
 ## 优化概述 / Optimization Overview
 
-本次优化主要解决M尊享欢迎功能的性能问题和handler冲突问题。
+本次优化主要解决M尊享欢迎功能的性能问题和handler冲突问题，并通过使用配置文件列表完全消除数据库查询。
 
-This optimization addresses performance issues and handler conflicts in the M-tier welcome feature.
+This optimization addresses performance issues and handler conflicts in the M-tier welcome feature, and completely eliminates database queries by using a configuration file list.
 
 ## 主要问题 / Main Issues
 
@@ -65,26 +65,50 @@ This optimization addresses performance issues and handler conflicts in the M-ti
 
 **改进 / Improvement:**
 ```python
-# 缓存用户检查时间，避免频繁数据库查询
-_last_check_cache = {}
-_cache_timeout = 300  # 5分钟
+# 使用简单的日期缓存记录今天已经欢迎过的用户
+_welcomed_today = {}  # {user_id: date}
 
-if user_id in _last_check_cache:
-    last_check = _last_check_cache[user_id]
-    if (current_time - last_check).total_seconds() < _cache_timeout:
-        return  # 跳过5分钟内的重复检查
+today = datetime.date.today()
+if user_id in _welcomed_today and _welcomed_today[user_id] == today:
+    return  # 今天已经欢迎过
+_welcomed_today[user_id] = today
 ```
 
 **效果 / Effect:**
-- ✅ 同一用户5分钟内只查询一次数据库
-- ✅ 大幅减少数据库负载
-- ✅ 提高响应速度
+- ✅ 每个用户每天只欢迎一次
+- ✅ 使用内存缓存，无需数据库访问
+- ✅ 简单高效的实现
 
-- ✅ Only queries database once per user within 5 minutes
-- ✅ Greatly reduces database load
-- ✅ Improves response speed
+- ✅ Each user welcomed only once per day
+- ✅ Uses memory cache, no database access needed
+- ✅ Simple and efficient implementation
 
-### 3. 合并测试功能 / Merge Test Function
+### 3. 使用配置文件列表 / Use Configuration File List
+
+**改进 / Improvement:**
+```python
+# config.json 中添加 m_users 列表
+"m_users": [123456789, 987654321]
+
+# 代码中直接检查列表，无需数据库查询
+from bot import m_users
+
+if user_id not in m_users:
+    return  # 不是M尊享用户
+```
+
+**效果 / Effect:**
+- ✅ **完全消除数据库查询** - 从配置文件读取
+- ✅ 更快的响应速度 - O(1) 列表查找
+- ✅ 易于管理 - 直接编辑配置文件
+- ✅ 减少数据库依赖
+
+- ✅ **Completely eliminates database queries** - Read from config file
+- ✅ Faster response - O(1) list lookup
+- ✅ Easy to manage - Directly edit config file
+- ✅ Reduces database dependency
+
+### 4. 合并测试功能 / Merge Test Function
 
 **改进 / Improvement:**
 - 移除独立的 `test_reply.py` 文件
@@ -105,7 +129,7 @@ if msg.text and msg.text.strip().lower() == "test":
     return
 ```
 
-### 4. 使用Handler Groups / Use Handler Groups
+### 5. 使用Handler Groups / Use Handler Groups
 
 **改进 / Improvement:**
 ```python
@@ -121,7 +145,7 @@ if msg.text and msg.text.strip().lower() == "test":
 - ✅ Avoids conflicts with other features
 - ✅ Better execution order control
 
-### 5. 早期返回优化 / Early Return Optimization
+### 6. 早期返回优化 / Early Return Optimization
 
 **改进 / Improvement:**
 - 移除不必要的日志输出（频道消息）
@@ -155,20 +179,22 @@ if msg.text and msg.text.strip().lower() == "test":
 ### 优化后 / After Optimization
 
 - 只处理文本消息（减少60%触发）
-- 同一用户5分钟内只查询一次数据库
+- **完全不查询数据库** - 使用配置文件列表
+- 使用内存缓存记录今天已欢迎的用户
 - 早期返回减少不必要的处理
 
 - Only processes text messages (60% reduction)
-- Only one database query per user within 5 minutes
+- **No database queries at all** - Uses config file list
+- Uses memory cache to track welcomed users today
 - Early returns reduce unnecessary processing
 
 **示例场景 / Example Scenario:**
 - 同样的群组活动
 - 只处理40条文本消息
-- 假设用户在5分钟内平均发2条消息
-- **数据库查询次数：~20次/小时**（减少80%）
+- 使用配置文件列表，无需数据库查询
+- **数据库查询次数：0次/小时**（减少100%）
 
-**Queries: ~20/hour (80% reduction)**
+**Queries: 0/hour (100% reduction)**
 
 ## 兼容性 / Compatibility
 
@@ -177,28 +203,37 @@ if msg.text and msg.text.strip().lower() == "test":
 ✅ M尊享用户欢迎消息（每天一次）
 ✅ 测试功能（发送"test"）
 ✅ 日志记录
-✅ 数据库更新
 ✅ 欢迎消息随机选择
 ✅ 昵称占位符替换
 
 ✅ M-tier user welcome messages (once per day)
 ✅ Test functionality (send "test")
 ✅ Logging
-✅ Database updates
 ✅ Random welcome message selection
 ✅ Nickname placeholder replacement
 
-### 向后兼容 / Backward Compatibility
+### 配置变更 / Configuration Changes
 
-- ✅ 完全向后兼容现有配置
-- ✅ 数据库schema无需修改
-- ✅ 现有用户数据不受影响
-- ✅ 其他模块无需更改
+⚠️ **需要配置更新** - 需要在config.json中添加m_users列表
 
-- ✅ Fully backward compatible with existing configuration
-- ✅ No database schema changes required
-- ✅ Existing user data unaffected
-- ✅ No changes needed in other modules
+⚠️ **Configuration update required** - Need to add m_users list in config.json
+
+**更新步骤 / Update Steps:**
+1. 在 `config.json` 中添加 `"m_users": []` 字段
+2. 将M尊享用户的Telegram ID添加到列表中
+3. 重启bot
+
+1. Add `"m_users": []` field in `config.json`
+2. Add M-tier users' Telegram IDs to the list
+3. Restart bot
+
+### 数据库变更 / Database Changes
+
+✅ **无需数据库修改** - 不再使用数据库查询用户等级
+✅ **保留m_welcome_date字段** - 虽然不再使用，但保留以兼容旧版本
+
+✅ **No database changes required** - No longer queries database for user level
+✅ **Keeps m_welcome_date field** - No longer used, but kept for backward compatibility
 
 ## 文件变更 / File Changes
 
@@ -222,6 +257,37 @@ if msg.text and msg.text.strip().lower() == "test":
    - ❌ 不再需要独立文件
 
 ## 使用说明 / Usage Instructions
+
+### 配置M尊享用户列表 / Configure M-Tier User List
+
+在 `config.json` 中添加M尊享用户的Telegram ID：
+
+Add M-tier users' Telegram IDs to `config.json`:
+
+```json
+{
+  "m_users": [123456789, 987654321, 111222333],
+  ...
+}
+```
+
+**获取用户ID / Getting User IDs:**
+1. 用户可以通过给bot发送 `/myinfo` 命令查看自己的ID
+2. 管理员可以通过转发用户消息给bot查看ID
+3. 可以使用其他Telegram bot获取用户ID
+
+1. Users can send `/myinfo` command to the bot to see their ID
+2. Admins can forward user messages to the bot to see their ID
+3. Can use other Telegram bots to get user IDs
+
+**添加/删除用户 / Add/Remove Users:**
+1. 编辑 `config.json` 文件
+2. 在 `m_users` 数组中添加或删除用户ID
+3. 重启bot使配置生效
+
+1. Edit `config.json` file
+2. Add or remove user IDs in the `m_users` array
+3. Restart bot for changes to take effect
 
 ### 正常使用 / Normal Usage
 
@@ -290,21 +356,42 @@ A: 检查以下几点 / Check the following:
 
 A: 不会 / No:
 
-- 缓存只影响数据库查询频率 / Caching only affects database query frequency
+- 缓存只记录今天已经欢迎过的用户 / Cache only tracks users welcomed today
 - M尊享欢迎仍然每天只触发一次 / M welcome still triggers only once per day
 - 测试功能不受缓存影响 / Test function is not affected by caching
+- 缓存使用简单的日期对比，无过期时间问题 / Cache uses simple date comparison, no expiration issues
 
-### Q: 如何禁用缓存？ / How to disable caching?
+### Q: 如何添加或删除M尊享用户？ / How to add or remove M-tier users?
 
-A: 修改 `m_welcome.py` 中的缓存超时 / Modify cache timeout in `m_welcome.py`:
+A: 编辑配置文件 / Edit config file:
 
-```python
-_cache_timeout = 0  # 禁用缓存 / Disable caching
-```
+1. 打开 `config.json` 文件
+2. 修改 `m_users` 数组
+3. 保存文件并重启bot
+
+1. Open `config.json` file
+2. Modify `m_users` array
+3. Save file and restart bot
+
+### Q: 为什么不使用数据库？ / Why not use database?
+
+A: 性能和简洁性 / Performance and simplicity:
+
+- 配置文件读取更快 / Config file reading is faster
+- 减少数据库负载 / Reduces database load
+- 易于备份和管理 / Easier to backup and manage
+- M尊享用户数量通常较少 / M-tier user count is usually small
 
 ## 版本历史 / Version History
 
-- **2025-01**: 性能优化版本 / Performance optimization version
+- **2025-01 v2**: 使用配置文件列表 / Use configuration file list
+  - ✅ **完全消除数据库查询** - 使用config.json中的m_users列表
+  - ✅ 简化缓存机制 - 只记录今天已欢迎的用户
+  - ✅ 提高响应速度 - 直接列表查找
+  - ✅ 易于管理 - 直接编辑配置文件
+  - ✅ 100% 数据库查询减少
+
+- **2025-01 v1**: 性能优化版本 / Performance optimization version
   - ✅ 添加 `filters.text` 过滤器
   - ✅ 实现5分钟缓存机制
   - ✅ 合并测试功能

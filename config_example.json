@@ -113,5 +113,6 @@
     "allow_origins": [
       "*"
     ]
-  }
+  },
+  "m_users": []
 }

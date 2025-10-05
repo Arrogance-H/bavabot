@@ -37,20 +37,37 @@ Translation: "m_welcome function cannot be implemented, check if there is a bett
 ### 2. 实现缓存机制 (Implement Caching)
 
 ```python
-_last_check_cache = {}  # {user_id: last_check_time}
-_cache_timeout = 300    # 5 minutes
+_welcomed_today = {}  # {user_id: date}
 
-# 5分钟内同一用户只检查一次
-if user_id in _last_check_cache:
-    if (current_time - last_check).total_seconds() < _cache_timeout:
-        return  # Skip
+# 记录今天已经欢迎过的用户
+today = datetime.date.today()
+if user_id in _welcomed_today and _welcomed_today[user_id] == today:
+    return  # 今天已经欢迎过
+_welcomed_today[user_id] = today
 ```
 
-**效果**: 减少80%的数据库查询
+**效果**: 每个用户每天只欢迎一次，使用内存缓存
 
-**Effect**: Reduces 80% of database queries
+**Effect**: Each user welcomed only once per day, uses memory cache
 
 ### 3. 合并测试功能 (Merge Test Function)
+
+```python
+# config.json
+"m_users": [123456789, 987654321]
+
+# m_welcome.py
+from bot import m_users
+
+if user_id not in m_users:
+    return  # 不是M尊享用户
+```
+
+**效果**: **完全消除数据库查询**，从配置文件读取M用户列表
+
+**Effect**: **Completely eliminates database queries**, reads M user list from config file
+
+### 4. 合并测试功能 (Merge Test Function)
 
 - 移除 `test_reply.py`
 - 集成测试功能到 `m_welcome.py`
@@ -60,7 +77,7 @@ if user_id in _last_check_cache:
 - Integrated test function into `m_welcome.py`
 - Test messages processed first, no database query
 
-### 4. 使用Handler Groups (Use Handler Groups)
+### 5. 使用Handler Groups (Use Handler Groups)
 
 ```python
 @bot.on_message(..., group=1)
@@ -75,7 +92,7 @@ if user_id in _last_check_cache:
 | 指标 / Metric | 优化前 / Before | 优化后 / After | 改进 / Improvement |
 |--------------|----------------|---------------|-------------------|
 | Handler触发 | 100%消息 | 40%消息 | ↓60% |
-| 数据库查询 | 100次/小时 | 20次/小时 | ↓80% |
+| 数据库查询 | 100次/小时 | 0次/小时 | ↓100% |
 | CPU使用 | 高 / High | 低 / Low | ↓50%+ |
 | 内存使用 | 中 / Medium | 低 / Low | ↓30%+ |
 
