@@ -4,7 +4,7 @@
 部分目前有 导出日志，更改探针，更改emby线路，设置购买按钮
 
 """
-from bot import bot, prefixes, bot_photo, Now, LOGGER, config, save_config, _open, auto_update, moviepilot, sakura_b
+from bot import bot, prefixes, bot_photo, Now, LOGGER, config, save_config, _open, auto_update, moviepilot, sakura_b, m_users
 from pyrogram import filters
 
 from bot.func_helper.filters import admins_on_filter
@@ -143,6 +143,104 @@ async def set_m_emby_line(_, call):
         await editMessage(call, f"**【M尊享线路】:** \n\n{config.emby_m_line}\n\n设置完成！done！",
                           buttons=back_config_p_ikb)
         LOGGER.info(f"【admin】：{call.from_user.id} - 更新M尊享线路为{config.emby_m_line}设置完成")
+
+@bot.on_callback_query(filters.regex('manage_m_users') & admins_on_filter)
+async def manage_m_users(_, call):
+    """管理M尊享用户ID列表"""
+    await callAnswer(call, '👥 管理M用户')
+    
+    # 显示当前M用户列表
+    m_users_list = config.m_users if config.m_users else []
+    m_users_str = ', '.join(map(str, m_users_list)) if m_users_list else '无'
+    
+    send = await editMessage(call,
+                             f"👥【管理M尊享用户】\n\n"
+                             f"当前M用户列表：\n`{m_users_str}`\n\n"
+                             f"请输入要添加或删除的用户ID：\n"
+                             f"• 添加用户：`add 123456789`\n"
+                             f"• 删除用户：`del 123456789`\n"
+                             f"• 查看列表：`list`\n"
+                             f"取消点击 /cancel")
+    if send is False:
+        return
+
+    txt = await callListen(call, 120, buttons=back_set_ikb('manage_m_users'))
+    if txt is False:
+        return
+
+    if txt.text == '/cancel':
+        await txt.delete()
+        await editMessage(call, '__您已经取消输入__ **会话已结束！**', buttons=back_set_ikb('manage_m_users'))
+    else:
+        await txt.delete()
+        try:
+            parts = txt.text.strip().split()
+            if len(parts) < 1:
+                raise ValueError("无效的命令格式")
+            
+            cmd = parts[0].lower()
+            
+            if cmd == 'list':
+                # 显示当前列表
+                m_users_str = ', '.join(map(str, config.m_users)) if config.m_users else '无'
+                await editMessage(call, 
+                                f"👥【M尊享用户列表】\n\n`{m_users_str}`\n\n操作完成！",
+                                buttons=back_config_p_ikb)
+                LOGGER.info(f"【admin】：{call.from_user.id} - 查看M用户列表")
+            
+            elif cmd in ['add', 'del']:
+                if len(parts) < 2:
+                    raise ValueError("请提供用户ID")
+                
+                user_id = int(parts[1])
+                
+                if cmd == 'add':
+                    if user_id not in config.m_users:
+                        config.m_users.append(user_id)
+                        # 同步更新全局 m_users 变量
+                        m_users.clear()
+                        m_users.extend(config.m_users)
+                        save_config()
+                        m_users_str = ', '.join(map(str, config.m_users))
+                        await editMessage(call,
+                                        f"✅ 已添加用户 `{user_id}` 到M尊享列表\n\n"
+                                        f"当前列表：\n`{m_users_str}`\n\n操作完成！",
+                                        buttons=back_config_p_ikb)
+                        LOGGER.info(f"【admin】：{call.from_user.id} - 添加M用户 {user_id}")
+                    else:
+                        await editMessage(call,
+                                        f"⚠️ 用户 `{user_id}` 已在M尊享列表中",
+                                        buttons=back_set_ikb('manage_m_users'))
+                
+                elif cmd == 'del':
+                    if user_id in config.m_users:
+                        config.m_users.remove(user_id)
+                        # 同步更新全局 m_users 变量
+                        m_users.clear()
+                        m_users.extend(config.m_users)
+                        save_config()
+                        m_users_str = ', '.join(map(str, config.m_users)) if config.m_users else '无'
+                        await editMessage(call,
+                                        f"✅ 已从M尊享列表移除用户 `{user_id}`\n\n"
+                                        f"当前列表：\n`{m_users_str}`\n\n操作完成！",
+                                        buttons=back_config_p_ikb)
+                        LOGGER.info(f"【admin】：{call.from_user.id} - 删除M用户 {user_id}")
+                    else:
+                        await editMessage(call,
+                                        f"⚠️ 用户 `{user_id}` 不在M尊享列表中",
+                                        buttons=back_set_ikb('manage_m_users'))
+            else:
+                raise ValueError("未知的命令，请使用 add、del 或 list")
+                
+        except (ValueError, IndexError) as e:
+            await editMessage(call, 
+                            f"❌ 格式错误：{str(e)}\n\n您的输入：`{txt.text}`\n\n"
+                            f"正确格式：\n"
+                            f"• `add 123456789`\n"
+                            f"• `del 123456789`\n"
+                            f"• `list`",
+                            buttons=back_set_ikb('manage_m_users'))
+
 
 # 设置需要显示/隐藏的库
 @bot.on_callback_query(filters.regex('set_block') & admins_on_filter)
