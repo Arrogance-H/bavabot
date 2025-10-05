@@ -28,15 +28,6 @@ async def welcome_m_user(_, msg):
     
     user_id = msg.from_user.id
     
-    # 测试模式：允许任何用户发送"test"来测试功能
-    if msg.text and msg.text.strip().lower() == "test":
-        LOGGER.info(f"【M尊享欢迎】- 测试模式：用户 {msg.from_user.first_name} (ID: {user_id}) 发送了测试消息")
-        user_name = msg.from_user.first_name
-        welcome_msg = random.choice(Yulv.load_yulv().m_welcome)
-        welcome_msg = welcome_msg.replace("{name}", user_name)
-        await msg.reply(welcome_msg)
-        return
-    
     # 检查用户是否在M尊享列表中
     if user_id not in m_users:
         return
