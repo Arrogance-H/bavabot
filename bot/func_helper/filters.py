@@ -20,6 +20,7 @@ from pyrogram.enums import ChatMemberStatus
 async def admins_on_filter(filt, client, update) -> bool:
     """
     过滤admins中id，包括owner
+    仅允许 owner 和 admins 列表中的用户通过
     :param client:
     :param update:
     :return:
@@ -37,30 +38,7 @@ async def admins_on_filter(filt, client, update) -> bool:
             LOGGER.info(f"【权限检查】用户 {uid} 通过 owner/admin 权限验证")
         return True
     
-    # Check if user ID is explicitly in group list (for special users)
-    if uid in group:
-        if hasattr(update, 'data') and 'preserve_manage' in update.data:
-            LOGGER.info(f"【权限检查】用户 {uid} 通过 group 权限验证")
-        return True
-    
-    # Check if user is actually a member of any authorized group
-    for i in group:
-        try:
-            u = await client.get_chat_member(chat_id=int(i), user_id=uid)
-            if u.status in [ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.MEMBER,
-                            ChatMemberStatus.OWNER]:
-                if hasattr(update, 'data') and 'preserve_manage' in update.data:
-                    LOGGER.info(f"【权限检查】用户 {uid} 通过群组 {i} 成员权限验证")
-                return True
-        except BadRequest as e:
-            if e.ID == 'USER_NOT_PARTICIPANT':
-                continue
-            elif e.ID == 'CHAT_ADMIN_REQUIRED':
-                LOGGER.error(f"bot不能在 {i} 中工作，请检查bot是否在群组及其权限设置")
-                continue
-            else:
-                continue
-    
+    # Permission denied - not an admin
     if hasattr(update, 'data') and 'preserve_manage' in update.data:
         LOGGER.warning(f"【权限检查】用户 {uid} 权限验证失败，无法访问 preserve_manage")
     

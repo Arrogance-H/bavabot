@@ -11,13 +11,14 @@ cache = Cache()
 def judge_admins(uid):
     """
     判断是否admin
+    仅允许 owner 和 admins 列表中的用户
     :param uid: tg_id
     :return: bool
     """
-    if uid != owner and uid not in admins and uid not in group:
-        return False
-    else:
+    if uid == owner or uid in admins:
         return True
+    else:
+        return False
 
 
 def compare_user_level(user_level, required_level):

@@ -56,7 +56,7 @@ async def user_info(_, msg):
 
 
 # 封禁或者解除
-@bot.on_callback_query(filters.regex('user_ban'))
+@bot.on_callback_query(filters.regex('user_ban') & admins_on_filter)
 async def kk_user_ban(_, call):
     if not judge_admins(call.from_user.id):
         return await call.answer("请不要以下犯上 ok？", show_alert=True)
@@ -101,7 +101,7 @@ async def kk_user_ban(_, call):
 
 
 # 开通额外媒体库
-@bot.on_callback_query(filters.regex('embyextralib_unblock'))
+@bot.on_callback_query(filters.regex('embyextralib_unblock') & admins_on_filter)
 async def user_embyextralib_unblock(_, call):
     if not judge_admins(call.from_user.id):
         return await call.answer("请不要以下犯上 ok？", show_alert=True)
@@ -131,7 +131,7 @@ async def user_embyextralib_unblock(_, call):
 
 
 # 隐藏额外媒体库
-@bot.on_callback_query(filters.regex('embyextralib_block'))
+@bot.on_callback_query(filters.regex('embyextralib_block') & admins_on_filter)
 async def user_embyextralib_block(_, call):
     if not judge_admins(call.from_user.id):
         return await call.answer("请不要以下犯上 ok？", show_alert=True)
@@ -159,7 +159,7 @@ async def user_embyextralib_block(_, call):
 
 
 # 赠送资格
-@bot.on_callback_query(filters.regex('gift'))
+@bot.on_callback_query(filters.regex('gift') & admins_on_filter)
 async def gift(_, call):
     if not judge_admins(call.from_user.id):
         return await call.answer("请不要以下犯上 ok？", show_alert=True)
@@ -183,7 +183,7 @@ async def gift(_, call):
 
 
 # 删除账户
-@bot.on_callback_query(filters.regex('closeemby'))
+@bot.on_callback_query(filters.regex('closeemby') & admins_on_filter)
 async def close_emby(_, call):
     if not judge_admins(call.from_user.id):
         return await call.answer("请不要以下犯上 ok？", show_alert=True)
@@ -214,7 +214,7 @@ async def close_emby(_, call):
         LOGGER.info(f"【admin】：{call.from_user.id} 对 {b} 的账户 {e.name} 删除失败 ")
 
 
-@bot.on_callback_query(filters.regex('fuckoff'))
+@bot.on_callback_query(filters.regex('fuckoff') & admins_on_filter)
 async def fuck_off_m(_, call):
     if not judge_admins(call.from_user.id):
         return await call.answer("请不要以下犯上 ok？", show_alert=True)
@@ -241,7 +241,7 @@ async def fuck_off_m(_, call):
 
 
 # 管理员切换用户保号方式
-@bot.on_callback_query(filters.regex('kk_preserve_switch'))
+@bot.on_callback_query(filters.regex('kk_preserve_switch') & admins_on_filter)
 async def kk_preserve_switch(_, call):
     """在kk面板中切换用户保号方式"""
     if not judge_admins(call.from_user.id):

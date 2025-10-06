@@ -332,7 +332,7 @@ async def delete_unused_codes(_, call):
     await editMessage(call, text, buttons=keyboard)
 
 
-@bot.on_callback_query(filters.regex('ch_admin_link'))
+@bot.on_callback_query(filters.regex('ch_admin_link') & admins_on_filter)
 async def ch_admin_link(client, call):
     i = int(call.data.split('-')[1])
     if call.from_user.id != owner and call.from_user.id != i:
@@ -345,8 +345,8 @@ async def ch_admin_link(client, call):
 
 
 @bot.on_callback_query(
-    filters.regex('register_mon') | filters.regex('register_sea')
-    | filters.regex('register_half') | filters.regex('register_year') | filters.regex('register_used') | filters.regex('register_unused'))
+    (filters.regex('register_mon') | filters.regex('register_sea')
+    | filters.regex('register_half') | filters.regex('register_year') | filters.regex('register_used') | filters.regex('register_unused')) & admins_on_filter)
 async def buy_mon(_, call):
     await call.answer('✅ 显示注册码')
     cd, times, u = call.data.split('_')
@@ -362,7 +362,7 @@ async def buy_mon(_, call):
 
 
 # 检索翻页
-@bot.on_callback_query(filters.regex('pagination_keyboard'))
+@bot.on_callback_query(filters.regex('pagination_keyboard') & admins_on_filter)
 async def paginate_keyboard(_, call):
     j, mode = map(int, call.data.split(":")[1].split('_'))
     await callAnswer(call, f'好的，将为您翻到第 {j} 页')
@@ -372,7 +372,7 @@ async def paginate_keyboard(_, call):
     await editMessage(call, f'🔎当前模式- **{mode}**天，检索出以下 **{b}**页链接：\n\n{text}', keyboard)
 
 
-@bot.on_callback_query(filters.regex('set_renew'))
+@bot.on_callback_query(filters.regex('set_renew') & admins_on_filter)
 async def set_renew(_, call):
     await callAnswer(call, '🚀 进入续期设置')
     try:
@@ -410,7 +410,7 @@ async def set_freeze_days(_, call):
         await editMessage(call, f"✔️ 成功，您已设置 **封存账号天数 {a}**", buttons=back_free_ikb)
         LOGGER.info(f"【admin】：管理员 {call.from_user.first_name} 调整了封存账号天数：{a}")
 
-@bot.on_callback_query(filters.regex('set_invite_lv'))
+@bot.on_callback_query(filters.regex('set_invite_lv') & admins_on_filter)
 async def invite_lv_set(_, call):
     try:
         method = call.data
