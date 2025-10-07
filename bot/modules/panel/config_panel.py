@@ -149,6 +149,11 @@ async def manage_m_users(_, call):
     """管理M尊享用户ID列表"""
     await callAnswer(call, '👥 管理M用户')
     
+    # 确保 m_users 已初始化为列表
+    if config.m_users is None:
+        config.m_users = []
+        save_config()
+    
     # 显示当前M用户列表
     m_users_list = config.m_users if config.m_users else []
     m_users_str = ', '.join(map(str, m_users_list)) if m_users_list else '无'

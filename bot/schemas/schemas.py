@@ -1,6 +1,6 @@
 import json
 import os
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional, Union
 
 # 嵌套式的数据设计，规范数据 config.json
@@ -199,7 +199,15 @@ class Config(BaseModel):
     red_envelope: RedEnvelope = Field(default_factory=RedEnvelope)
     api: API = Field(default_factory=API)
     # M尊享用户列表 (Telegram user IDs)
-    m_users: Optional[List[int]] = []
+    m_users: List[int] = Field(default_factory=list)
+
+    @field_validator('m_users', mode='before')
+    @classmethod
+    def validate_m_users(cls, v):
+        """将 None 转换为空列表，以支持旧配置文件"""
+        if v is None:
+            return []
+        return v
 
     def __init__(self, **data):
         super().__init__(**data)
