@@ -90,6 +90,30 @@ mzj_claim_date = Column(DateTime, nullable=True)  # Last mzj monthly claim date
 - 现有用户在首次使用新功能时，该字段为 `None`，可以正常领取
 - SQLAlchemy 的 `checkfirst=True` 确保数据库表安全创建
 
+### 数据库迁移 / Database Migration
+
+提供了两种方式添加新字段：
+
+**方式一：自动迁移（推荐）**
+- Docker 用户：直接启动容器，SQLAlchemy 会自动创建字段
+- 非 Docker 用户：启动 Bot 时，SQLAlchemy 会自动创建字段
+
+**方式二：手动迁移脚本**
+- 运行迁移脚本：`python3 migrate_mzj_claim_date.py`
+- 该脚本会安全地检查并添加 `mzj_claim_date` 字段
+- Docker 用户无需运行此脚本（自动处理）
+
+Two methods to add the new field:
+
+**Method 1: Automatic Migration (Recommended)**
+- Docker users: Start container, SQLAlchemy auto-creates the field
+- Non-Docker users: Start Bot, SQLAlchemy auto-creates the field
+
+**Method 2: Manual Migration Script**
+- Run migration script: `python3 migrate_mzj_claim_date.py`
+- This script safely checks and adds the `mzj_claim_date` field
+- Docker users don't need to run this (handled automatically)
+
 ## 测试建议 / Testing Recommendations
 
 由于此功能依赖特定日期（每月19日），建议测试时：
@@ -113,6 +137,7 @@ Since this feature depends on a specific date (19th of each month), it's recomme
 1. `bot/sql_helper/sql_emby.py` - 添加 mzj_claim_date 字段
 2. `bot/modules/commands/mzj.py` - 重写为随机奖励系统
 3. `bot/modules/commands/__init__.py` - 移除callback处理函数导出
+4. `migrate_mzj_claim_date.py` - 数据库迁移脚本（新增）
 
 ## 日志记录 / Logging
 
