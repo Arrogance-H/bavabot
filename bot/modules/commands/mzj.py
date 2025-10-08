@@ -67,9 +67,9 @@ async def mzj_command(_, msg):
         
         if sql_update_emby(Emby.tg == user_id, iv=new_balance, mzj_claim_date=now):
             await sendMessage(msg, 
-                            f"🎉 **恭喜中奖！**\n\n"
-                            f"· M用户: [{user_name}](tg://user?id={user_id}) `{user_id}`\n"
-                            f"· 奖励类型: 💰 Joy币\n"
+                            f"🎉 **M尊享礼**\n\n"
+                            f"· M尊享: [{user_name}](tg://user?id={user_id}) `{user_id}`\n"
+                            f"· 奖励类型: 💰 JOY币\n"
                             f"· 获得 {reward} {sakura_b}\n"
                             f"· 当前余额: **{new_balance}** {sakura_b}")
             LOGGER.info(f"【mzj】用户 {user_name}-{user_id} 随机领取了 {reward}{sakura_b}")
@@ -82,11 +82,11 @@ async def mzj_command(_, msg):
         
         if sql_update_emby(Emby.tg == user_id, us=new_us, mzj_claim_date=now):
             await sendMessage(msg, 
-                            f"🎉 **恭喜中奖！**\n\n"
-                            f"· M用户: [{user_name}](tg://user?id={user_id}) `{user_id}`\n"
+                            f"🎉 **M尊享礼**\n\n"
+                            f"· M尊享: [{user_name}](tg://user?id={user_id}) `{user_id}`\n"
                             f"· 奖励类型: 🎫 ME注册资格\n"
                             f"· 获得 1 个注册资格\n"
-                            f"· 当前注册资格数: **{new_us}**")
+                            f"· 您可将注册资格赠予家人朋友")
             LOGGER.info(f"【mzj】用户 {user_name}-{user_id} 随机领取了 1个注册资格")
         else:
             return await sendMessage(msg, '⚠️ 数据库操作失败，请稍后重试', timer=30)
@@ -95,11 +95,10 @@ async def mzj_command(_, msg):
         # 支付宝红包 - 独立红包奖励
         if sql_update_emby(Emby.tg == user_id, mzj_claim_date=now):
             await sendMessage(msg, 
-                            f"🎉 **恭喜中奖！**\n\n"
+                            f"🎉 **M尊享里**\n\n"
                             f"· M用户: [{user_name}](tg://user?id={user_id}) `{user_id}`\n"
                             f"· 奖励类型: 🧧 支付宝红包\n"
-                            f"· 请联系管理员领取支付宝红包\n\n"
-                            f"💡 这是一个独立的支付宝红包奖励！")
+                            f"· 请联系管理员领取支付宝红包\n\n")
             LOGGER.info(f"【mzj】用户 {user_name}-{user_id} 随机领取了支付宝红包")
         else:
             return await sendMessage(msg, '⚠️ 数据库操作失败，请稍后重试', timer=30)
