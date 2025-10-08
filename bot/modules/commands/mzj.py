@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 import random
 from pyrogram import filters
 from bot import bot, prefixes, LOGGER, sakura_b
-from bot.func_helper.msg_utils import sendMessage, deleteMessage
+from bot.func_helper.msg_utils import sendMessage
 from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby
 from bot.func_helper.fix_bottons import group_f
 from bot.schemas import MAX_INT_VALUE
@@ -53,6 +53,9 @@ async def mzj_command(_, msg):
     reward_options = ["coins", "register", "redenvelope"]
     reward_type = random.choice(reward_options)
     
+    # 获取用户昵称
+    user_name = msg.from_user.first_name
+    
     # 处理不同类型的奖励
     if reward_type == "coins":
         # 100 Joy币
@@ -65,12 +68,11 @@ async def mzj_command(_, msg):
         if sql_update_emby(Emby.tg == user_id, iv=new_balance, mzj_claim_date=now):
             await sendMessage(msg, 
                             f"🎉 **恭喜中奖！**\n\n"
+                            f"· M用户: [{user_name}](tg://user?id={user_id}) `{user_id}`\n"
                             f"· 奖励类型: 💰 Joy币\n"
                             f"· 获得 {reward} {sakura_b}\n"
-                            f"· 当前余额: **{new_balance}** {sakura_b}",
-                            timer=60)
-            await deleteMessage(msg)
-            LOGGER.info(f"【mzj】用户 {msg.from_user.first_name}-{user_id} 随机领取了 {reward}{sakura_b}")
+                            f"· 当前余额: **{new_balance}** {sakura_b}")
+            LOGGER.info(f"【mzj】用户 {user_name}-{user_id} 随机领取了 {reward}{sakura_b}")
         else:
             return await sendMessage(msg, '⚠️ 数据库操作失败，请稍后重试', timer=30)
     
@@ -81,12 +83,11 @@ async def mzj_command(_, msg):
         if sql_update_emby(Emby.tg == user_id, us=new_us, mzj_claim_date=now):
             await sendMessage(msg, 
                             f"🎉 **恭喜中奖！**\n\n"
+                            f"· M用户: [{user_name}](tg://user?id={user_id}) `{user_id}`\n"
                             f"· 奖励类型: 🎫 ME注册资格\n"
                             f"· 获得 1 个注册资格\n"
-                            f"· 当前注册资格数: **{new_us}**",
-                            timer=60)
-            await deleteMessage(msg)
-            LOGGER.info(f"【mzj】用户 {msg.from_user.first_name}-{user_id} 随机领取了 1个注册资格")
+                            f"· 当前注册资格数: **{new_us}**")
+            LOGGER.info(f"【mzj】用户 {user_name}-{user_id} 随机领取了 1个注册资格")
         else:
             return await sendMessage(msg, '⚠️ 数据库操作失败，请稍后重试', timer=30)
     
@@ -95,11 +96,10 @@ async def mzj_command(_, msg):
         if sql_update_emby(Emby.tg == user_id, mzj_claim_date=now):
             await sendMessage(msg, 
                             f"🎉 **恭喜中奖！**\n\n"
+                            f"· M用户: [{user_name}](tg://user?id={user_id}) `{user_id}`\n"
                             f"· 奖励类型: 🧧 支付宝红包\n"
                             f"· 请联系管理员领取支付宝红包\n\n"
-                            f"💡 这是一个独立的支付宝红包奖励！",
-                            timer=60)
-            await deleteMessage(msg)
-            LOGGER.info(f"【mzj】用户 {msg.from_user.first_name}-{user_id} 随机领取了支付宝红包")
+                            f"💡 这是一个独立的支付宝红包奖励！")
+            LOGGER.info(f"【mzj】用户 {user_name}-{user_id} 随机领取了支付宝红包")
         else:
             return await sendMessage(msg, '⚠️ 数据库操作失败，请稍后重试', timer=30)
