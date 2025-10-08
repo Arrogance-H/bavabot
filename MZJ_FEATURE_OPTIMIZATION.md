@@ -54,10 +54,10 @@ mzj_claim_date = Column(DateTime, nullable=True)  # Last mzj monthly claim date
 - 显示当前余额
 
 #### Option 2: 🎫 ME注册资格 / ME Registration Qualification
-- 增加用户的 `us` (注册资格) 数量 +1
+- 这是一个荣誉奖励，不实际增加注册资格数量
 - 更新 `mzj_claim_date` 防止重复领取
-- 显示当前注册资格总数
-- 用户可以使用注册资格邀请他人注册
+- 用户的 `us` (注册资格) 数量保持不变
+- 作为本月的荣誉奖励发放
 
 #### Option 3: 🧧 支付宝红包 / Alipay Red Envelope
 - 这是一个独立的支付宝红包奖励

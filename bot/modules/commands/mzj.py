@@ -77,17 +77,14 @@ async def mzj_command(_, msg):
             return await sendMessage(msg, '⚠️ 数据库操作失败，请稍后重试', timer=30)
     
     elif reward_type == "register":
-        # ME注册资格
-        new_us = e.us + 1
-        
-        if sql_update_emby(Emby.tg == user_id, us=new_us, mzj_claim_date=now):
+        # ME注册资格 - 荣誉奖励，不实际增加注册资格数量
+        if sql_update_emby(Emby.tg == user_id, mzj_claim_date=now):
             await sendMessage(msg, 
                             f"🎉 **M尊享礼**\n\n"
                             f"· M尊享: [{user_name}](tg://user?id={user_id}) `{user_id}`\n"
-                            f"· 奖励类型: 🎫 ME注册资格\n"
-                            f"· 获得 1 个注册资格\n"
-                            f"· 您可将注册资格赠予家人朋友")
-            LOGGER.info(f"【mzj】用户 {user_name}-{user_id} 随机领取了 1个注册资格")
+                            f"· 奖励类型: 🎫 ME注册资格（荣誉）\n"
+                            f"· 恭喜您获得本月荣誉奖励！")
+            LOGGER.info(f"【mzj】用户 {user_name}-{user_id} 随机领取了 ME注册资格（荣誉）")
         else:
             return await sendMessage(msg, '⚠️ 数据库操作失败，请稍后重试', timer=30)
     
