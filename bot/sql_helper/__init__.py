@@ -23,7 +23,7 @@ Base.metadata.bind = engine
 
 def auto_migrate_preserve_mode_fields():
     """
-    自动迁移保号方式字段和M欢迎字段（Docker模式下使用）
+    自动迁移保号方式字段、M欢迎字段和mzj月度奖励字段（Docker模式下使用）
     """
     try:
         with engine.connect() as conn:
@@ -89,6 +89,27 @@ def auto_migrate_preserve_mode_fields():
                 """))
                 conn.commit()
                 logger.info("✅ m_welcome_date 字段自动添加成功")
+            
+            # 检查是否需要添加 mzj_claim_date 字段
+            result = conn.execute(text("""
+                SELECT COUNT(*) as count 
+                FROM information_schema.columns 
+                WHERE table_schema = :db_name 
+                AND table_name = 'emby' 
+                AND column_name = 'mzj_claim_date'
+            """), {"db_name": db_name})
+            
+            mzj_claim_date_exists = result.fetchone()[0] > 0
+            
+            if not mzj_claim_date_exists:
+                logger.info("➕ 自动添加 mzj_claim_date 字段...")
+                conn.execute(text("""
+                    ALTER TABLE emby 
+                    ADD COLUMN mzj_claim_date DATETIME DEFAULT NULL 
+                    COMMENT 'M尊享用户最后mzj月度奖励领取日期'
+                """))
+                conn.commit()
+                logger.info("✅ mzj_claim_date 字段自动添加成功")
             
             # 确保现有记录有默认值
             if not preserve_mode_exists or not preserve_mode_changed_exists:
