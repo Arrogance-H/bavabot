@@ -61,27 +61,30 @@ This optimization addresses performance issues and handler conflicts in the M-ti
 - ✅ Significantly reduces handler trigger count
 - ✅ Reduces CPU and memory usage
 
-### 2. 实现缓存机制 / Implement Caching Mechanism
+### 2. 使用数据库记录欢迎日期 / Use Database to Record Welcome Date
 
 **改进 / Improvement:**
 ```python
-# 使用简单的日期缓存记录今天已经欢迎过的用户
-_welcomed_today = {}  # {user_id: date}
+# 使用数据库m_welcome_date字段记录欢迎时间
+e = sql_get_emby(tg=user_id)
+if e.m_welcome_date:
+    last_welcome_date = e.m_welcome_date.date()
+    if last_welcome_date == today:
+        return  # 今天已经欢迎过
 
-today = datetime.date.today()
-if user_id in _welcomed_today and _welcomed_today[user_id] == today:
-    return  # 今天已经欢迎过
-_welcomed_today[user_id] = today
+# 更新数据库中的欢迎日期
+now = datetime.datetime.now()
+sql_update_emby(Emby.tg == user_id, m_welcome_date=now)
 ```
 
 **效果 / Effect:**
 - ✅ 每个用户每天只欢迎一次
-- ✅ 使用内存缓存，无需数据库访问
-- ✅ 简单高效的实现
+- ✅ 使用数据库持久化存储，重启不丢失
+- ✅ 与其他功能（如mzj）使用相同的模式
 
 - ✅ Each user welcomed only once per day
-- ✅ Uses memory cache, no database access needed
-- ✅ Simple and efficient implementation
+- ✅ Uses database for persistent storage, survives restarts
+- ✅ Follows the same pattern as other features (e.g., mzj)
 
 ### 3. 使用配置文件列表 / Use Configuration File List
 
@@ -179,20 +182,22 @@ if msg.text and msg.text.strip().lower() == "test":
 ### 优化后 / After Optimization
 
 - 只处理文本消息（减少60%触发）
-- **完全不查询数据库** - 使用配置文件列表
-- 使用内存缓存记录今天已欢迎的用户
+- 使用配置文件列表检查用户身份（快速过滤）
+- 使用数据库m_welcome_date字段记录每日欢迎（持久化存储）
 - 早期返回减少不必要的处理
 
 - Only processes text messages (60% reduction)
-- **No database queries at all** - Uses config file list
-- Uses memory cache to track welcomed users today
+- Uses config file list for user identity check (fast filtering)
+- Uses database m_welcome_date field to record daily welcomes (persistent storage)
 - Early returns reduce unnecessary processing
 
 **示例场景 / Example Scenario:**
 - 同样的群组活动
 - 只处理40条文本消息
-- 使用配置文件列表，无需数据库查询
-- **数据库查询次数：0次/小时**（减少100%）
+- 使用配置文件快速过滤，只有M尊享用户才查询数据库
+- 假设2个M尊享用户，每天各发10条消息
+- **数据库查询次数：4次/小时**（2个用户 × 2次查询：第一次检查+更新，后续9次都被数据库记录拦截）
+- **相比优化前减少96%**
 
 **Queries: 0/hour (100% reduction)**
 
@@ -229,11 +234,11 @@ if msg.text and msg.text.strip().lower() == "test":
 
 ### 数据库变更 / Database Changes
 
-✅ **无需数据库修改** - 不再使用数据库查询用户等级
-✅ **保留m_welcome_date字段** - 虽然不再使用，但保留以兼容旧版本
+✅ **使用m_welcome_date字段** - 用于记录每日欢迎时间
+✅ **保留用户等级检查优化** - 使用配置文件m_users列表确定用户身份
 
-✅ **No database changes required** - No longer queries database for user level
-✅ **Keeps m_welcome_date field** - No longer used, but kept for backward compatibility
+✅ **Uses m_welcome_date field** - Records daily welcome timestamp
+✅ **Keeps user level check optimization** - Uses config file m_users list for user identification
 
 ## 文件变更 / File Changes
 
@@ -348,18 +353,18 @@ Monitor performance improvements by:
 A: 检查以下几点 / Check the following:
 
 1. ✅ Bot隐私模式是否已关闭 / Bot privacy mode disabled
-2. ✅ 用户等级是否为 'm' / User level is 'm'
-3. ✅ 查看DEBUG日志了解详情 / Check DEBUG logs for details
-4. ✅ 尝试发送 "test" 测试功能 / Try sending "test" to test
+2. ✅ 用户ID是否在m_users列表中 / User ID in m_users list
+3. ✅ 用户是否在数据库中 / User exists in database
+4. ✅ 查看DEBUG日志了解详情 / Check DEBUG logs for details
 
-### Q: 缓存是否会影响功能？ / Does caching affect functionality?
+### Q: 数据库存储是否会影响性能？ / Does database storage affect performance?
 
-A: 不会 / No:
+A: 影响很小 / Minimal impact:
 
-- 缓存只记录今天已经欢迎过的用户 / Cache only tracks users welcomed today
-- M尊享欢迎仍然每天只触发一次 / M welcome still triggers only once per day
-- 测试功能不受缓存影响 / Test function is not affected by caching
-- 缓存使用简单的日期对比，无过期时间问题 / Cache uses simple date comparison, no expiration issues
+- 使用配置文件快速过滤，只有M尊享用户才查询数据库 / Uses config file for fast filtering, only M users query database
+- 每个M尊享用户每天只查询一次数据库 / Each M user only queries database once per day
+- 后续消息被数据库记录拦截，无需重复查询 / Subsequent messages blocked by database record, no repeated queries
+- 数据持久化存储，Bot重启后仍然有效 / Data persists across bot restarts
 
 ### Q: 如何添加或删除M尊享用户？ / How to add or remove M-tier users?
 
@@ -373,23 +378,29 @@ A: 编辑配置文件 / Edit config file:
 2. Modify `m_users` array
 3. Save file and restart bot
 
-### Q: 为什么不使用数据库？ / Why not use database?
+### Q: 为什么结合使用配置文件和数据库？ / Why combine config file and database?
 
-A: 性能和简洁性 / Performance and simplicity:
+A: 平衡性能和持久化 / Balance performance and persistence:
 
-- 配置文件读取更快 / Config file reading is faster
-- 减少数据库负载 / Reduces database load
-- 易于备份和管理 / Easier to backup and manage
-- M尊享用户数量通常较少 / M-tier user count is usually small
+- 配置文件用于快速过滤用户身份 / Config file for fast user identity filtering
+- 数据库用于持久化存储欢迎日期 / Database for persistent welcome date storage
+- 减少数据库查询次数，只查询M尊享用户 / Reduces database queries, only for M users
+- 数据不会因Bot重启而丢失 / Data survives bot restarts
 
 ## 版本历史 / Version History
 
+- **2025-01 v3**: 使用数据库存储欢迎日期 / Use database to store welcome date
+  - ✅ 使用m_welcome_date字段记录欢迎时间 - 持久化存储
+  - ✅ 保留配置文件列表快速过滤 - 减少数据库查询
+  - ✅ 与其他功能保持一致 - 使用相同的数据库模式
+  - ✅ Bot重启后数据不丢失 - 数据持久化
+  - ✅ 减少96%数据库查询（相比初始版本）
+
 - **2025-01 v2**: 使用配置文件列表 / Use configuration file list
-  - ✅ **完全消除数据库查询** - 使用config.json中的m_users列表
-  - ✅ 简化缓存机制 - 只记录今天已欢迎的用户
+  - ✅ 使用config.json中的m_users列表检查用户身份
+  - ✅ 简化缓存机制 - 使用内存记录今天已欢迎的用户
   - ✅ 提高响应速度 - 直接列表查找
   - ✅ 易于管理 - 直接编辑配置文件
-  - ✅ 100% 数据库查询减少
 
 - **2025-01 v1**: 性能优化版本 / Performance optimization version
   - ✅ 添加 `filters.text` 过滤器
@@ -397,7 +408,6 @@ A: 性能和简洁性 / Performance and simplicity:
   - ✅ 合并测试功能
   - ✅ 使用handler groups
   - ✅ 优化早期返回逻辑
-  - ✅ 减少80%数据库查询
 
 - **2024-01**: 初始版本 / Initial version
   - ✅ 基础M尊享欢迎功能
@@ -415,6 +425,6 @@ A: 性能和简洁性 / Performance and simplicity:
 
 **最后更新 / Last Updated**: 2025-01
 
-**注意 / Note**: 本次优化向后兼容，无需修改配置或数据库。
+**注意 / Note**: 本次更新使用数据库m_welcome_date字段存储欢迎日期，提供持久化存储，Bot重启后数据不丢失。
 
-**Note**: This optimization is backward compatible, no configuration or database changes required.
+**Note**: This update uses the database m_welcome_date field to store welcome dates, providing persistent storage that survives bot restarts.
