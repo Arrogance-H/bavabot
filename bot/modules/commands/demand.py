@@ -230,6 +230,24 @@ async def demand_command(_, msg):
                         sent_count += 1
                         LOGGER.info(f"[Demand] 群组通知已发送: {request.request_name} (ID: {request.download_id})")
                         
+                        # 发送私聊通知给点播用户
+                        try:
+                            private_notification_text = (
+                                f"🎉 **ME点播入库通知**\n\n"
+                                f"🎬 **影片名称**: {request.request_name}\n"
+                                f"📊 **点播状态**: 已入库 ✅\n"
+                                f"📺 影片已可在Emby中观看！\n\n"
+                                f"感谢您使用ME点播服务！"
+                            )
+                            
+                            await bot.send_message(
+                                chat_id=request.tg,
+                                text=private_notification_text
+                            )
+                            LOGGER.info(f"[Demand] 私聊通知已发送给用户 {request.tg}: {request.request_name}")
+                        except Exception as private_error:
+                            LOGGER.error(f"[Demand] 发送私聊通知失败 (用户: {request.tg}): {str(private_error)}")
+                        
                     except Exception as send_error:
                         failed_count += 1
                         LOGGER.error(f"[Demand] 发送群组通知失败 {request.download_id}: {str(send_error)}")
@@ -459,6 +477,24 @@ async def handle_demand_set_transferred(_, call):
                     text=notification_text
                 )
                 LOGGER.info(f"[Demand] 已入库通知已发送: {request.request_name} (ID: {request_id})")
+                
+                # 发送私聊通知给点播用户
+                try:
+                    private_notification_text = (
+                        f"🎉 **ME点播入库通知**\n\n"
+                        f"🎬 **影片名称**: {request.request_name}\n"
+                        f"📊 **点播状态**: 已入库 ✅\n"
+                        f"📺 影片已可在Emby中观看！\n\n"
+                        f"感谢您使用ME点播服务！"
+                    )
+                    
+                    await bot.send_message(
+                        chat_id=request.tg,
+                        text=private_notification_text
+                    )
+                    LOGGER.info(f"[Demand] 私聊通知已发送给用户 {request.tg}: {request.request_name}")
+                except Exception as private_error:
+                    LOGGER.error(f"[Demand] 发送私聊通知失败 (用户: {request.tg}): {str(private_error)}")
                 
         except Exception as notify_error:
             LOGGER.error(f"[Demand] 发送已入库通知失败 {request_id}: {str(notify_error)}")

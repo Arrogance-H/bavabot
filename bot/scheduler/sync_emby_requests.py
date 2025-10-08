@@ -123,6 +123,24 @@ async def check_emby_requests():
                                 LOGGER.info(f"[Emby Request Check] 群组通知已发送: {request.request_name}")
                             except Exception as e:
                                 LOGGER.error(f"[Emby Request Check] 发送群组通知失败: {str(e)}")
+                            
+                            # 发送私聊通知给点播用户
+                            try:
+                                private_notification_text = (
+                                    f"🎉 **ME点播入库通知**\n\n"
+                                    f"🎬 **影片名称**: {request.request_name}\n"
+                                    f"📊 **点播状态**: 已入库 ✅\n"
+                                    f"📺 影片已可在Emby中观看！\n\n"
+                                    f"感谢您使用ME点播服务！"
+                                )
+                                
+                                await bot.send_message(
+                                    chat_id=request.tg,
+                                    text=private_notification_text
+                                )
+                                LOGGER.info(f"[Emby Request Check] 私聊通知已发送给用户 {request.tg}: {request.request_name}")
+                            except Exception as e:
+                                LOGGER.error(f"[Emby Request Check] 发送私聊通知失败 (用户: {request.tg}): {str(e)}")
                         else:
                             LOGGER.error(f"[Emby Request Check] 更新状态失败: {request.download_id}")
                     else:
