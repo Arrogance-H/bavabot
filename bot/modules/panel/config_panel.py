@@ -12,6 +12,7 @@ from bot.func_helper.fix_bottons import config_preparation, close_it_ikb, back_c
 from bot.func_helper.msg_utils import deleteMessage, editMessage, callAnswer, callListen, sendPhoto, sendFile
 from bot.func_helper.scheduler import scheduler
 from bot.scheduler.sync_mp_download import sync_download_tasks
+from bot.sql_helper.sql_emby import get_all_emby, Emby
 
 
 @bot.on_message(filters.command('config', prefixes=prefixes) & admins_on_filter)
@@ -165,6 +166,7 @@ async def manage_m_users(_, call):
                              f"• 添加用户：`add 123456789`\n"
                              f"• 删除用户：`del 123456789`\n"
                              f"• 查看列表：`list`\n"
+                             f"• 同步数据库：`sync`\n"
                              f"取消点击 /cancel")
     if send is False:
         return
@@ -192,6 +194,30 @@ async def manage_m_users(_, call):
                                 f"👥【M尊享用户列表】\n\n`{m_users_str}`\n\n操作完成！",
                                 buttons=back_config_p_ikb)
                 LOGGER.info(f"【admin】：{call.from_user.id} - 查看M用户列表")
+            
+            elif cmd == 'sync':
+                # 从数据库同步M尊享用户
+                m_level_users = get_all_emby(Emby.lv == 'm')
+                if m_level_users:
+                    # 获取所有M级用户的TG ID
+                    synced_ids = [user.tg for user in m_level_users if user.tg]
+                    # 更新config.m_users，保留原有ID并添加新ID
+                    config.m_users = list(set(config.m_users + synced_ids))
+                    # 同步更新全局 m_users 变量
+                    m_users.clear()
+                    m_users.extend(config.m_users)
+                    save_config()
+                    m_users_str = ', '.join(map(str, config.m_users))
+                    await editMessage(call,
+                                    f"✅ 已从数据库同步 {len(synced_ids)} 个M尊享用户\n\n"
+                                    f"当前列表：\n`{m_users_str}`\n\n操作完成！",
+                                    buttons=back_config_p_ikb)
+                    LOGGER.info(f"【admin】：{call.from_user.id} - 从数据库同步M用户，共{len(synced_ids)}个")
+                else:
+                    await editMessage(call,
+                                    f"⚠️ 数据库中未找到M尊享用户\n\n"
+                                    f"当前列表：\n`{m_users_str}`",
+                                    buttons=back_config_p_ikb)
             
             elif cmd in ['add', 'del']:
                 if len(parts) < 2:
@@ -235,7 +261,7 @@ async def manage_m_users(_, call):
                                         f"⚠️ 用户 `{user_id}` 不在M尊享列表中",
                                         buttons=back_set_ikb('manage_m_users'))
             else:
-                raise ValueError("未知的命令，请使用 add、del 或 list")
+                raise ValueError("未知的命令，请使用 add、del、list 或 sync")
                 
         except (ValueError, IndexError) as e:
             await editMessage(call, 
@@ -243,7 +269,8 @@ async def manage_m_users(_, call):
                             f"正确格式：\n"
                             f"• `add 123456789`\n"
                             f"• `del 123456789`\n"
-                            f"• `list`",
+                            f"• `list`\n"
+                            f"• `sync`",
                             buttons=back_set_ikb('manage_m_users'))
 
 
