@@ -82,8 +82,8 @@ async def mzj_command(_, msg):
             await sendMessage(msg, 
                             f"🎉 **M尊享礼**\n\n"
                             f"· M尊享: [{user_name}](tg://user?id={user_id}) `{user_id}`\n"
-                            f"· 奖励类型: 🎫 ME注册资格（荣誉）\n"
-                            f"· 恭喜您获得本月荣誉奖励！")
+                            f"· 奖励类型: 🎫 1个ME注册资格\n"
+                            f"· 您可将注册资格赠予家人朋友！")
             LOGGER.info(f"【mzj】用户 {user_name}-{user_id} 随机领取了 ME注册资格（荣誉）")
         else:
             return await sendMessage(msg, '⚠️ 数据库操作失败，请稍后重试', timer=30)
