@@ -236,8 +236,7 @@ async def demand_command(_, msg):
                                 f"🎉 **ME点播入库通知**\n\n"
                                 f"🎬 **影片名称**: {request.request_name}\n"
                                 f"📊 **点播状态**: 已入库 ✅\n"
-                                f"📺 影片已可在Emby中观看！\n\n"
-                                f"感谢您使用ME点播服务！"
+                                f"📺 影片已可在Emby中观看！"
                             )
                             
                             await bot.send_message(
