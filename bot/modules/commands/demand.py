@@ -87,18 +87,23 @@ def format_demand_records(current_page=1, current_filter="all"):
             # 格式化北京时间显示
             time_str = format_beijing_time(record.create_at)
             
-            # 用户ID信息 - 记录点播用户的Telegram ID
-            user_info = f"用户ID: {record.tg}"
+            # 获取用户等级信息
+            user_info = sql_get_emby(tg=record.tg)
+            lv_dict = {
+                'm': 'M尊享',
+                'a': '白名单',
+                'b': '普通用户',
+                'c': '已禁用',
+                'd': '未注册'
+            }
+            user_level = lv_dict.get(user_info.lv, '未知') if user_info else '未注册'
+            user_name = user_info.name if user_info else f"用户{record.tg}"
             
-            # 状态显示
-            status_emoji = {
-                'pending': '⏳',
-                'downloading': '🔄', 
-                'completed': '✅'
-            }.get(record.download_state, '❓')
+            # 用户信息显示 - 包含用户名和等级
+            user_display = f"{user_name} | 🎖️{user_level}"
             
             text += f"#{global_idx} 🎬 {record.request_name}\n"
-            text += f"     {time_str} | {user_info} | {status_emoji}{record.download_state}\n"
+            text += f"     {time_str} | {user_display}\n"
             text += f"     请求ID: {record.download_id}\n\n"
 
         keyboard = get_demand_records_keyboard(current_page, total_pages, current_filter)
@@ -367,51 +372,24 @@ async def handle_demand_set_transferred(_, call):
             await editMessage(call, f"❌ 请求不存在: {request_id}")
             return
         
-        # 发送群组通知
+        # 发送私聊通知给点播用户
         try:
-            from bot import group, bot
+            from bot import bot
             
-            if group and len(group) > 0:
-                # 获取用户信息
-                user_info = sql_get_emby(tg=request.tg)
-                username = user_info.name if user_info else f"用户{request.tg}"
-                
-                # 构建通知消息
-                notification_text = (
-                    f"🎉 **ME点播入库通知**\n\n"
-                    f"🎬 **影片名称**: {request.request_name}\n"
-                    f"📊 **点播状态**: 已入库 📽️\n"
-                    f"👤 **ME用户**: {username}\n"
-                    f"📺 影片已可在Emby中观看！"
-                )
-                
-                # 发送群组通知
-                await bot.send_message(
-                    chat_id=group[0],
-                    text=notification_text
-                )
-                LOGGER.info(f"[Demand] 已入库通知已发送: {request.request_name} (ID: {request_id})")
-                
-                # 发送私聊通知给点播用户
-                try:
-                    private_notification_text = (
-                        f"🎉 **ME点播入库通知**\n\n"
-                        f"🎬 **影片名称**: {request.request_name}\n"
-                        f"📊 **点播状态**: 已入库 ✅\n"
-                        f"📺 影片已可在Emby中观看！\n\n"
-                        f"感谢您使用ME点播服务！"
-                    )
-                    
-                    await bot.send_message(
-                        chat_id=request.tg,
-                        text=private_notification_text
-                    )
-                    LOGGER.info(f"[Demand] 私聊通知已发送给用户 {request.tg}: {request.request_name}")
-                except Exception as private_error:
-                    LOGGER.error(f"[Demand] 发送私聊通知失败 (用户: {request.tg}): {str(private_error)}")
-                
-        except Exception as notify_error:
-            LOGGER.error(f"[Demand] 发送已入库通知失败 {request_id}: {str(notify_error)}")
+            private_notification_text = (
+                f"🎉 **ME点播入库通知**\n\n"
+                f"🎬 **影片名称**: {request.request_name}\n"
+                f"📺 影片已可在Emby中观看！\n\n"
+                f"祝您观影愉快😀！"
+            )
+            
+            await bot.send_message(
+                chat_id=request.tg,
+                text=private_notification_text
+            )
+            LOGGER.info(f"[Demand] 私聊通知已发送给用户 {request.tg}: {request.request_name}")
+        except Exception as private_error:
+            LOGGER.error(f"[Demand] 发送私聊通知失败 (用户: {request.tg}): {str(private_error)}")
         
         # 删除请求记录
         success = sql_delete_request_record(request_id)
