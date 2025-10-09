@@ -380,21 +380,10 @@ async def handle_demand_set_transferred(_, call):
             user_info = sql_get_emby(tg=request.tg)
             username = user_info.name if user_info else f"用户{request.tg}"
             
-            # 获取用户等级信息
-            lv_dict = {
-                'm': 'M尊享',
-                'a': '白名单',
-                'b': '普通用户',
-                'c': '已禁用',
-                'd': '未注册'
-            }
-            user_level = lv_dict.get(user_info.lv, '未知') if user_info else '未注册'
-            
             private_notification_text = (
                 f"🎉 **ME点播入库通知**\n\n"
                 f"🎬 **影片名称**: {request.request_name}\n"
                 f"👤 **ME用户**: {username}\n"
-                f"🎖️ **用户等级**: {user_level}\n"
                 f"📺 影片已可在Emby中观看！\n\n"
                 f"感谢您使用ME点播服务！"
             )
@@ -403,7 +392,7 @@ async def handle_demand_set_transferred(_, call):
                 chat_id=request.tg,
                 text=private_notification_text
             )
-            LOGGER.info(f"[Demand] 私聊通知已发送给用户 {request.tg}: {request.request_name} (等级: {user_level})")
+            LOGGER.info(f"[Demand] 私聊通知已发送给用户 {request.tg}: {request.request_name}")
         except Exception as private_error:
             LOGGER.error(f"[Demand] 发送私聊通知失败 (用户: {request.tg}): {str(private_error)}")
         
