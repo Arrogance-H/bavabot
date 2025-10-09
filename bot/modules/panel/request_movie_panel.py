@@ -311,30 +311,25 @@ def get_download_text(download_tasks, request_record):
     return text
 def get_request_record_text(request_record):
     text = '📈 点播记录\n'
+    
+    # 用户等级字典
+    lv_dict = {
+        'm': 'M尊享',
+        'a': '白名单',
+        'b': '普通用户',
+        'c': '已禁用',
+        'd': '未注册'
+    }
+    
     for index, item in enumerate(request_record, start=1):
-        progress = item.progress
-        progress_text = ''
-        if item.transfer_state is not None:
-            if item.transfer_state:
-                text += f"「{index}」：{item.request_name} \n状态：已入库 📽️\n"
-            else:
-                text += f"「{index}」：{item.request_name} \n状态：入库失败 🚫\n"
+        # 获取用户等级信息
+        user_info = sql_get_emby(tg=item.tg)
+        if user_info and user_info.lv:
+            user_level = lv_dict.get(user_info.lv, '未知')
         else:
-            if progress is None:
-                progress_text = '未知'
-            else:
-                progress = round(progress, 1)
-                left_progress = '🟩' * int(progress/10)
-                right_progress = '⬜️' * (10 - int(progress // 10))
-                progress_text = f"{left_progress}{right_progress} {progress}%"
-            download_state_text = '正在排队'
-            if item.download_state == 'downloading':
-                download_state_text = '正在下载'
-            elif item.download_state == 'completed':
-                download_state_text = '已完成'
-            elif item.download_state == 'failed':
-                download_state_text = '下载失败'
-            text += f"「{index}」：{item.request_name} \n状态：{download_state_text} {progress_text}\n 剩余时间：{item.left_time}\n"
+            user_level = '未知'
+        
+        text += f"「{index}」：{item.request_name} \n用户等级：{user_level}\n"
     return text
 
 # 添加新的回调处理函数

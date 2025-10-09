@@ -1333,11 +1333,22 @@ async def confirm_season_request(_, call):
                 parse_mode=enums.ParseMode.MARKDOWN
             )
             
+            # 获取用户等级信息
+            lv_dict = {
+                'm': 'M尊享',
+                'a': '白名单',
+                'b': '普通用户',
+                'c': '已禁用',
+                'd': '未注册'
+            }
+            user_level_name = lv_dict.get(emby_user.lv, '未知')
+            
             # 发送通知给管理员和owner
             admin_notification = (
                 f"📺 **ME点播新请求 - 电视剧**\n\n"
                 f"**用户**: [{call.from_user.first_name}](tg://user?id={call.from_user.id})\n"
                 f"**TG ID**: `{call.from_user.id}`\n"
+                f"**用户等级**: {user_level_name}\n"
                 f"**剧集**: {tv_title}\n"
                 f"**季数**: 第{season_number}季 ({selected_season.get('episode_count', '未知')}集)\n"
                 f"**原名**: {selected_item.get('original_title', '未知')}\n"
@@ -1476,11 +1487,22 @@ async def confirm_me_request(_, call):
                 parse_mode=enums.ParseMode.MARKDOWN
             )
             
+            # 获取用户等级信息
+            lv_dict = {
+                'm': 'M尊享',
+                'a': '白名单',
+                'b': '普通用户',
+                'c': '已禁用',
+                'd': '未注册'
+            }
+            user_level_name = lv_dict.get(emby_user.lv, '未知')
+            
             # 发送通知给管理员和owner
             admin_notification = (
                 f"🎬 **ME点播新请求**\n\n"
                 f"**用户**: [{call.from_user.first_name}](tg://user?id={call.from_user.id})\n"
                 f"**TG ID**: `{call.from_user.id}`\n"
+                f"**用户等级**: {user_level_name}\n"
                 f"**影片**: {request_title}\n"
                 f"**原名**: {selected_item.get('original_title', '未知')}\n"
                 f"**类型**: {selected_item.get('media_type_cn', '未知')}\n"
