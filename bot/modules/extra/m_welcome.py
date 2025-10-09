@@ -2,11 +2,12 @@
 M尊享用户欢迎功能
 当M等级用户在群组中发言时自动发送欢迎消息（每天仅一次）
 使用配置文件中的m_users列表确定用户身份
+使用配置文件中的m_welcome_exclude列表排除不需要欢迎的用户
 使用数据库m_welcome_date字段记录欢迎日期
 """
 import datetime
 import random
-from bot import bot, group, m_users, LOGGER
+from bot import bot, group, m_users, m_welcome_exclude, LOGGER
 from pyrogram import filters
 from bot.schemas import Yulv
 from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby
@@ -19,6 +20,7 @@ async def welcome_m_user(_, msg):
     - 使用 group=1 确保在其他handler之后执行
     - 使用 filters.text 仅处理文本消息，提高性能
     - 使用配置文件m_users列表确定用户身份
+    - 使用配置文件m_welcome_exclude列表排除不需要欢迎的用户
     - 使用数据库m_welcome_date字段记录每日欢迎
     """
     # 只处理真实用户
@@ -29,6 +31,11 @@ async def welcome_m_user(_, msg):
     
     # 检查用户是否在M尊享列表中
     if user_id not in m_users:
+        return
+    
+    # 检查用户是否在排除列表中
+    if user_id in m_welcome_exclude:
+        LOGGER.debug(f"【M尊享欢迎】- 用户 {msg.from_user.first_name} (ID: {user_id}) 在排除列表中，跳过欢迎")
         return
     
     # 从数据库获取用户信息

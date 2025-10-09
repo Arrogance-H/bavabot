@@ -4,7 +4,7 @@
 部分目前有 导出日志，更改探针，更改emby线路，设置购买按钮
 
 """
-from bot import bot, prefixes, bot_photo, Now, LOGGER, config, save_config, _open, auto_update, moviepilot, sakura_b, m_users
+from bot import bot, prefixes, bot_photo, Now, LOGGER, config, save_config, _open, auto_update, moviepilot, sakura_b, m_users, m_welcome_exclude
 from pyrogram import filters
 
 from bot.func_helper.filters import admins_on_filter
@@ -272,6 +272,111 @@ async def manage_m_users(_, call):
                             f"• `list`\n"
                             f"• `sync`",
                             buttons=back_set_ikb('manage_m_users'))
+
+
+# 管理M尊享欢迎排除列表
+@bot.on_callback_query(filters.regex('manage_m_welcome_exclude') & admins_on_filter)
+async def manage_m_welcome_exclude(_, call):
+    """管理M尊享欢迎排除列表"""
+    await callAnswer(call, '🚫 管理M欢迎排除列表')
+    
+    # 确保 m_welcome_exclude 已初始化为列表
+    if config.m_welcome_exclude is None:
+        config.m_welcome_exclude = []
+        save_config()
+    
+    # 显示当前排除列表
+    exclude_list = config.m_welcome_exclude if config.m_welcome_exclude else []
+    exclude_str = ', '.join(map(str, exclude_list)) if exclude_list else '无'
+    
+    send = await editMessage(call,
+                             f"🚫【管理M尊享欢迎排除列表】\n\n"
+                             f"当前排除列表：\n`{exclude_str}`\n\n"
+                             f"在排除列表中的用户将不会收到欢迎消息\n\n"
+                             f"请输入要添加或删除的用户ID：\n"
+                             f"• 添加用户：`add 123456789`\n"
+                             f"• 删除用户：`del 123456789`\n"
+                             f"• 查看列表：`list`\n"
+                             f"取消点击 /cancel")
+    if send is False:
+        return
+
+    txt = await callListen(call, 120, buttons=back_set_ikb('manage_m_welcome_exclude'))
+    if txt is False:
+        return
+
+    if txt.text == '/cancel':
+        await txt.delete()
+        await editMessage(call, '__您已经取消输入__ **会话已结束！**', buttons=back_set_ikb('manage_m_welcome_exclude'))
+    else:
+        await txt.delete()
+        try:
+            parts = txt.text.strip().split()
+            if len(parts) < 1:
+                raise ValueError("无效的命令格式")
+            
+            cmd = parts[0].lower()
+            
+            if cmd == 'list':
+                # 显示当前列表
+                exclude_str = ', '.join(map(str, config.m_welcome_exclude)) if config.m_welcome_exclude else '无'
+                await editMessage(call, 
+                                f"🚫【M尊享欢迎排除列表】\n\n`{exclude_str}`\n\n操作完成！",
+                                buttons=back_config_p_ikb)
+                LOGGER.info(f"【admin】：{call.from_user.id} - 查看M欢迎排除列表")
+            
+            elif cmd in ['add', 'del']:
+                if len(parts) < 2:
+                    raise ValueError("请提供用户ID")
+                
+                user_id = int(parts[1])
+                
+                if cmd == 'add':
+                    if user_id not in config.m_welcome_exclude:
+                        config.m_welcome_exclude.append(user_id)
+                        # 同步更新全局 m_welcome_exclude 变量
+                        m_welcome_exclude.clear()
+                        m_welcome_exclude.extend(config.m_welcome_exclude)
+                        save_config()
+                        exclude_str = ', '.join(map(str, config.m_welcome_exclude))
+                        await editMessage(call,
+                                        f"✅ 已添加用户 `{user_id}` 到M欢迎排除列表\n\n"
+                                        f"当前列表：\n`{exclude_str}`\n\n操作完成！",
+                                        buttons=back_config_p_ikb)
+                        LOGGER.info(f"【admin】：{call.from_user.id} - 添加用户 {user_id} 到M欢迎排除列表")
+                    else:
+                        await editMessage(call,
+                                        f"⚠️ 用户 `{user_id}` 已在M欢迎排除列表中",
+                                        buttons=back_set_ikb('manage_m_welcome_exclude'))
+                
+                elif cmd == 'del':
+                    if user_id in config.m_welcome_exclude:
+                        config.m_welcome_exclude.remove(user_id)
+                        # 同步更新全局 m_welcome_exclude 变量
+                        m_welcome_exclude.clear()
+                        m_welcome_exclude.extend(config.m_welcome_exclude)
+                        save_config()
+                        exclude_str = ', '.join(map(str, config.m_welcome_exclude)) if config.m_welcome_exclude else '无'
+                        await editMessage(call,
+                                        f"✅ 已从M欢迎排除列表移除用户 `{user_id}`\n\n"
+                                        f"当前列表：\n`{exclude_str}`\n\n操作完成！",
+                                        buttons=back_config_p_ikb)
+                        LOGGER.info(f"【admin】：{call.from_user.id} - 从M欢迎排除列表移除用户 {user_id}")
+                    else:
+                        await editMessage(call,
+                                        f"⚠️ 用户 `{user_id}` 不在M欢迎排除列表中",
+                                        buttons=back_set_ikb('manage_m_welcome_exclude'))
+            else:
+                raise ValueError("未知的命令，请使用 add、del 或 list")
+                
+        except (ValueError, IndexError) as e:
+            await editMessage(call, 
+                            f"❌ 格式错误：{str(e)}\n\n您的输入：`{txt.text}`\n\n"
+                            f"正确格式：\n"
+                            f"• `add 123456789`\n"
+                            f"• `del 123456789`\n"
+                            f"• `list`",
+                            buttons=back_set_ikb('manage_m_welcome_exclude'))
 
 
 # 设置需要显示/隐藏的库

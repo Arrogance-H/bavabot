@@ -67,6 +67,7 @@ tmdb = config.tmdb
 auto_update = config.auto_update
 api = config.api
 m_users = config.m_users
+m_welcome_exclude = config.m_welcome_exclude
 save_config()
 
 LOGGER.info("配置文件加载完毕")

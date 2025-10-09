@@ -200,10 +200,20 @@ class Config(BaseModel):
     api: API = Field(default_factory=API)
     # M尊享用户列表 (Telegram user IDs)
     m_users: List[int] = Field(default_factory=list)
+    # M尊享欢迎排除列表 (Telegram user IDs) - 在此列表中的用户不会收到欢迎消息
+    m_welcome_exclude: List[int] = Field(default_factory=list)
 
     @field_validator('m_users', mode='before')
     @classmethod
     def validate_m_users(cls, v):
+        """将 None 转换为空列表，以支持旧配置文件"""
+        if v is None:
+            return []
+        return v
+
+    @field_validator('m_welcome_exclude', mode='before')
+    @classmethod
+    def validate_m_welcome_exclude(cls, v):
         """将 None 转换为空列表，以支持旧配置文件"""
         if v is None:
             return []
