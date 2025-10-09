@@ -385,7 +385,7 @@ async def handle_demand_set_transferred(_, call):
                 f"🎬 **影片名称**: {request.request_name}\n"
                 f"👤 **ME用户**: {username}\n"
                 f"📺 影片已可在Emby中观看！\n\n"
-                f"感谢您使用ME点播服务！"
+                f"祝您观影愉快😀！"
             )
             
             await bot.send_message(
