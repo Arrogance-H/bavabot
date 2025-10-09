@@ -56,19 +56,21 @@ sync
 系统将：
 1. 查询数据库中所有 `lv='m'` 的用户
 2. 提取他们的Telegram ID
-3. 合并到 `config.m_users` 列表（保留原有ID）
-4. 更新全局 `m_users` 变量
-5. 保存到 `config.json` 文件
-6. 显示同步的用户数量
+3. **过滤掉在 `m_welcome_exclude` 排除列表中的用户** 🚫
+4. 合并到 `config.m_users` 列表（保留原有ID）
+5. 更新全局 `m_users` 变量
+6. 保存到 `config.json` 文件
+7. 显示同步的用户数量和跳过的用户数量
 
 **English:**
 The system will:
 1. Query all users with `lv='m'` from the database
 2. Extract their Telegram IDs
-3. Merge them into the `config.m_users` list (preserving existing IDs)
-4. Update the global `m_users` variable
-5. Save to `config.json` file
-6. Display the count of synced users
+3. **Filter out users in the `m_welcome_exclude` exclusion list** 🚫
+4. Merge them into the `config.m_users` list (preserving existing IDs)
+5. Update the global `m_users` variable
+6. Save to `config.json` file
+7. Display the count of synced users and skipped users
 
 ---
 
@@ -96,16 +98,28 @@ m_level_users = get_all_emby(Emby.lv == 'm')
 # 2. 提取TG ID
 synced_ids = [user.tg for user in m_level_users if user.tg]
 
-# 3. 合并到配置（去重）
-config.m_users = list(set(config.m_users + synced_ids))
+# 3. 过滤掉在排除列表中的用户
+synced_ids_filtered = [uid for uid in synced_ids if uid not in config.m_welcome_exclude]
 
-# 4. 同步全局变量
+# 4. 合并到配置（去重）
+config.m_users = list(set(config.m_users + synced_ids_filtered))
+
+# 5. 同步全局变量
 m_users.clear()
 m_users.extend(config.m_users)
 
-# 5. 保存配置
+# 6. 保存配置
 save_config()
 ```
+
+**注意 / Note:**
+- 🚫 在 `m_welcome_exclude`（欢迎排除列表）中的用户将不会被同步到 `m_users`
+- 这确保了管理员明确排除的用户不会在同步操作中被意外添加回来
+- 如果有被跳过的用户，系统会显示跳过的数量
+
+- 🚫 Users in `m_welcome_exclude` will not be synced to `m_users`
+- This ensures that explicitly excluded users are not accidentally added back during sync
+- If users are skipped, the system will display the count
 
 ### 数据流 / Data Flow
 
@@ -133,6 +147,7 @@ save_config()
 - ✅ **保持一致性** - 确保数据库和配置文件同步
 - ✅ **简单易用** - 只需输入 `sync` 命令
 - ✅ **安全可靠** - 保留原有数据，只添加新数据
+- ✅ **尊重排除列表** - 自动跳过在排除列表中的用户 🚫
 
 **English:**
 - ✅ **Prevents data loss** - Merges instead of overwriting existing IDs
@@ -140,6 +155,7 @@ save_config()
 - ✅ **Maintains consistency** - Ensures database and config file are in sync
 - ✅ **Easy to use** - Just enter the `sync` command
 - ✅ **Safe and reliable** - Preserves existing data, only adds new data
+- ✅ **Respects exclusion list** - Automatically skips users in exclusion list 🚫
 
 ---
 
@@ -177,6 +193,22 @@ save_config()
 
 ---
 
+### Q5: 如果用户在排除列表中，同步时会怎样？
+**A:** 在 `m_welcome_exclude` 排除列表中的用户将被自动跳过，不会添加到 `m_users`。系统会显示跳过的用户数量。例如：
+```
+✅ 已从数据库同步 3 个M尊享用户
+⚠️ 跳过 2 个在排除列表中的用户
+```
+
+### Q5: What happens if a user is in the exclusion list during sync?
+**A:** Users in the `m_welcome_exclude` exclusion list will be automatically skipped and not added to `m_users`. The system will display the count of skipped users. For example:
+```
+✅ Synced 3 M-tier users from database
+⚠️ Skipped 2 users in exclusion list
+```
+
+---
+
 ## 文件修改 / Files Modified
 
 - `bot/modules/panel/config_panel.py`
@@ -195,6 +227,7 @@ save_config()
 ## 相关文档 / Related Documentation
 
 - [M_WELCOME_OPTIMIZATION.md](./M_WELCOME_OPTIMIZATION.md) - M尊享欢迎功能优化
+- [M_WELCOME_EXCLUDE_FEATURE.md](./M_WELCOME_EXCLUDE_FEATURE.md) - M尊享欢迎排除列表功能
 - [config_example.json](./config_example.json) - 配置文件示例
 
 ---

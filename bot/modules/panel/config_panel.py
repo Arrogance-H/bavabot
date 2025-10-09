@@ -201,18 +201,22 @@ async def manage_m_users(_, call):
                 if m_level_users:
                     # 获取所有M级用户的TG ID
                     synced_ids = [user.tg for user in m_level_users if user.tg]
-                    # 更新config.m_users，保留原有ID并添加新ID
-                    config.m_users = list(set(config.m_users + synced_ids))
+                    # 过滤掉在排除列表中的用户
+                    synced_ids_filtered = [uid for uid in synced_ids if uid not in config.m_welcome_exclude]
+                    excluded_count = len(synced_ids) - len(synced_ids_filtered)
+                    # 更新config.m_users，保留原有ID并添加新ID（排除已在排除列表中的用户）
+                    config.m_users = list(set(config.m_users + synced_ids_filtered))
                     # 同步更新全局 m_users 变量
                     m_users.clear()
                     m_users.extend(config.m_users)
                     save_config()
                     m_users_str = ', '.join(map(str, config.m_users))
-                    await editMessage(call,
-                                    f"✅ 已从数据库同步 {len(synced_ids)} 个M尊享用户\n\n"
-                                    f"当前列表：\n`{m_users_str}`\n\n操作完成！",
-                                    buttons=back_config_p_ikb)
-                    LOGGER.info(f"【admin】：{call.from_user.id} - 从数据库同步M用户，共{len(synced_ids)}个")
+                    msg = f"✅ 已从数据库同步 {len(synced_ids_filtered)} 个M尊享用户\n\n"
+                    if excluded_count > 0:
+                        msg += f"⚠️ 跳过 {excluded_count} 个在排除列表中的用户\n\n"
+                    msg += f"当前列表：\n`{m_users_str}`\n\n操作完成！"
+                    await editMessage(call, msg, buttons=back_config_p_ikb)
+                    LOGGER.info(f"【admin】：{call.from_user.id} - 从数据库同步M用户，共{len(synced_ids_filtered)}个，跳过{excluded_count}个排除用户")
                 else:
                     await editMessage(call,
                                     f"⚠️ 数据库中未找到M尊享用户\n\n"
