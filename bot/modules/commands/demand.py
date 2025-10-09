@@ -376,14 +376,9 @@ async def handle_demand_set_transferred(_, call):
         try:
             from bot import bot
             
-            # 获取用户信息
-            user_info = sql_get_emby(tg=request.tg)
-            username = user_info.name if user_info else f"用户{request.tg}"
-            
             private_notification_text = (
                 f"🎉 **ME点播入库通知**\n\n"
                 f"🎬 **影片名称**: {request.request_name}\n"
-                f"👤 **ME用户**: {username}\n"
                 f"📺 影片已可在Emby中观看！\n\n"
                 f"祝您观影愉快😀！"
             )
