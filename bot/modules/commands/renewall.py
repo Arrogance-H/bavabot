@@ -12,6 +12,7 @@ from bot import bot, prefixes, bot_photo, LOGGER, sakura_b
 from bot.func_helper.msg_utils import sendMessage, deleteMessage, ask_return
 from bot.func_helper.filters import admins_on_filter
 from bot.sql_helper.sql_emby import get_all_emby, Emby, sql_update_embys, sql_clear_emby_iv
+from sqlalchemy import or_
 
 
 @bot.on_message(filters.command('renewall', prefixes) & admins_on_filter)
@@ -65,7 +66,7 @@ async def coins_all(_, msg):
                                  f"🔔 **使用格式：**/coinsall [+/-数量]\n\n  给所有未封禁emby [+/- {sakura_b}]", timer=60)
     send = await bot.send_photo(msg.chat.id, photo=bot_photo,
                                 caption=f"⚡【{sakura_b}任务】\n  **正在开启派送{sakura_b}中...请稍后**")
-    rst = get_all_emby(Emby.lv == 'b')
+    rst = get_all_emby(or_(Emby.lv == 'b', Emby.lv == 'a', Emby.lv == 'm'))
     if rst is None:
         LOGGER.info(
             f"【{sakura_b}任务】 -{msg.from_user.first_name}({msg.from_user.id}) 没有检测到任何emby账户，结束")
