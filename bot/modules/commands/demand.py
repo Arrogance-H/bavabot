@@ -7,7 +7,7 @@ demand - 查看和管理ME点播请求，支持状态编辑
 
 from pyrogram import filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from bot import bot, prefixes, LOGGER
+from bot import bot, prefixes, LOGGER, sakura_b
 from bot.func_helper.filters import admins_filter
 from bot.func_helper.msg_utils import sendMessage, deleteMessage, editMessage, callAnswer, callListen
 from bot.sql_helper.sql_request_record import (
@@ -17,7 +17,7 @@ from bot.sql_helper.sql_request_record import (
     sql_update_request_status,
     sql_get_request_record_by_download_id
 )
-from bot.sql_helper.sql_emby import sql_get_emby
+from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby
 import pytz
 import math
 
@@ -41,6 +41,190 @@ def format_beijing_time(utc_time):
         return beijing_time.strftime('%m-%d %H:%M')
     except:
         return "未知时间"
+
+
+def get_user_demand_statistics():
+    """获取按用户分组的点播统计"""
+    try:
+        all_records, _, _, _ = sql_get_all_request_records(page=1, limit=1000)
+        me_records = [r for r in all_records if r.download_id.startswith('ME')]
+        
+        # 按用户分组统计
+        user_stats = {}
+        for record in me_records:
+            tg_id = record.tg
+            if tg_id not in user_stats:
+                user_stats[tg_id] = {
+                    'count': 0,
+                    'records': []
+                }
+            user_stats[tg_id]['count'] += 1
+            user_stats[tg_id]['records'].append(record)
+        
+        return user_stats
+    except Exception as e:
+        LOGGER.error(f"获取用户点播统计失败: {str(e)}")
+        return {}
+
+
+def format_user_list(current_page=1):
+    """格式化用户列表显示"""
+    try:
+        user_stats = get_user_demand_statistics()
+        
+        if not user_stats:
+            text = "📋 暂无点播用户记录"
+            keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("❌ 取消", callback_data="closeit")]])
+            return text, keyboard
+        
+        # 按点播数量排序
+        sorted_users = sorted(user_stats.items(), key=lambda x: x[1]['count'], reverse=True)
+        
+        total_users = len(sorted_users)
+        total_pages = max(1, math.ceil(total_users / RECORDS_PER_PAGE))
+        
+        if current_page > total_pages:
+            current_page = total_pages
+        if current_page < 1:
+            current_page = 1
+        
+        start_idx = (current_page - 1) * RECORDS_PER_PAGE
+        end_idx = start_idx + RECORDS_PER_PAGE
+        page_users = sorted_users[start_idx:end_idx]
+        
+        text = f"📊 点播用户统计 (第{current_page}/{total_pages}页，共{total_users}位用户)\n\n"
+        
+        keyboard_buttons = []
+        for tg_id, stats in page_users:
+            user_info = sql_get_emby(tg=tg_id)
+            lv_dict = {
+                'm': 'M尊享',
+                'a': '白名单',
+                'b': '普通用户',
+                'c': '已禁用',
+                'd': '未注册'
+            }
+            user_level = lv_dict.get(user_info.lv, '未知') if user_info else '未注册'
+            user_name = user_info.name if user_info else f"用户{tg_id}"
+            
+            text += f"👤 {user_name} | 🎖️{user_level}\n"
+            text += f"   📊 {stats['count']}条点播记录\n\n"
+            
+            # 添加按钮查看该用户的详细记录
+            keyboard_buttons.append([InlineKeyboardButton(
+                f"{user_name} ({stats['count']}条)",
+                callback_data=f"demand_user_{tg_id}_1"
+            )])
+        
+        # 分页按钮
+        page_row = []
+        if current_page > 1:
+            page_row.append(InlineKeyboardButton("⬅️ 上页", callback_data=f"demand_userlist_{current_page-1}"))
+        if current_page < total_pages:
+            page_row.append(InlineKeyboardButton("下页 ➡️", callback_data=f"demand_userlist_{current_page+1}"))
+        
+        if page_row:
+            keyboard_buttons.append(page_row)
+        
+        # 返回按钮
+        keyboard_buttons.append([
+            InlineKeyboardButton("🔙 返回全部记录", callback_data="demand_refresh_all"),
+            InlineKeyboardButton("❌ 取消", callback_data="closeit")
+        ])
+        
+        keyboard = InlineKeyboardMarkup(keyboard_buttons)
+        return text, keyboard
+        
+    except Exception as e:
+        LOGGER.error(f"格式化用户列表失败: {str(e)}")
+        return "❌ 获取用户列表失败", None
+
+
+def format_user_demands(tg_id, current_page=1):
+    """格式化单个用户的点播记录"""
+    try:
+        all_records, _, _, _ = sql_get_all_request_records(page=1, limit=1000)
+        user_records = [r for r in all_records if r.download_id.startswith('ME') and r.tg == tg_id]
+        
+        if not user_records:
+            text = "📋 该用户暂无点播记录"
+            keyboard = InlineKeyboardMarkup([[
+                InlineKeyboardButton("🔙 返回用户列表", callback_data="demand_view_by_user"),
+                InlineKeyboardButton("❌ 取消", callback_data="closeit")
+            ]])
+            return text, keyboard
+        
+        # 按时间排序
+        user_records.sort(key=lambda x: x.create_at)
+        
+        total_records = len(user_records)
+        total_pages = max(1, math.ceil(total_records / RECORDS_PER_PAGE))
+        
+        if current_page > total_pages:
+            current_page = total_pages
+        if current_page < 1:
+            current_page = 1
+        
+        start_idx = (current_page - 1) * RECORDS_PER_PAGE
+        end_idx = start_idx + RECORDS_PER_PAGE
+        page_records = user_records[start_idx:end_idx]
+        
+        # 获取用户信息
+        user_info = sql_get_emby(tg=tg_id)
+        lv_dict = {
+            'm': 'M尊享',
+            'a': '白名单',
+            'b': '普通用户',
+            'c': '已禁用',
+            'd': '未注册'
+        }
+        user_level = lv_dict.get(user_info.lv, '未知') if user_info else '未注册'
+        user_name = user_info.name if user_info else f"用户{tg_id}"
+        
+        text = f"👤 {user_name} | 🎖️{user_level}\n"
+        text += f"📊 共{total_records}条点播记录 (第{current_page}/{total_pages}页)\n\n"
+        
+        for idx, record in enumerate(page_records):
+            global_idx = start_idx + idx + 1
+            time_str = format_beijing_time(record.create_at)
+            
+            status_dict = {
+                'pending': '⏳ 待处理',
+                'downloading': '🔄 处理中',
+                'completed': '✅ 已入库',
+                'playable': '📽️ 可播放'
+            }
+            status = status_dict.get(record.download_state, '❓ 未知')
+            
+            text += f"#{global_idx} 🎬 {record.request_name}\n"
+            text += f"     {time_str} | {status}\n"
+            text += f"     请求ID: {record.download_id}\n\n"
+        
+        # 键盘
+        keyboard_buttons = []
+        
+        # 分页按钮
+        page_row = []
+        if current_page > 1:
+            page_row.append(InlineKeyboardButton("⬅️ 上页", callback_data=f"demand_user_{tg_id}_{current_page-1}"))
+        if current_page < total_pages:
+            page_row.append(InlineKeyboardButton("下页 ➡️", callback_data=f"demand_user_{tg_id}_{current_page+1}"))
+        
+        if page_row:
+            keyboard_buttons.append(page_row)
+        
+        # 返回按钮
+        keyboard_buttons.append([
+            InlineKeyboardButton("🔙 返回用户列表", callback_data="demand_view_by_user"),
+            InlineKeyboardButton("❌ 取消", callback_data="closeit")
+        ])
+        
+        keyboard = InlineKeyboardMarkup(keyboard_buttons)
+        return text, keyboard
+        
+    except Exception as e:
+        LOGGER.error(f"格式化用户点播记录失败: {str(e)}")
+        return "❌ 获取用户记录失败", None
 
 
 def format_demand_records(current_page=1, current_filter="all"):
@@ -122,17 +306,25 @@ def get_demand_records_keyboard(current_page, total_pages, current_filter="all")
     filter_buttons = [
         ("📋 全部", "all"),
         ("⏳ 待处理", "pending"),
-        ("✅ 已入库", "completed")
+        ("✅ 已入库", "completed"),
+        ("📽️ 可播放", "playable")
     ]
     
-    # 筛选按钮行
-    filter_row = []
-    for text, filter_type in filter_buttons:
+    # 筛选按钮行（分两行显示）
+    filter_row1 = []
+    filter_row2 = []
+    for idx, (text, filter_type) in enumerate(filter_buttons):
         callback_data = f"demand_filter_{filter_type}"
         if filter_type == current_filter:
             text = f"• {text} •"  # 当前选中的筛选项
-        filter_row.append(InlineKeyboardButton(text, callback_data=callback_data))
-    keyboard.append(filter_row)
+        button = InlineKeyboardButton(text, callback_data=callback_data)
+        if idx < 2:
+            filter_row1.append(button)
+        else:
+            filter_row2.append(button)
+    
+    keyboard.append(filter_row1)
+    keyboard.append(filter_row2)
     
     # 分页按钮行
     page_row = []
@@ -145,12 +337,18 @@ def get_demand_records_keyboard(current_page, total_pages, current_filter="all")
     if page_row:
         keyboard.append(page_row)
     
-    # 刷新和编辑状态按钮行 - 合并到同一行
+    # 刷新和编辑状态按钮行
     action_row = [
         InlineKeyboardButton("🔄 刷新", callback_data=f"demand_refresh_{current_filter}"),
         InlineKeyboardButton("📝 编辑状态", callback_data="demand_edit_status")
     ]
     keyboard.append(action_row)
+    
+    # 按用户查看按钮
+    user_view_row = [
+        InlineKeyboardButton("👥 按用户查看", callback_data="demand_view_by_user")
+    ]
+    keyboard.append(user_view_row)
     
     # 取消按钮行
     cancel_row = [
@@ -301,6 +499,9 @@ async def handle_demand_edit_status(_, call):
                 InlineKeyboardButton("⏳ 待处理", callback_data=f"demand_set_status_{selected_record.download_id}_pending")
             ],
             [
+                InlineKeyboardButton("📽️ 可播放(扣币)", callback_data=f"demand_set_playable_{selected_record.download_id}")
+            ],
+            [
                 InlineKeyboardButton("📽️ 已入库(删除)", callback_data=f"demand_set_transferred_{selected_record.download_id}")
             ],
             [
@@ -312,7 +513,8 @@ async def handle_demand_edit_status(_, call):
         current_status_text = {
             'pending': '⏳ 待处理',
             'downloading': '🔄 处理中', 
-            'completed': '✅ 已入库'
+            'completed': '✅ 已入库',
+            'playable': '📽️ 可播放'
         }.get(selected_record.download_state, '❓ 未知')
         
         status_text = (
@@ -328,6 +530,204 @@ async def handle_demand_edit_status(_, call):
     except Exception as e:
         LOGGER.error(f"处理状态编辑失败: {str(e)}")
         await callAnswer(call, "❌ 编辑状态失败", True)
+
+
+@bot.on_callback_query(filters.regex(r'^demand_set_playable_(.+)$') & admins_filter)
+async def handle_demand_set_playable(_, call):
+    """处理设置为可播放状态 - 扣除10 JOY币并通知用户"""
+    try:
+        request_id = call.matches[0].group(1)
+        
+        # 获取请求详情
+        request = sql_get_request_record_by_download_id(request_id)
+        
+        if not request:
+            await editMessage(call, f"❌ 请求不存在: {request_id}")
+            return
+        
+        # 获取用户信息
+        user_info = sql_get_emby(tg=request.tg)
+        
+        if not user_info:
+            await editMessage(call, f"❌ 用户不存在: {request.tg}")
+            return
+        
+        # 检查用户是否有足够的JOY币
+        current_coins = user_info.iv
+        if current_coins < 10:
+            await editMessage(call, 
+                f"❌ 用户{user_info.name}的{sakura_b}不足\n\n"
+                f"当前{sakura_b}: {current_coins}\n"
+                f"需要扣除: 10{sakura_b}\n\n"
+                f"是否仍要标记为可播放？",
+                buttons=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("✅ 确认标记", callback_data=f"demand_playable_force_{request_id}")],
+                    [InlineKeyboardButton("❌ 取消", callback_data="demand_edit_status_cancel")]
+                ])
+            )
+            return
+        
+        # 扣除10 JOY币
+        new_coins = current_coins - 10
+        success = sql_update_emby(Emby.tg == request.tg, iv=new_coins)
+        
+        if not success:
+            await editMessage(call, f"❌ 扣除{sakura_b}失败")
+            return
+        
+        # 更新状态为可播放
+        status_success = sql_update_request_status(request_id, 'playable')
+        
+        if not status_success:
+            # 如果状态更新失败，回退币扣除
+            sql_update_emby(Emby.tg == request.tg, iv=current_coins)
+            await editMessage(call, f"❌ 更新状态失败")
+            return
+        
+        # 发送私聊通知给点播用户
+        try:
+            from bot import bot
+            
+            private_notification_text = (
+                f"📽️ **点播可播放通知**\n\n"
+                f"🎬 **影片名称**: {request.request_name}\n"
+                f"📺 该影片已标记为可播放状态！\n\n"
+                f"💰 **扣费提醒**: 已扣除 10{sakura_b}\n"
+                f"💳 **当前余额**: {new_coins}{sakura_b}\n\n"
+                f"影片已可在Emby中观看，祝您观影愉快😀！"
+            )
+            
+            await bot.send_message(
+                chat_id=request.tg,
+                text=private_notification_text
+            )
+            LOGGER.info(f"[Demand] 可播放通知已发送给用户 {request.tg}: {request.request_name}, 扣除10{sakura_b}")
+        except Exception as private_error:
+            LOGGER.error(f"[Demand] 发送可播放通知失败 (用户: {request.tg}): {str(private_error)}")
+        
+        # 返回主界面
+        text, keyboard = format_demand_records(1, "all")
+        await editMessage(call, text, buttons=keyboard)
+        await callAnswer(call, f"✅ 已标记为可播放，扣除10{sakura_b}")
+        LOGGER.info(f"管理员 {call.from_user.id} 标记点播请求为可播放: {request_id}, 用户: {request.tg}, 扣除10{sakura_b}")
+        
+    except Exception as e:
+        LOGGER.error(f"处理可播放状态失败: {str(e)}")
+        await callAnswer(call, "❌ 操作失败", True)
+
+
+@bot.on_callback_query(filters.regex(r'^demand_playable_force_(.+)$') & admins_filter)
+async def handle_demand_playable_force(_, call):
+    """强制标记为可播放（即使币不足）"""
+    try:
+        request_id = call.matches[0].group(1)
+        
+        # 获取请求详情
+        request = sql_get_request_record_by_download_id(request_id)
+        
+        if not request:
+            await editMessage(call, f"❌ 请求不存在: {request_id}")
+            return
+        
+        # 获取用户信息
+        user_info = sql_get_emby(tg=request.tg)
+        
+        if not user_info:
+            await editMessage(call, f"❌ 用户不存在: {request.tg}")
+            return
+        
+        # 扣除10 JOY币（可能为负）
+        current_coins = user_info.iv
+        new_coins = current_coins - 10
+        success = sql_update_emby(Emby.tg == request.tg, iv=new_coins)
+        
+        if not success:
+            await editMessage(call, f"❌ 扣除{sakura_b}失败")
+            return
+        
+        # 更新状态为可播放
+        status_success = sql_update_request_status(request_id, 'playable')
+        
+        if not status_success:
+            # 如果状态更新失败，回退币扣除
+            sql_update_emby(Emby.tg == request.tg, iv=current_coins)
+            await editMessage(call, f"❌ 更新状态失败")
+            return
+        
+        # 发送私聊通知给点播用户
+        try:
+            from bot import bot
+            
+            private_notification_text = (
+                f"📽️ **点播可播放通知**\n\n"
+                f"🎬 **影片名称**: {request.request_name}\n"
+                f"📺 该影片已标记为可播放状态！\n\n"
+                f"💰 **扣费提醒**: 已扣除 10{sakura_b}\n"
+                f"💳 **当前余额**: {new_coins}{sakura_b}\n\n"
+                f"影片已可在Emby中观看，祝您观影愉快😀！"
+            )
+            
+            await bot.send_message(
+                chat_id=request.tg,
+                text=private_notification_text
+            )
+            LOGGER.info(f"[Demand] 可播放通知已发送给用户 {request.tg}: {request.request_name}, 扣除10{sakura_b}")
+        except Exception as private_error:
+            LOGGER.error(f"[Demand] 发送可播放通知失败 (用户: {request.tg}): {str(private_error)}")
+        
+        # 返回主界面
+        text, keyboard = format_demand_records(1, "all")
+        await editMessage(call, text, buttons=keyboard)
+        await callAnswer(call, f"✅ 已标记为可播放，扣除10{sakura_b}")
+        LOGGER.info(f"管理员 {call.from_user.id} 强制标记点播请求为可播放: {request_id}, 用户: {request.tg}, 扣除10{sakura_b}")
+        
+    except Exception as e:
+        LOGGER.error(f"强制标记可播放状态失败: {str(e)}")
+        await callAnswer(call, "❌ 操作失败", True)
+
+
+@bot.on_callback_query(filters.regex(r'^demand_view_by_user$') & admins_filter)
+async def handle_demand_view_by_user(_, call):
+    """处理按用户查看请求"""
+    try:
+        text, keyboard = format_user_list(1)
+        await editMessage(call, text, buttons=keyboard)
+        await callAnswer(call, "👥 按用户查看")
+        
+    except Exception as e:
+        LOGGER.error(f"处理按用户查看失败: {str(e)}")
+        await callAnswer(call, "❌ 查看失败", True)
+
+
+@bot.on_callback_query(filters.regex(r'^demand_userlist_(\d+)$') & admins_filter)
+async def handle_demand_userlist_page(_, call):
+    """处理用户列表分页"""
+    try:
+        page = int(call.matches[0].group(1))
+        
+        text, keyboard = format_user_list(page)
+        await editMessage(call, text, buttons=keyboard)
+        await callAnswer(call, f"已切换到第{page}页")
+        
+    except Exception as e:
+        LOGGER.error(f"处理用户列表分页失败: {str(e)}")
+        await callAnswer(call, "❌ 分页失败", True)
+
+
+@bot.on_callback_query(filters.regex(r'^demand_user_(\d+)_(\d+)$') & admins_filter)
+async def handle_demand_user_records(_, call):
+    """处理查看单个用户的点播记录"""
+    try:
+        tg_id = int(call.matches[0].group(1))
+        page = int(call.matches[0].group(2))
+        
+        text, keyboard = format_user_demands(tg_id, page)
+        await editMessage(call, text, buttons=keyboard)
+        await callAnswer(call, "查看用户点播记录")
+        
+    except Exception as e:
+        LOGGER.error(f"处理用户点播记录失败: {str(e)}")
+        await callAnswer(call, "❌ 查看失败", True)
 
 
 @bot.on_callback_query(filters.regex(r'^demand_set_status_(.+)_(.+)$') & admins_filter)
