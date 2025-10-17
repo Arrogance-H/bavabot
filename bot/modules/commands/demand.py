@@ -127,9 +127,8 @@ def format_user_list(current_page=1):
         if page_row:
             keyboard_buttons.append(page_row)
         
-        # 返回按钮
+        # 取消按钮
         keyboard_buttons.append([
-            InlineKeyboardButton("🔙 返回全部记录", callback_data="demand_refresh_all"),
             InlineKeyboardButton("❌ 取消", callback_data="closeit")
         ])
         
@@ -368,27 +367,17 @@ def get_demand_records_keyboard(current_page, total_pages, current_filter="all")
 @bot.on_message(filters.command('demand', prefixes) & admins_filter)
 async def demand_command(_, msg):
     """
-    ME点播请求管理命令 - 仅限管理员和Owner使用
+    ME点播用户列表命令 - 仅限管理员和Owner使用
     
     权限限制：只有管理员(owner、admins)可以访问，群组成员无法使用
-    功能：查看和管理ME点播请求，记录用户ID，使用北京时间显示
+    功能：显示按用户分组的点播统计，点击用户可查看详细记录并编辑状态
     """
     try:
         await deleteMessage(msg)
         
-        # 解析命令参数
-        args = msg.command[1:] if len(msg.command) > 1 else []
-        
-        if len(args) == 0:
-            # 显示所有ME点播请求
-            text, keyboard = format_demand_records(1, "all")
-            await sendMessage(msg, text, send=True, chat_id=msg.chat.id, buttons=keyboard)
-            
-        elif args[0] in ['pending', 'completed']:
-            # 按状态筛选ME点播请求
-            filter_type = args[0]
-            text, keyboard = format_demand_records(1, filter_type)
-            await sendMessage(msg, text, send=True, chat_id=msg.chat.id, buttons=keyboard)
+        # 直接显示用户列表
+        text, keyboard = format_user_list(1)
+        await sendMessage(msg, text, send=True, chat_id=msg.chat.id, buttons=keyboard)
             
     except Exception as e:
         LOGGER.error(f"处理demand命令时出错 (用户: {msg.from_user.id}): {str(e)}")
