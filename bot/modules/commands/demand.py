@@ -24,6 +24,7 @@ import math
 # Beijing timezone for consistent time display
 BEIJING_TZ = pytz.timezone('Asia/Shanghai')
 RECORDS_PER_PAGE = 5
+COIN_DEDUCTION_PLAYABLE = 10  # JOY coins deducted when marking as playable
 
 
 def format_beijing_time(utc_time):
@@ -554,11 +555,11 @@ async def handle_demand_set_playable(_, call):
         
         # 检查用户是否有足够的JOY币
         current_coins = user_info.iv
-        if current_coins < 10:
+        if current_coins < COIN_DEDUCTION_PLAYABLE:
             await editMessage(call, 
                 f"❌ 用户{user_info.name}的{sakura_b}不足\n\n"
                 f"当前{sakura_b}: {current_coins}\n"
-                f"需要扣除: 10{sakura_b}\n\n"
+                f"需要扣除: {COIN_DEDUCTION_PLAYABLE}{sakura_b}\n\n"
                 f"是否仍要标记为可播放？",
                 buttons=InlineKeyboardMarkup([
                     [InlineKeyboardButton("✅ 确认标记", callback_data=f"demand_playable_force_{request_id}")],
@@ -567,8 +568,8 @@ async def handle_demand_set_playable(_, call):
             )
             return
         
-        # 扣除10 JOY币
-        new_coins = current_coins - 10
+        # 扣除JOY币
+        new_coins = current_coins - COIN_DEDUCTION_PLAYABLE
         success = sql_update_emby(Emby.tg == request.tg, iv=new_coins)
         
         if not success:
@@ -586,13 +587,11 @@ async def handle_demand_set_playable(_, call):
         
         # 发送私聊通知给点播用户
         try:
-            from bot import bot
-            
             private_notification_text = (
                 f"📽️ **点播可播放通知**\n\n"
                 f"🎬 **影片名称**: {request.request_name}\n"
                 f"📺 该影片已标记为可播放状态！\n\n"
-                f"💰 **扣费提醒**: 已扣除 10{sakura_b}\n"
+                f"💰 **扣费提醒**: 已扣除 {COIN_DEDUCTION_PLAYABLE}{sakura_b}\n"
                 f"💳 **当前余额**: {new_coins}{sakura_b}\n\n"
                 f"影片已可在Emby中观看，祝您观影愉快😀！"
             )
@@ -601,15 +600,15 @@ async def handle_demand_set_playable(_, call):
                 chat_id=request.tg,
                 text=private_notification_text
             )
-            LOGGER.info(f"[Demand] 可播放通知已发送给用户 {request.tg}: {request.request_name}, 扣除10{sakura_b}")
+            LOGGER.info(f"[Demand] 可播放通知已发送给用户 {request.tg}: {request.request_name}, 扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
         except Exception as private_error:
             LOGGER.error(f"[Demand] 发送可播放通知失败 (用户: {request.tg}): {str(private_error)}")
         
         # 返回主界面
         text, keyboard = format_demand_records(1, "all")
         await editMessage(call, text, buttons=keyboard)
-        await callAnswer(call, f"✅ 已标记为可播放，扣除10{sakura_b}")
-        LOGGER.info(f"管理员 {call.from_user.id} 标记点播请求为可播放: {request_id}, 用户: {request.tg}, 扣除10{sakura_b}")
+        await callAnswer(call, f"✅ 已标记为可播放，扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
+        LOGGER.info(f"管理员 {call.from_user.id} 标记点播请求为可播放: {request_id}, 用户: {request.tg}, 扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
         
     except Exception as e:
         LOGGER.error(f"处理可播放状态失败: {str(e)}")
@@ -636,9 +635,9 @@ async def handle_demand_playable_force(_, call):
             await editMessage(call, f"❌ 用户不存在: {request.tg}")
             return
         
-        # 扣除10 JOY币（可能为负）
+        # 扣除JOY币（可能为负）
         current_coins = user_info.iv
-        new_coins = current_coins - 10
+        new_coins = current_coins - COIN_DEDUCTION_PLAYABLE
         success = sql_update_emby(Emby.tg == request.tg, iv=new_coins)
         
         if not success:
@@ -656,13 +655,11 @@ async def handle_demand_playable_force(_, call):
         
         # 发送私聊通知给点播用户
         try:
-            from bot import bot
-            
             private_notification_text = (
                 f"📽️ **点播可播放通知**\n\n"
                 f"🎬 **影片名称**: {request.request_name}\n"
                 f"📺 该影片已标记为可播放状态！\n\n"
-                f"💰 **扣费提醒**: 已扣除 10{sakura_b}\n"
+                f"💰 **扣费提醒**: 已扣除 {COIN_DEDUCTION_PLAYABLE}{sakura_b}\n"
                 f"💳 **当前余额**: {new_coins}{sakura_b}\n\n"
                 f"影片已可在Emby中观看，祝您观影愉快😀！"
             )
@@ -671,15 +668,15 @@ async def handle_demand_playable_force(_, call):
                 chat_id=request.tg,
                 text=private_notification_text
             )
-            LOGGER.info(f"[Demand] 可播放通知已发送给用户 {request.tg}: {request.request_name}, 扣除10{sakura_b}")
+            LOGGER.info(f"[Demand] 可播放通知已发送给用户 {request.tg}: {request.request_name}, 扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
         except Exception as private_error:
             LOGGER.error(f"[Demand] 发送可播放通知失败 (用户: {request.tg}): {str(private_error)}")
         
         # 返回主界面
         text, keyboard = format_demand_records(1, "all")
         await editMessage(call, text, buttons=keyboard)
-        await callAnswer(call, f"✅ 已标记为可播放，扣除10{sakura_b}")
-        LOGGER.info(f"管理员 {call.from_user.id} 强制标记点播请求为可播放: {request_id}, 用户: {request.tg}, 扣除10{sakura_b}")
+        await callAnswer(call, f"✅ 已标记为可播放，扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
+        LOGGER.info(f"管理员 {call.from_user.id} 强制标记点播请求为可播放: {request_id}, 用户: {request.tg}, 扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
         
     except Exception as e:
         LOGGER.error(f"强制标记可播放状态失败: {str(e)}")
