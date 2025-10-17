@@ -7,7 +7,9 @@ ignore =
     # E203: whitespace before ':'
     E203,
     # W503: line break before binary operator (conflicts with black)
-    W503
+    W503,
+    # F401: module imported but unused (common in __init__.py files)
+    # F403: 'from module import *' used (common in main.py for module loading)
 
 # Exclude directories
 exclude =
@@ -26,7 +28,8 @@ exclude =
 
 # Per-file ignores (if needed)
 per-file-ignores =
-    __init__.py:F401
+    __init__.py:F401,F403
+    main.py:F401,F403
 
 # Count the number of occurrences of each error/warning code
 count = True
