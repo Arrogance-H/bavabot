@@ -145,7 +145,7 @@ def format_user_list(current_page=1):
         return "❌ 获取用户列表失败", None
 
 
-def format_user_demands(tg_id, current_page=1):
+async def format_user_demands(tg_id, current_page=1):
     """格式化单个用户的点播记录"""
     try:
         all_records, _, _, _ = sql_get_all_request_records(page=1, limit=1000)
@@ -184,7 +184,13 @@ def format_user_demands(tg_id, current_page=1):
             'd': '未注册'
         }
         user_level = lv_dict.get(user_info.lv, '未知') if user_info else '未注册'
-        user_name = user_info.name if user_info else f"用户{tg_id}"
+        
+        # 获取TG昵称
+        try:
+            tg_user = await bot.get_users(tg_id)
+            user_name = tg_user.first_name if tg_user.first_name else f"用户{tg_id}"
+        except:
+            user_name = f"用户{tg_id}"
         
         text = f"👤 {user_name} | 🎖️{user_level}\n"
         text += f"📊 共{total_records}条点播记录 (第{current_page}/{total_pages}页)\n\n"
@@ -729,7 +735,7 @@ async def handle_demand_user_records(_, call):
         tg_id = int(call.matches[0].group(1))
         page = int(call.matches[0].group(2))
         
-        text, keyboard = format_user_demands(tg_id, page)
+        text, keyboard = await format_user_demands(tg_id, page)
         await editMessage(call, text, buttons=keyboard)
         await callAnswer(call, "查看用户点播记录")
         
@@ -762,7 +768,7 @@ async def handle_demand_user_edit_status(_, call):
             
         if msg.text == '/cancel':
             await msg.delete()
-            text, keyboard = format_user_demands(tg_id, current_page)
+            text, keyboard = await format_user_demands(tg_id, current_page)
             await editMessage(call, text, buttons=keyboard)
             return
         
@@ -846,7 +852,7 @@ async def handle_demand_user_set_status(_, call):
         
         if success:
             # 返回用户视图
-            text, keyboard = format_user_demands(tg_id, current_page)
+            text, keyboard = await format_user_demands(tg_id, current_page)
             await editMessage(call, text, buttons=keyboard)
             
             status_name = {
@@ -937,7 +943,7 @@ async def handle_demand_user_set_playable(_, call):
             LOGGER.error(f"[Demand] 发送可播放通知失败 (用户: {request.tg}): {str(private_error)}")
         
         # 返回用户视图
-        text, keyboard = format_user_demands(tg_id, current_page)
+        text, keyboard = await format_user_demands(tg_id, current_page)
         await editMessage(call, text, buttons=keyboard)
         await callAnswer(call, f"✅ 已标记为可播放，扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
         LOGGER.info(f"管理员 {call.from_user.id} 在用户视图标记点播请求为可播放: {request_id}, 用户: {request.tg}, 扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
@@ -1007,7 +1013,7 @@ async def handle_demand_user_playable_force(_, call):
             LOGGER.error(f"[Demand] 发送可播放通知失败 (用户: {request.tg}): {str(private_error)}")
         
         # 返回用户视图
-        text, keyboard = format_user_demands(tg_id, current_page)
+        text, keyboard = await format_user_demands(tg_id, current_page)
         await editMessage(call, text, buttons=keyboard)
         await callAnswer(call, f"✅ 已标记为可播放，扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
         LOGGER.info(f"管理员 {call.from_user.id} 在用户视图强制标记点播请求为可播放: {request_id}, 用户: {request.tg}, 扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
@@ -1054,7 +1060,7 @@ async def handle_demand_user_set_transferred(_, call):
         
         if success:
             # 返回用户视图
-            text, keyboard = format_user_demands(tg_id, current_page)
+            text, keyboard = await format_user_demands(tg_id, current_page)
             await editMessage(call, text, buttons=keyboard)
             await callAnswer(call, "✅ 已标记为已入库并删除记录")
             LOGGER.info(f"管理员 {call.from_user.id} 在用户视图标记点播请求为已入库并删除: {request_id}")
@@ -1121,7 +1127,7 @@ async def handle_demand_user_delete_execute(_, call):
         
         if success:
             # 返回用户视图
-            text, keyboard = format_user_demands(tg_id, current_page)
+            text, keyboard = await format_user_demands(tg_id, current_page)
             await editMessage(call, text, buttons=keyboard)
             await callAnswer(call, "✅ 删除成功")
             LOGGER.info(f"管理员 {call.from_user.id} 在用户视图删除点播请求: {request_id}")
@@ -1140,7 +1146,7 @@ async def handle_demand_user_edit_cancel(_, call):
         tg_id = int(call.matches[0].group(1))
         current_page = int(call.matches[0].group(2))
         
-        text, keyboard = format_user_demands(tg_id, current_page)
+        text, keyboard = await format_user_demands(tg_id, current_page)
         await editMessage(call, text, buttons=keyboard)
         await callAnswer(call, "已取消编辑")
         
