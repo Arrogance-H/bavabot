@@ -609,11 +609,17 @@ async def handle_demand_set_playable(_, call):
         except Exception as private_error:
             LOGGER.error(f"[Demand] 发送可播放通知失败 (用户: {request.tg}): {str(private_error)}")
         
+        # 删除请求记录
+        delete_success = sql_delete_request_record(request_id)
+        
+        if not delete_success:
+            LOGGER.error(f"[Demand] 删除点播请求记录失败: {request_id}")
+        
         # 返回主界面
         text, keyboard = format_demand_records(1, "all")
         await editMessage(call, text, buttons=keyboard)
-        await callAnswer(call, f"✅ 已标记为可播放，扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
-        LOGGER.info(f"管理员 {call.from_user.id} 标记点播请求为可播放: {request_id}, 用户: {request.tg}, 扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
+        await callAnswer(call, f"✅ 已标记为可播放并删除记录，扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
+        LOGGER.info(f"管理员 {call.from_user.id} 标记点播请求为可播放并删除: {request_id}, 用户: {request.tg}, 扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
         
     except Exception as e:
         LOGGER.error(f"处理可播放状态失败: {str(e)}")
@@ -676,11 +682,17 @@ async def handle_demand_playable_force(_, call):
         except Exception as private_error:
             LOGGER.error(f"[Demand] 发送可播放通知失败 (用户: {request.tg}): {str(private_error)}")
         
+        # 删除请求记录
+        delete_success = sql_delete_request_record(request_id)
+        
+        if not delete_success:
+            LOGGER.error(f"[Demand] 删除点播请求记录失败: {request_id}")
+        
         # 返回主界面
         text, keyboard = format_demand_records(1, "all")
         await editMessage(call, text, buttons=keyboard)
-        await callAnswer(call, f"✅ 已标记为可播放，扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
-        LOGGER.info(f"管理员 {call.from_user.id} 强制标记点播请求为可播放: {request_id}, 用户: {request.tg}, 扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
+        await callAnswer(call, f"✅ 已标记为可播放并删除记录，扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
+        LOGGER.info(f"管理员 {call.from_user.id} 强制标记点播请求为可播放并删除: {request_id}, 用户: {request.tg}, 扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
         
     except Exception as e:
         LOGGER.error(f"强制标记可播放状态失败: {str(e)}")
@@ -942,11 +954,17 @@ async def handle_demand_user_set_playable(_, call):
         except Exception as private_error:
             LOGGER.error(f"[Demand] 发送可播放通知失败 (用户: {request.tg}): {str(private_error)}")
         
+        # 删除请求记录
+        delete_success = sql_delete_request_record(request_id)
+        
+        if not delete_success:
+            LOGGER.error(f"[Demand] 删除点播请求记录失败: {request_id}")
+        
         # 返回用户视图
         text, keyboard = await format_user_demands(tg_id, current_page)
         await editMessage(call, text, buttons=keyboard)
-        await callAnswer(call, f"✅ 已标记为可播放，扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
-        LOGGER.info(f"管理员 {call.from_user.id} 在用户视图标记点播请求为可播放: {request_id}, 用户: {request.tg}, 扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
+        await callAnswer(call, f"✅ 已标记为可播放并删除记录，扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
+        LOGGER.info(f"管理员 {call.from_user.id} 在用户视图标记点播请求为可播放并删除: {request_id}, 用户: {request.tg}, 扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
         
     except Exception as e:
         LOGGER.error(f"处理用户视图可播放状态失败: {str(e)}")
@@ -1012,11 +1030,17 @@ async def handle_demand_user_playable_force(_, call):
         except Exception as private_error:
             LOGGER.error(f"[Demand] 发送可播放通知失败 (用户: {request.tg}): {str(private_error)}")
         
+        # 删除请求记录
+        delete_success = sql_delete_request_record(request_id)
+        
+        if not delete_success:
+            LOGGER.error(f"[Demand] 删除点播请求记录失败: {request_id}")
+        
         # 返回用户视图
         text, keyboard = await format_user_demands(tg_id, current_page)
         await editMessage(call, text, buttons=keyboard)
-        await callAnswer(call, f"✅ 已标记为可播放，扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
-        LOGGER.info(f"管理员 {call.from_user.id} 在用户视图强制标记点播请求为可播放: {request_id}, 用户: {request.tg}, 扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
+        await callAnswer(call, f"✅ 已标记为可播放并删除记录，扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
+        LOGGER.info(f"管理员 {call.from_user.id} 在用户视图强制标记点播请求为可播放并删除: {request_id}, 用户: {request.tg}, 扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
         
     except Exception as e:
         LOGGER.error(f"强制标记可播放状态失败: {str(e)}")
