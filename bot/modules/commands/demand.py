@@ -593,12 +593,12 @@ async def handle_demand_set_playable(_, call):
         # 发送私聊通知给点播用户
         try:
             private_notification_text = (
-                f"📽️ **点播可播放通知**\n\n"
+                f"📽️ **点播惩罚通知**\n\n"
                 f"🎬 **影片名称**: {request.request_name}\n"
-                f"📺 该影片已标记为可播放状态！\n\n"
-                f"💰 **扣费提醒**: 已扣除 {COIN_DEDUCTION_PLAYABLE}{sakura_b}\n"
+                f"📺 该影片已可播放！\n\n"
+                f"💰 **惩罚**: 已扣除 {COIN_DEDUCTION_PLAYABLE}{sakura_b}\n"
                 f"💳 **当前余额**: {new_coins}{sakura_b}\n\n"
-                f"影片已可在Emby中观看，祝您观影愉快😀！"
+                f"下次注意哟，祝您观影愉快😀！"
             )
             
             await bot.send_message(
