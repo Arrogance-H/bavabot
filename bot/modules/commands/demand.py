@@ -27,6 +27,26 @@ RECORDS_PER_PAGE = 5
 COIN_DEDUCTION_PLAYABLE = 10  # JOY coins deducted when marking as playable
 
 
+async def batch_get_tg_users(tg_ids):
+    """批量获取TG用户信息的辅助函数"""
+    tg_users_map = {}
+    if not tg_ids:
+        return tg_users_map
+    
+    try:
+        tg_users = await bot.get_users(tg_ids)
+        # Handle both single user and list of users
+        if not isinstance(tg_users, list):
+            tg_users = [tg_users]
+        for tg_user in tg_users:
+            if tg_user:
+                tg_users_map[tg_user.id] = tg_user.first_name if tg_user.first_name else f"用户{tg_user.id}"
+    except Exception as e:
+        LOGGER.warning(f"批量获取TG用户信息失败: {str(e)}")
+    
+    return tg_users_map
+
+
 def format_beijing_time(utc_time):
     """Convert UTC time to Beijing time for display"""
     if not utc_time:
@@ -95,17 +115,7 @@ async def format_user_list(current_page=1):
         
         # 批量获取TG用户信息以提升性能
         tg_ids = [tg_id for tg_id, _ in page_users]
-        tg_users_map = {}
-        try:
-            tg_users = await bot.get_users(tg_ids)
-            # Handle both single user and list of users
-            if not isinstance(tg_users, list):
-                tg_users = [tg_users]
-            for tg_user in tg_users:
-                if tg_user:
-                    tg_users_map[tg_user.id] = tg_user.first_name if tg_user.first_name else f"用户{tg_user.id}"
-        except Exception as e:
-            LOGGER.warning(f"批量获取TG用户信息失败: {str(e)}")
+        tg_users_map = await batch_get_tg_users(tg_ids)
         
         text = f"📊 点播用户统计 (第{current_page}/{total_pages}页，共{total_users}位用户)\n\n"
         
@@ -202,11 +212,8 @@ async def format_user_demands(tg_id, current_page=1):
         user_level = lv_dict.get(user_info.lv, '未知') if user_info else '未注册'
         
         # 获取TG昵称
-        try:
-            tg_user = await bot.get_users(tg_id)
-            user_name = tg_user.first_name if tg_user.first_name else f"用户{tg_id}"
-        except:
-            user_name = f"用户{tg_id}"
+        tg_users_map = await batch_get_tg_users([tg_id])
+        user_name = tg_users_map.get(tg_id, f"用户{tg_id}")
         
         text = f"👤 {user_name} | 🎖️{user_level}\n"
         text += f"📊 共{total_records}条点播记录 (第{current_page}/{total_pages}页)\n\n"
@@ -295,18 +302,8 @@ async def format_demand_records(current_page=1, current_filter="all"):
         page_records = records[start_idx:end_idx]
         
         # 批量获取TG用户信息以提升性能
-        unique_tg_ids = list(set(record.tg for record in page_records))
-        tg_users_map = {}
-        try:
-            tg_users = await bot.get_users(unique_tg_ids)
-            # Handle both single user and list of users
-            if not isinstance(tg_users, list):
-                tg_users = [tg_users]
-            for tg_user in tg_users:
-                if tg_user:
-                    tg_users_map[tg_user.id] = tg_user.first_name if tg_user.first_name else f"用户{tg_user.id}"
-        except Exception as e:
-            LOGGER.warning(f"批量获取TG用户信息失败: {str(e)}")
+        unique_tg_ids = list({record.tg for record in page_records})
+        tg_users_map = await batch_get_tg_users(unique_tg_ids)
         
         text = f"📋 ME点播请求记录 (第{current_page}/{total_pages}页，共{total_records}条)\n\n"
 
