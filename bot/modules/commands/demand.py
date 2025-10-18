@@ -27,6 +27,26 @@ RECORDS_PER_PAGE = 5
 COIN_DEDUCTION_PLAYABLE = 10  # JOY coins deducted when marking as playable
 
 
+async def batch_get_tg_users(tg_ids):
+    """批量获取TG用户信息的辅助函数"""
+    tg_users_map = {}
+    if not tg_ids:
+        return tg_users_map
+    
+    try:
+        tg_users = await bot.get_users(tg_ids)
+        # Handle both single user and list of users
+        if not isinstance(tg_users, list):
+            tg_users = [tg_users]
+        for tg_user in tg_users:
+            if tg_user:
+                tg_users_map[tg_user.id] = tg_user.first_name if tg_user.first_name else f"用户{tg_user.id}"
+    except Exception as e:
+        LOGGER.warning(f"批量获取TG用户信息失败: {str(e)}")
+    
+    return tg_users_map
+
+
 def format_beijing_time(utc_time):
     """Convert UTC time to Beijing time for display"""
     if not utc_time:
@@ -68,7 +88,7 @@ def get_user_demand_statistics():
         return {}
 
 
-def format_user_list(current_page=1):
+async def format_user_list(current_page=1):
     """格式化用户列表显示"""
     try:
         user_stats = get_user_demand_statistics()
@@ -93,6 +113,10 @@ def format_user_list(current_page=1):
         end_idx = start_idx + RECORDS_PER_PAGE
         page_users = sorted_users[start_idx:end_idx]
         
+        # 批量获取TG用户信息以提升性能
+        tg_ids = [tg_id for tg_id, _ in page_users]
+        tg_users_map = await batch_get_tg_users(tg_ids)
+        
         text = f"📊 点播用户统计 (第{current_page}/{total_pages}页，共{total_users}位用户)\n\n"
         
         keyboard_buttons = []
@@ -106,7 +130,9 @@ def format_user_list(current_page=1):
                 'd': '未注册'
             }
             user_level = lv_dict.get(user_info.lv, '未知') if user_info else '未注册'
-            user_name = user_info.name if user_info else f"用户{tg_id}"
+            
+            # 从批量获取的结果中获取TG昵称
+            user_name = tg_users_map.get(tg_id, f"用户{tg_id}")
             
             text += f"👤 {user_name} | 🎖️{user_level}\n"
             text += f"   📊 {stats['count']}条点播记录\n\n"
@@ -186,11 +212,8 @@ async def format_user_demands(tg_id, current_page=1):
         user_level = lv_dict.get(user_info.lv, '未知') if user_info else '未注册'
         
         # 获取TG昵称
-        try:
-            tg_user = await bot.get_users(tg_id)
-            user_name = tg_user.first_name if tg_user.first_name else f"用户{tg_id}"
-        except:
-            user_name = f"用户{tg_id}"
+        tg_users_map = await batch_get_tg_users([tg_id])
+        user_name = tg_users_map.get(tg_id, f"用户{tg_id}")
         
         text = f"👤 {user_name} | 🎖️{user_level}\n"
         text += f"📊 共{total_records}条点播记录 (第{current_page}/{total_pages}页)\n\n"
@@ -243,7 +266,7 @@ async def format_user_demands(tg_id, current_page=1):
         return "❌ 获取用户记录失败", None
 
 
-def format_demand_records(current_page=1, current_filter="all"):
+async def format_demand_records(current_page=1, current_filter="all"):
     """格式化ME点播请求记录显示"""
     try:
         # 获取记录 - 首先获取所有ME点播请求，然后在代码中处理分页
@@ -278,6 +301,10 @@ def format_demand_records(current_page=1, current_filter="all"):
         end_idx = start_idx + RECORDS_PER_PAGE
         page_records = records[start_idx:end_idx]
         
+        # 批量获取TG用户信息以提升性能
+        unique_tg_ids = list({record.tg for record in page_records})
+        tg_users_map = await batch_get_tg_users(unique_tg_ids)
+        
         text = f"📋 ME点播请求记录 (第{current_page}/{total_pages}页，共{total_records}条)\n\n"
 
         for idx, record in enumerate(page_records):
@@ -297,7 +324,9 @@ def format_demand_records(current_page=1, current_filter="all"):
                 'd': '未注册'
             }
             user_level = lv_dict.get(user_info.lv, '未知') if user_info else '未注册'
-            user_name = user_info.name if user_info else f"用户{record.tg}"
+            
+            # 从批量获取的结果中获取TG昵称
+            user_name = tg_users_map.get(record.tg, f"用户{record.tg}")
             
             # 用户信息显示 - 包含用户名和等级
             user_display = f"{user_name} | 🎖️{user_level}"
@@ -387,7 +416,7 @@ async def demand_command(_, msg):
         await deleteMessage(msg)
         
         # 直接显示用户列表
-        text, keyboard = format_user_list(1)
+        text, keyboard = await format_user_list(1)
         await sendMessage(msg, text, send=True, chat_id=msg.chat.id, buttons=keyboard)
             
     except Exception as e:
@@ -402,7 +431,7 @@ async def handle_demand_page(_, call):
         page = int(call.matches[0].group(1))
         filter_type = call.matches[0].group(2)
         
-        text, keyboard = format_demand_records(page, filter_type)
+        text, keyboard = await format_demand_records(page, filter_type)
         await editMessage(call, text, buttons=keyboard)
         await callAnswer(call, f"已切换到第{page}页")
         
@@ -417,7 +446,7 @@ async def handle_demand_filter(_, call):
     try:
         filter_type = call.matches[0].group(1)
         
-        text, keyboard = format_demand_records(1, filter_type)
+        text, keyboard = await format_demand_records(1, filter_type)
         await editMessage(call, text, buttons=keyboard)
         
         filter_names = {
@@ -438,7 +467,7 @@ async def handle_demand_refresh(_, call):
     try:
         filter_type = call.matches[0].group(1)
         
-        text, keyboard = format_demand_records(1, filter_type)
+        text, keyboard = await format_demand_records(1, filter_type)
         await editMessage(call, text, buttons=keyboard)
         await callAnswer(call, "🔄 已刷新")
         
@@ -468,7 +497,7 @@ async def handle_demand_edit_status(_, call):
             
         if msg.text == '/cancel':
             await msg.delete()
-            text, keyboard = format_demand_records(1, "all")
+            text, keyboard = await format_demand_records(1, "all")
             await editMessage(call, text, buttons=keyboard)
             return
         
@@ -616,7 +645,7 @@ async def handle_demand_set_playable(_, call):
             LOGGER.error(f"[Demand] 删除点播请求记录失败: {request_id}")
         
         # 返回主界面
-        text, keyboard = format_demand_records(1, "all")
+        text, keyboard = await format_demand_records(1, "all")
         await editMessage(call, text, buttons=keyboard)
         await callAnswer(call, f"✅ 已标记为可播放并删除记录，扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
         LOGGER.info(f"管理员 {call.from_user.id} 标记点播请求为可播放并删除: {request_id}, 用户: {request.tg}, 扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
@@ -689,7 +718,7 @@ async def handle_demand_playable_force(_, call):
             LOGGER.error(f"[Demand] 删除点播请求记录失败: {request_id}")
         
         # 返回主界面
-        text, keyboard = format_demand_records(1, "all")
+        text, keyboard = await format_demand_records(1, "all")
         await editMessage(call, text, buttons=keyboard)
         await callAnswer(call, f"✅ 已标记为可播放并删除记录，扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
         LOGGER.info(f"管理员 {call.from_user.id} 强制标记点播请求为可播放并删除: {request_id}, 用户: {request.tg}, 扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
@@ -703,7 +732,7 @@ async def handle_demand_playable_force(_, call):
 async def handle_demand_view_by_user(_, call):
     """处理按用户查看请求"""
     try:
-        text, keyboard = format_user_list(1)
+        text, keyboard = await format_user_list(1)
         await editMessage(call, text, buttons=keyboard)
         await callAnswer(call, "👥 按用户查看")
         
@@ -716,7 +745,7 @@ async def handle_demand_view_by_user(_, call):
 async def handle_demand_view_all(_, call):
     """处理查看所有点播请求"""
     try:
-        text, keyboard = format_demand_records(1, "all")
+        text, keyboard = await format_demand_records(1, "all")
         await editMessage(call, text, buttons=keyboard)
         await callAnswer(call, "📋 已切换到查看所有点播")
         
@@ -731,7 +760,7 @@ async def handle_demand_userlist_page(_, call):
     try:
         page = int(call.matches[0].group(1))
         
-        text, keyboard = format_user_list(page)
+        text, keyboard = await format_user_list(page)
         await editMessage(call, text, buttons=keyboard)
         await callAnswer(call, f"已切换到第{page}页")
         
@@ -1191,7 +1220,7 @@ async def handle_demand_set_status(_, call):
         
         if success:
             # 返回主界面
-            text, keyboard = format_demand_records(1, "all")
+            text, keyboard = await format_demand_records(1, "all")
             await editMessage(call, text, buttons=keyboard)
             
             status_name = {
@@ -1245,7 +1274,7 @@ async def handle_demand_set_transferred(_, call):
         
         if success:
             # 返回主界面
-            text, keyboard = format_demand_records(1, "all")
+            text, keyboard = await format_demand_records(1, "all")
             await editMessage(call, text, buttons=keyboard)
             await callAnswer(call, "✅ 已标记为已入库并删除记录")
             LOGGER.info(f"管理员 {call.from_user.id} 标记ME点播请求为已入库并删除: {request_id}")
@@ -1308,7 +1337,7 @@ async def handle_demand_delete_execute(_, call):
         
         if success:
             # 返回主界面
-            text, keyboard = format_demand_records(1, "all")
+            text, keyboard = await format_demand_records(1, "all")
             await editMessage(call, text, buttons=keyboard)
             await callAnswer(call, "✅ 删除成功")
             LOGGER.info(f"管理员 {call.from_user.id} 删除ME点播请求: {request_id}")
@@ -1324,7 +1353,7 @@ async def handle_demand_delete_execute(_, call):
 async def handle_demand_edit_status_cancel(_, call):
     """处理状态编辑取消请求"""
     try:
-        text, keyboard = format_demand_records(1, "all")
+        text, keyboard = await format_demand_records(1, "all")
         await editMessage(call, text, buttons=keyboard)
         await callAnswer(call, "已取消编辑")
         
