@@ -127,6 +127,11 @@ def format_user_list(current_page=1):
         if page_row:
             keyboard_buttons.append(page_row)
         
+        # 查看所有点播按钮
+        keyboard_buttons.append([
+            InlineKeyboardButton("📋 查看所有点播", callback_data="demand_view_all")
+        ])
+        
         # 取消按钮
         keyboard_buttons.append([
             InlineKeyboardButton("❌ 取消", callback_data="closeit")
@@ -140,7 +145,7 @@ def format_user_list(current_page=1):
         return "❌ 获取用户列表失败", None
 
 
-def format_user_demands(tg_id, current_page=1):
+async def format_user_demands(tg_id, current_page=1):
     """格式化单个用户的点播记录"""
     try:
         all_records, _, _, _ = sql_get_all_request_records(page=1, limit=1000)
@@ -179,7 +184,13 @@ def format_user_demands(tg_id, current_page=1):
             'd': '未注册'
         }
         user_level = lv_dict.get(user_info.lv, '未知') if user_info else '未注册'
-        user_name = user_info.name if user_info else f"用户{tg_id}"
+        
+        # 获取TG昵称
+        try:
+            tg_user = await bot.get_users(tg_id)
+            user_name = tg_user.first_name if tg_user.first_name else f"用户{tg_id}"
+        except:
+            user_name = f"用户{tg_id}"
         
         text = f"👤 {user_name} | 🎖️{user_level}\n"
         text += f"📊 共{total_records}条点播记录 (第{current_page}/{total_pages}页)\n\n"
@@ -582,12 +593,12 @@ async def handle_demand_set_playable(_, call):
         # 发送私聊通知给点播用户
         try:
             private_notification_text = (
-                f"📽️ **点播可播放通知**\n\n"
+                f"📽️ **点播惩罚通知**\n\n"
                 f"🎬 **影片名称**: {request.request_name}\n"
-                f"📺 该影片已标记为可播放状态！\n\n"
-                f"💰 **扣费提醒**: 已扣除 {COIN_DEDUCTION_PLAYABLE}{sakura_b}\n"
+                f"📺 该影片已可播放！\n\n"
+                f"💰 **惩罚**: 已扣除 {COIN_DEDUCTION_PLAYABLE}{sakura_b}\n"
                 f"💳 **当前余额**: {new_coins}{sakura_b}\n\n"
-                f"影片已可在Emby中观看，祝您观影愉快😀！"
+                f"下次注意哟，祝您观影愉快😀！"
             )
             
             await bot.send_message(
@@ -598,11 +609,17 @@ async def handle_demand_set_playable(_, call):
         except Exception as private_error:
             LOGGER.error(f"[Demand] 发送可播放通知失败 (用户: {request.tg}): {str(private_error)}")
         
+        # 删除请求记录
+        delete_success = sql_delete_request_record(request_id)
+        
+        if not delete_success:
+            LOGGER.error(f"[Demand] 删除点播请求记录失败: {request_id}")
+        
         # 返回主界面
         text, keyboard = format_demand_records(1, "all")
         await editMessage(call, text, buttons=keyboard)
-        await callAnswer(call, f"✅ 已标记为可播放，扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
-        LOGGER.info(f"管理员 {call.from_user.id} 标记点播请求为可播放: {request_id}, 用户: {request.tg}, 扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
+        await callAnswer(call, f"✅ 已标记为可播放并删除记录，扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
+        LOGGER.info(f"管理员 {call.from_user.id} 标记点播请求为可播放并删除: {request_id}, 用户: {request.tg}, 扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
         
     except Exception as e:
         LOGGER.error(f"处理可播放状态失败: {str(e)}")
@@ -665,11 +682,17 @@ async def handle_demand_playable_force(_, call):
         except Exception as private_error:
             LOGGER.error(f"[Demand] 发送可播放通知失败 (用户: {request.tg}): {str(private_error)}")
         
+        # 删除请求记录
+        delete_success = sql_delete_request_record(request_id)
+        
+        if not delete_success:
+            LOGGER.error(f"[Demand] 删除点播请求记录失败: {request_id}")
+        
         # 返回主界面
         text, keyboard = format_demand_records(1, "all")
         await editMessage(call, text, buttons=keyboard)
-        await callAnswer(call, f"✅ 已标记为可播放，扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
-        LOGGER.info(f"管理员 {call.from_user.id} 强制标记点播请求为可播放: {request_id}, 用户: {request.tg}, 扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
+        await callAnswer(call, f"✅ 已标记为可播放并删除记录，扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
+        LOGGER.info(f"管理员 {call.from_user.id} 强制标记点播请求为可播放并删除: {request_id}, 用户: {request.tg}, 扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
         
     except Exception as e:
         LOGGER.error(f"强制标记可播放状态失败: {str(e)}")
@@ -686,6 +709,19 @@ async def handle_demand_view_by_user(_, call):
         
     except Exception as e:
         LOGGER.error(f"处理按用户查看失败: {str(e)}")
+        await callAnswer(call, "❌ 查看失败", True)
+
+
+@bot.on_callback_query(filters.regex(r'^demand_view_all$') & admins_filter)
+async def handle_demand_view_all(_, call):
+    """处理查看所有点播请求"""
+    try:
+        text, keyboard = format_demand_records(1, "all")
+        await editMessage(call, text, buttons=keyboard)
+        await callAnswer(call, "📋 已切换到查看所有点播")
+        
+    except Exception as e:
+        LOGGER.error(f"处理查看所有点播失败: {str(e)}")
         await callAnswer(call, "❌ 查看失败", True)
 
 
@@ -711,7 +747,7 @@ async def handle_demand_user_records(_, call):
         tg_id = int(call.matches[0].group(1))
         page = int(call.matches[0].group(2))
         
-        text, keyboard = format_user_demands(tg_id, page)
+        text, keyboard = await format_user_demands(tg_id, page)
         await editMessage(call, text, buttons=keyboard)
         await callAnswer(call, "查看用户点播记录")
         
@@ -744,7 +780,7 @@ async def handle_demand_user_edit_status(_, call):
             
         if msg.text == '/cancel':
             await msg.delete()
-            text, keyboard = format_user_demands(tg_id, current_page)
+            text, keyboard = await format_user_demands(tg_id, current_page)
             await editMessage(call, text, buttons=keyboard)
             return
         
@@ -828,7 +864,7 @@ async def handle_demand_user_set_status(_, call):
         
         if success:
             # 返回用户视图
-            text, keyboard = format_user_demands(tg_id, current_page)
+            text, keyboard = await format_user_demands(tg_id, current_page)
             await editMessage(call, text, buttons=keyboard)
             
             status_name = {
@@ -918,11 +954,17 @@ async def handle_demand_user_set_playable(_, call):
         except Exception as private_error:
             LOGGER.error(f"[Demand] 发送可播放通知失败 (用户: {request.tg}): {str(private_error)}")
         
+        # 删除请求记录
+        delete_success = sql_delete_request_record(request_id)
+        
+        if not delete_success:
+            LOGGER.error(f"[Demand] 删除点播请求记录失败: {request_id}")
+        
         # 返回用户视图
-        text, keyboard = format_user_demands(tg_id, current_page)
+        text, keyboard = await format_user_demands(tg_id, current_page)
         await editMessage(call, text, buttons=keyboard)
-        await callAnswer(call, f"✅ 已标记为可播放，扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
-        LOGGER.info(f"管理员 {call.from_user.id} 在用户视图标记点播请求为可播放: {request_id}, 用户: {request.tg}, 扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
+        await callAnswer(call, f"✅ 已标记为可播放并删除记录，扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
+        LOGGER.info(f"管理员 {call.from_user.id} 在用户视图标记点播请求为可播放并删除: {request_id}, 用户: {request.tg}, 扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
         
     except Exception as e:
         LOGGER.error(f"处理用户视图可播放状态失败: {str(e)}")
@@ -988,11 +1030,17 @@ async def handle_demand_user_playable_force(_, call):
         except Exception as private_error:
             LOGGER.error(f"[Demand] 发送可播放通知失败 (用户: {request.tg}): {str(private_error)}")
         
+        # 删除请求记录
+        delete_success = sql_delete_request_record(request_id)
+        
+        if not delete_success:
+            LOGGER.error(f"[Demand] 删除点播请求记录失败: {request_id}")
+        
         # 返回用户视图
-        text, keyboard = format_user_demands(tg_id, current_page)
+        text, keyboard = await format_user_demands(tg_id, current_page)
         await editMessage(call, text, buttons=keyboard)
-        await callAnswer(call, f"✅ 已标记为可播放，扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
-        LOGGER.info(f"管理员 {call.from_user.id} 在用户视图强制标记点播请求为可播放: {request_id}, 用户: {request.tg}, 扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
+        await callAnswer(call, f"✅ 已标记为可播放并删除记录，扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
+        LOGGER.info(f"管理员 {call.from_user.id} 在用户视图强制标记点播请求为可播放并删除: {request_id}, 用户: {request.tg}, 扣除{COIN_DEDUCTION_PLAYABLE}{sakura_b}")
         
     except Exception as e:
         LOGGER.error(f"强制标记可播放状态失败: {str(e)}")
@@ -1036,7 +1084,7 @@ async def handle_demand_user_set_transferred(_, call):
         
         if success:
             # 返回用户视图
-            text, keyboard = format_user_demands(tg_id, current_page)
+            text, keyboard = await format_user_demands(tg_id, current_page)
             await editMessage(call, text, buttons=keyboard)
             await callAnswer(call, "✅ 已标记为已入库并删除记录")
             LOGGER.info(f"管理员 {call.from_user.id} 在用户视图标记点播请求为已入库并删除: {request_id}")
@@ -1103,7 +1151,7 @@ async def handle_demand_user_delete_execute(_, call):
         
         if success:
             # 返回用户视图
-            text, keyboard = format_user_demands(tg_id, current_page)
+            text, keyboard = await format_user_demands(tg_id, current_page)
             await editMessage(call, text, buttons=keyboard)
             await callAnswer(call, "✅ 删除成功")
             LOGGER.info(f"管理员 {call.from_user.id} 在用户视图删除点播请求: {request_id}")
@@ -1122,7 +1170,7 @@ async def handle_demand_user_edit_cancel(_, call):
         tg_id = int(call.matches[0].group(1))
         current_page = int(call.matches[0].group(2))
         
-        text, keyboard = format_user_demands(tg_id, current_page)
+        text, keyboard = await format_user_demands(tg_id, current_page)
         await editMessage(call, text, buttons=keyboard)
         await callAnswer(call, "已取消编辑")
         
