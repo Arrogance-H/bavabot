@@ -127,6 +127,11 @@ def format_user_list(current_page=1):
         if page_row:
             keyboard_buttons.append(page_row)
         
+        # 查看所有点播按钮
+        keyboard_buttons.append([
+            InlineKeyboardButton("📋 查看所有点播", callback_data="demand_view_all")
+        ])
+        
         # 取消按钮
         keyboard_buttons.append([
             InlineKeyboardButton("❌ 取消", callback_data="closeit")
@@ -686,6 +691,19 @@ async def handle_demand_view_by_user(_, call):
         
     except Exception as e:
         LOGGER.error(f"处理按用户查看失败: {str(e)}")
+        await callAnswer(call, "❌ 查看失败", True)
+
+
+@bot.on_callback_query(filters.regex(r'^demand_view_all$') & admins_filter)
+async def handle_demand_view_all(_, call):
+    """处理查看所有点播请求"""
+    try:
+        text, keyboard = format_demand_records(1, "all")
+        await editMessage(call, text, buttons=keyboard)
+        await callAnswer(call, "📋 查看所有点播")
+        
+    except Exception as e:
+        LOGGER.error(f"处理查看所有点播失败: {str(e)}")
         await callAnswer(call, "❌ 查看失败", True)
 
 
