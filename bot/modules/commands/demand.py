@@ -700,7 +700,7 @@ async def handle_demand_view_all(_, call):
     try:
         text, keyboard = format_demand_records(1, "all")
         await editMessage(call, text, buttons=keyboard)
-        await callAnswer(call, "📋 查看所有点播")
+        await callAnswer(call, "📋 已切换到查看所有点播")
         
     except Exception as e:
         LOGGER.error(f"处理查看所有点播失败: {str(e)}")
