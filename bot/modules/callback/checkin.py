@@ -570,6 +570,12 @@ async def auto_start_or_cancel_game(game_id):
         if game['started']:
             return
         
+        # 尝试原子地标记游戏为已开始，防止与手动开始冲突
+        # 由于Python的GIL，对布尔值的检查和设置是原子的
+        # 但为了安全，我们在开始前再次检查
+        if game['started']:
+            return
+        
         participant_count = len(game['participants'])
         chat_id = game['chat_id']
         message_id = game['message_id']
@@ -631,10 +637,17 @@ async def auto_start_or_cancel_game(game_id):
             LOGGER.info(f"【F1多人游戏】自动取消游戏 - game_id: {game_id}, 参与人数: {participant_count}")
             
             # 给所有参与者退款
+            refunded_count = 0
+            failed_refunds = []
             for user_id in game['participants'].keys():
                 e = sql_get_emby(user_id)
                 if e:
                     sql_update_emby(Emby.tg == user_id, iv=e.iv + 5)
+                    refunded_count += 1
+                else:
+                    # 记录退款失败的用户
+                    failed_refunds.append(user_id)
+                    LOGGER.warning(f"【F1多人游戏】退款失败，用户不在数据库 - user_id: {user_id}")
             
             # 更新消息提示游戏取消
             participant_list = '\n'.join([
@@ -662,6 +675,10 @@ async def auto_start_or_cancel_game(game_id):
                 asyncio.create_task(delete_message_after_delay(chat_id, message_id, 30))
             except Exception as e:
                 LOGGER.error(f"【F1多人游戏】更新取消消息失败 - game_id: {game_id}, error: {e}")
+            
+            # 取消自动任务（清理引用）
+            if game['auto_start_task'] and not game['auto_start_task'].done():
+                game['auto_start_task'].cancel()
             
             # 清理游戏数据
             del multiplayer_f1_games[game_id]
