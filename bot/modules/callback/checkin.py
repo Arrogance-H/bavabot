@@ -19,8 +19,11 @@ daily_punch_limits = {}
 # F1游戏每日限制次数
 DAILY_PUNCH_LIMIT = 3
 
-# 存储多人F1游戏房间 {game_id: {'creator': user_id, 'participants': {user_id: {'name': str, 'clicks': int}}, 'started': bool, 'game_active': bool, 'chat_id': int, 'message_id': int}}
+# 存储多人F1游戏房间 {game_id: {'creator': user_id, 'participants': {user_id: {'name': str, 'clicks': int}}, 'started': bool, 'game_active': bool, 'chat_id': int, 'message_id': int, 'auto_start_task': asyncio.Task}}
 multiplayer_f1_games = {}
+
+# F1多人游戏自动开始等待时间（秒）
+F1_AUTO_START_TIMEOUT = 300  # 5分钟
 
 
 def get_punch_count(user_id: int) -> tuple[int, int]:
@@ -336,7 +339,8 @@ async def start_multiplayer_f1(_, msg):
         'started': False,
         'game_active': False,
         'chat_id': msg.chat.id,
-        'message_id': None
+        'message_id': None,
+        'auto_start_task': None
     }
     
     # 创建按钮
@@ -353,11 +357,16 @@ async def start_multiplayer_f1(_, msg):
         f"📋 参与玩家:\n"
         f"1️⃣ {msg.from_user.first_name}\n\n"
         f"⚠️ 至少需要2名玩家才能开始游戏\n"
+        f"⏰ 5分钟后自动开始（满足人数）或取消（不满足人数）\n"
         f"🏆 获胜者将赢得所有投入的joy币！"
     )
     
     sent = await sendMessage(msg, text=text, buttons=buttons, send=True)
     multiplayer_f1_games[game_id]['message_id'] = sent.id
+    
+    # 启动5分钟自动开始/取消任务
+    auto_task = asyncio.create_task(auto_start_or_cancel_game(game_id))
+    multiplayer_f1_games[game_id]['auto_start_task'] = auto_task
     
     await deleteMessage(msg)
 
@@ -427,9 +436,11 @@ async def join_multiplayer_f1(_, call):
     
     if participant_count >= 2:
         text += "✅ 已满足最低人数，发起者可以开始游戏\n"
-        text += f"🏆 奖池: {participant_count * 5} {sakura_b}"
+        text += f"🏆 奖池: {participant_count * 5} {sakura_b}\n"
+        text += "⏰ 5分钟后将自动开始游戏"
     else:
         text += "⚠️ 至少需要2名玩家才能开始游戏\n"
+        text += "⏰ 5分钟后自动开始（满足人数）或取消（不满足人数）\n"
         text += "🏆 获胜者将赢得所有投入的joy币！"
     
     await editMessage(call, text, buttons=buttons)
@@ -466,6 +477,10 @@ async def start_multiplayer_f1_game(_, call):
     
     # 标记游戏已开始
     game['started'] = True
+    
+    # 取消自动开始任务（如果存在）
+    if game['auto_start_task'] and not game['auto_start_task'].done():
+        game['auto_start_task'].cancel()
     
     # 显示准备阶段
     await editMessage(call, "🎮 **多人F1竞速赛**\n\n⏳ 准备中...\n\n3秒后开始，请疯狂点击加速按钮！")
@@ -537,6 +552,125 @@ async def delete_message_after_delay(chat_id, message_id, delay_seconds):
     except Exception:
         # 如果删除失败（例如消息已被删除），忽略错误
         pass
+
+
+async def auto_start_or_cancel_game(game_id):
+    """5分钟后自动开始游戏（满足最少人数）或取消游戏（不满足最少人数）"""
+    try:
+        # 等待5分钟
+        await asyncio.sleep(F1_AUTO_START_TIMEOUT)
+        
+        # 检查游戏是否还存在
+        if game_id not in multiplayer_f1_games:
+            return
+        
+        game = multiplayer_f1_games[game_id]
+        
+        # 如果游戏已经手动开始，不做处理
+        if game['started']:
+            return
+        
+        participant_count = len(game['participants'])
+        chat_id = game['chat_id']
+        message_id = game['message_id']
+        
+        # 检查是否满足最少人数要求（2人）
+        if participant_count >= 2:
+            # 满足条件，自动开始游戏
+            LOGGER.info(f"【F1多人游戏】自动开始游戏 - game_id: {game_id}, 参与人数: {participant_count}")
+            
+            # 标记游戏已开始
+            game['started'] = True
+            
+            # 更新消息提示自动开始
+            try:
+                await bot.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    text="🎮 **多人F1竞速赛**\n\n⏰ 5分钟等待时间已到，游戏自动开始！\n\n⏳ 准备中..."
+                )
+            except Exception:
+                pass
+            
+            await asyncio.sleep(3)
+            
+            # 激活游戏
+            game['game_active'] = True
+            
+            # 为每个参与者创建点击按钮
+            buttons_rows = []
+            for pid, pdata in game['participants'].items():
+                buttons_rows.append([
+                    InlineKeyboardButton(f"⚡ {pdata['name']}", f"f1_click_{game_id}_{pid}")
+                ])
+            
+            buttons = InlineKeyboardMarkup(buttons_rows)
+            
+            text = (
+                f"🎮 **多人F1竞速赛 - 进行中**\n\n"
+                f"⚡ 疯狂点击你的按钮加速吧！\n"
+                f"⏰ 剩余时间: 5秒"
+            )
+            
+            try:
+                await bot.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    text=text,
+                    reply_markup=buttons
+                )
+            except Exception:
+                pass
+            
+            # 5秒后结束游戏
+            await asyncio.sleep(5)
+            await end_multiplayer_f1_game(game_id)
+            
+        else:
+            # 不满足条件，取消游戏并退款
+            LOGGER.info(f"【F1多人游戏】自动取消游戏 - game_id: {game_id}, 参与人数: {participant_count}")
+            
+            # 给所有参与者退款
+            for user_id in game['participants'].keys():
+                e = sql_get_emby(user_id)
+                if e:
+                    sql_update_emby(Emby.tg == user_id, iv=e.iv + 5)
+            
+            # 更新消息提示游戏取消
+            participant_list = '\n'.join([
+                f"{i+1}️⃣ {p['name']}" 
+                for i, p in enumerate(game['participants'].values())
+            ])
+            
+            cancel_text = (
+                f"🏎️ **多人F1竞速赛 - 已取消**\n\n"
+                f"⏰ 5分钟等待时间已到\n"
+                f"❌ 参与人数不足（需要至少2人）\n\n"
+                f"📋 参与玩家:\n"
+                f"{participant_list}\n\n"
+                f"💰 已退还所有参与者的 5 {sakura_b}"
+            )
+            
+            try:
+                await bot.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    text=cancel_text
+                )
+                
+                # 30秒后删除消息
+                asyncio.create_task(delete_message_after_delay(chat_id, message_id, 30))
+            except Exception as e:
+                LOGGER.error(f"【F1多人游戏】更新取消消息失败 - game_id: {game_id}, error: {e}")
+            
+            # 清理游戏数据
+            del multiplayer_f1_games[game_id]
+            
+    except asyncio.CancelledError:
+        # 任务被取消（通常是因为游戏被手动开始），这是正常情况
+        pass
+    except Exception as e:
+        LOGGER.error(f"【F1多人游戏】自动开始/取消任务异常 - game_id: {game_id}, error: {e}")
 
 
 async def end_multiplayer_f1_game(game_id):
