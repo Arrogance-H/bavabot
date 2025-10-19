@@ -83,7 +83,8 @@ async def mzj_command(_, msg):
                             f"🎉 **M尊享礼**\n\n"
                             f"· M尊享: [{user_name}](tg://user?id={user_id}) `{user_id}`\n"
                             f"· 奖励类型: 🎫 1个ME注册资格\n"
-                            f"· 您可将注册资格赠予家人朋友！")
+                            f"· 您可将注册资格赠予家人朋友！30日内有效。"
+                            f"· 在ME群组中回复本消息并@赠送的人和管理员")
             LOGGER.info(f"【mzj】用户 {user_name}-{user_id} 随机领取了 ME注册资格（荣誉）")
         else:
             return await sendMessage(msg, '⚠️ 数据库操作失败，请稍后重试', timer=30)
@@ -92,10 +93,10 @@ async def mzj_command(_, msg):
         # 支付宝红包 - 独立红包奖励
         if sql_update_emby(Emby.tg == user_id, mzj_claim_date=now):
             await sendMessage(msg, 
-                            f"🎉 **M尊享里**\n\n"
-                            f"· M用户: [{user_name}](tg://user?id={user_id}) `{user_id}`\n"
+                            f"🎉 **M尊享礼**\n\n"
+                            f"· M尊享: [{user_name}](tg://user?id={user_id}) `{user_id}`\n"
                             f"· 奖励类型: 🧧 支付宝红包\n"
-                            f"· 请联系管理员领取支付宝红包\n\n")
+                            f"· 请带上本消息截图联系管理员领取支付宝红包\n\n")
             LOGGER.info(f"【mzj】用户 {user_name}-{user_id} 随机领取了支付宝红包")
         else:
             return await sendMessage(msg, '⚠️ 数据库操作失败，请稍后重试', timer=30)
