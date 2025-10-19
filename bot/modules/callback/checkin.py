@@ -440,7 +440,7 @@ async def join_multiplayer_f1(_, call):
         text += "⏰ 5分钟后将自动开始游戏"
     else:
         text += "⚠️ 至少需要2名玩家才能开始游戏\n"
-        text += "⏰ 5分钟后自动开始（满足人数）或取消（不满足人数）\n"
+        text += "⏰ 5分钟后自动开始游戏\n"
         text += "🏆 获胜者将赢得所有投入的joy币！"
     
     await editMessage(call, text, buttons=buttons)
