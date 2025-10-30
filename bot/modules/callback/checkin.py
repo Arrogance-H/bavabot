@@ -351,10 +351,10 @@ async def start_multiplayer_f1(_, msg):
         f"🏎️ **多人F1竞速赛**\n\n"
         f"🎯 发起者: {msg.from_user.first_name}\n"
         f"👥 当前玩家: 0/∞\n\n"
-        f"💡 点击任意档位按钮加入游戏 (5/10/30 {sakura_b})\n"
+        f"💡 选择门票档位加入游戏\n"
         f"⚠️ 至少需要2名玩家才能开始游戏\n"
         f"⏰ 5分钟后自动开始（满足人数）或取消（不满足人数）\n"
-        f"🏆 获胜者将赢得所有投入的joy币！"
+        f"🏆 获胜者将赢得所有投入的JOY币！"
     )
     
     sent = await sendMessage(msg, text=text, buttons=buttons, send=True)
@@ -471,10 +471,10 @@ async def update_game_display(call, game_id, game):
         text += "✅ 已满足最低人数，发起者可以开始游戏\n"
         text += "⏰ 5分钟后将自动开始游戏"
     else:
-        text += "💡 点击任意档位按钮加入游戏 (5/10/30 {sakura_b})\n"
+        text += "💡 选择参与门票档位加入游戏\n"
         text += "⚠️ 至少需要2名玩家才能开始游戏\n"
         text += "⏰ 5分钟后自动开始（满足人数）或取消（不满足人数）\n"
-        text += "🏆 获胜者将赢得所有投入的joy币！"
+        text += "🏆 获胜者将赢得所有投入的JOY币！"
     
     await editMessage(call, text, buttons=buttons)
 
@@ -776,7 +776,6 @@ async def end_multiplayer_f1_game(game_id):
             f"🏎️ **F1竞速赛 - 颁奖台**\n\n"
             f"🏆 获胜者: {winner_names[0]}\n"
             f"💰 奖励: {prize_per_winner} {sakura_b}\n\n"
-            f"📊 最终排名:\n{ranking}\n\n"
             f"🎯 总奖池: {total_prize} {sakura_b}"
         )
     else:
@@ -785,7 +784,6 @@ async def end_multiplayer_f1_game(game_id):
             f"🏎️ **F1竞速赛 - 颁奖台**\n\n"
             f"🏆 平局获胜者: {winners_str}\n"
             f"💰 每人奖励: {prize_per_winner} {sakura_b}\n\n"
-            f"📊 最终排名:\n{ranking}\n\n"
             f"🎯 总奖池: {total_prize} {sakura_b}"
         )
     
