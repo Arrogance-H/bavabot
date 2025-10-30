@@ -341,7 +341,7 @@ async def start_multiplayer_f1(_, msg):
     
     # 创建3个费用按钮在同一行
     fee_buttons = [
-        [InlineKeyboardButton(f"💰 {fee} {sakura_b}", f"f1_join_fee_{game_id}_{fee}") for fee in F1_FEE_TIERS],
+        [InlineKeyboardButton(f"{fee} {sakura_b}", f"f1_join_fee_{game_id}_{fee}") for fee in F1_FEE_TIERS],
         [InlineKeyboardButton("🏁 开始比赛 (0/2)", f"f1_start_{game_id}")]
     ]
     buttons = InlineKeyboardMarkup(fee_buttons)
@@ -445,7 +445,7 @@ async def update_game_display(call, game_id, game):
     
     # 创建3个费用按钮在同一行
     fee_buttons = [
-        [InlineKeyboardButton(f"💰 {fee} {sakura_b}", f"f1_join_fee_{game_id}_{fee}") for fee in F1_FEE_TIERS],
+        [InlineKeyboardButton(f"{fee} {sakura_b}", f"f1_join_fee_{game_id}_{fee}") for fee in F1_FEE_TIERS],
         [InlineKeyboardButton(f"🏁 开始比赛 ({participant_count}/2)", f"f1_start_{game_id}")]
     ]
     buttons = InlineKeyboardMarkup(fee_buttons)
@@ -773,7 +773,7 @@ async def end_multiplayer_f1_game(game_id):
         result_text = (
             f"🏎️ **F1竞速赛 - 颁奖台**\n\n"
             f"🏆 获胜者: {winner_names[0]}\n"
-            f"💰 奖励: {prize_per_winner} {sakura_b}\n\n"
+            f"💰 奖励: {prize_per_winner} {sakura_b}\n"
             f"🎯 总奖池: {total_prize} {sakura_b}\n\n"
             f"📊 排行榜:\n{ranking}"
         )
@@ -782,7 +782,7 @@ async def end_multiplayer_f1_game(game_id):
         result_text = (
             f"🏎️ **F1竞速赛 - 颁奖台**\n\n"
             f"🏆 平局获胜者: {winners_str}\n"
-            f"💰 每人奖励: {prize_per_winner} {sakura_b}\n\n"
+            f"💰 每人奖励: {prize_per_winner} {sakura_b}\n"
             f"🎯 总奖池: {total_prize} {sakura_b}\n\n"
             f"📊 排行榜:\n{ranking}"
         )
