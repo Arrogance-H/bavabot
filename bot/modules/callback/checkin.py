@@ -19,11 +19,14 @@ daily_punch_limits = {}
 # F1游戏每日限制次数
 DAILY_PUNCH_LIMIT = 3
 
-# 存储多人F1游戏房间 {game_id: {'creator': user_id, 'participants': {user_id: {'name': str, 'clicks': int}}, 'started': bool, 'game_active': bool, 'chat_id': int, 'message_id': int, 'auto_start_task': asyncio.Task}}
+# 存储多人F1游戏房间 {game_id: {'creator': user_id, 'participants': {user_id: {'name': str, 'clicks': int}}, 'started': bool, 'game_active': bool, 'chat_id': int, 'message_id': int, 'auto_start_task': asyncio.Task, 'fee': int}}
 multiplayer_f1_games = {}
 
 # F1多人游戏自动开始等待时间（秒）
 F1_AUTO_START_TIMEOUT = 300  # 5分钟
+
+# F1多人游戏可选费用档位
+F1_FEE_TIERS = [5, 10, 30]
 
 
 def get_punch_count(user_id: int) -> tuple[int, int]:
@@ -303,7 +306,7 @@ async def end_punch_game(call, user_id):
 
 @bot.on_message(filters.command('f1', prefixes) & filters.chat(group))
 async def start_multiplayer_f1(_, msg):
-    """在群组中发起多人F1游戏"""
+    """在群组中发起多人F1游戏 - 显示费用选项"""
     if not _open.punch_in:
         await sendMessage(msg, '❌ 未开启F1功能，等待！', timer=5)
         await deleteMessage(msg)
@@ -315,32 +318,87 @@ async def start_multiplayer_f1(_, msg):
         await deleteMessage(msg)
         return
     
-    # 检查余额是否足够
-    if e.iv < 5:
-        await sendMessage(msg, f'❌ 余额不足！参与游戏需要 5 {sakura_b}', timer=5)
+    # 检查余额是否足够最低档位
+    min_fee = min(F1_FEE_TIERS)
+    if e.iv < min_fee:
+        await sendMessage(msg, f'❌ 余额不足！参与游戏最低需要 {min_fee} {sakura_b}', timer=5)
         await deleteMessage(msg)
         return
     
-    # 创建游戏ID
-    game_id = f"f1_mp_{msg.chat.id}_{msg.from_user.id}_{int(datetime.now().timestamp())}"
+    # 创建费用选择按钮
+    fee_buttons = []
+    for fee in F1_FEE_TIERS:
+        if e.iv >= fee:
+            fee_buttons.append([InlineKeyboardButton(f"💰 {fee} {sakura_b}", f"f1_fee_{msg.from_user.id}_{fee}")])
+        else:
+            fee_buttons.append([InlineKeyboardButton(f"💰 {fee} {sakura_b} (余额不足)", f"f1_fee_insufficient")])
     
-    # 扣除发起者的5个joy币
-    sql_update_emby(Emby.tg == msg.from_user.id, iv=e.iv - 5)
+    buttons = InlineKeyboardMarkup(fee_buttons)
+    
+    text = (
+        f"🏎️ **多人F1竞速赛**\n\n"
+        f"🎯 发起者: {msg.from_user.first_name}\n"
+        f"💴 当前余额: {e.iv} {sakura_b}\n\n"
+        f"请选择参与费用档位："
+    )
+    
+    await sendMessage(msg, text=text, buttons=buttons, send=True)
+    await deleteMessage(msg)
+
+
+@bot.on_callback_query(filters.regex('f1_fee_insufficient'))
+async def handle_insufficient_fee(_, call):
+    """处理费用不足的回调"""
+    await callAnswer(call, '❌ 余额不足，请选择其他档位', True)
+
+
+@bot.on_callback_query(filters.regex(r'f1_fee_(\d+)_(\d+)'))
+async def create_multiplayer_f1_with_fee(_, call):
+    """确认费用并创建多人F1游戏"""
+    user_id = int(call.matches[0].group(1))
+    fee = int(call.matches[0].group(2))
+    
+    # 验证用户身份
+    if call.from_user.id != user_id:
+        await callAnswer(call, '❌ 请发起自己的游戏！', True)
+        return
+    
+    # 验证费用档位
+    if fee not in F1_FEE_TIERS:
+        await callAnswer(call, '❌ 无效的费用档位', True)
+        return
+    
+    e = sql_get_emby(user_id)
+    if not e:
+        await callAnswer(call, '🧮 未查询到数据库', True)
+        return
+    
+    # 检查余额
+    if e.iv < fee:
+        await callAnswer(call, f'❌ 余额不足！参与游戏需要 {fee} {sakura_b}', True)
+        return
+    
+    # 创建游戏ID
+    game_id = f"f1_mp_{call.message.chat.id}_{user_id}_{int(datetime.now().timestamp())}"
+    
+    # 扣除发起者的joy币
+    sql_update_emby(Emby.tg == user_id, iv=e.iv - fee)
     
     # 创建游戏房间
     multiplayer_f1_games[game_id] = {
-        'creator': msg.from_user.id,
+        'creator': user_id,
         'participants': {
-            msg.from_user.id: {
-                'name': msg.from_user.first_name or '玩家',
+            user_id: {
+                'name': call.from_user.first_name or '玩家',
                 'clicks': 0
             }
         },
         'started': False,
         'game_active': False,
-        'chat_id': msg.chat.id,
+        'chat_id': call.message.chat.id,
         'message_id': None,
-        'auto_start_task': None
+        'auto_start_task': None,
+        'fee': fee
     }
     
     # 创建按钮
@@ -351,24 +409,22 @@ async def start_multiplayer_f1(_, msg):
     
     text = (
         f"🏎️ **多人F1竞速赛**\n\n"
-        f"🎯 发起者: {msg.from_user.first_name}\n"
-        f"💰 参与费用: 5 {sakura_b}\n"
+        f"🎯 发起者: {call.from_user.first_name}\n"
+        f"💰 参与费用: {fee} {sakura_b}\n"
         f"👥 当前玩家: 1/∞\n\n"
         f"📋 参与玩家:\n"
-        f"1️⃣ {msg.from_user.first_name}\n\n"
+        f"1️⃣ {call.from_user.first_name}\n\n"
         f"⚠️ 至少需要2名玩家才能开始游戏\n"
         f"⏰ 5分钟后自动开始（满足人数）或取消（不满足人数）\n"
         f"🏆 获胜者将赢得所有投入的joy币！"
     )
     
-    sent = await sendMessage(msg, text=text, buttons=buttons, send=True)
-    multiplayer_f1_games[game_id]['message_id'] = sent.id
+    await editMessage(call, text, buttons=buttons)
+    multiplayer_f1_games[game_id]['message_id'] = call.message.id
     
     # 启动5分钟自动开始/取消任务
     auto_task = asyncio.create_task(auto_start_or_cancel_game(game_id))
     multiplayer_f1_games[game_id]['auto_start_task'] = auto_task
-    
-    await deleteMessage(msg)
 
 
 @bot.on_callback_query(filters.regex(r'f1_join_(.+)'))
@@ -382,6 +438,7 @@ async def join_multiplayer_f1(_, call):
     
     game = multiplayer_f1_games[game_id]
     user_id = call.from_user.id
+    fee = game['fee']
     
     # 检查游戏是否已开始
     if game['started']:
@@ -400,12 +457,12 @@ async def join_multiplayer_f1(_, call):
         return
     
     # 检查余额
-    if e.iv < 5:
-        await callAnswer(call, f'❌ 余额不足！参与游戏需要 5 {sakura_b}', True)
+    if e.iv < fee:
+        await callAnswer(call, f'❌ 余额不足！参与游戏需要 {fee} {sakura_b}', True)
         return
     
-    # 扣除5个joy币
-    sql_update_emby(Emby.tg == user_id, iv=e.iv - 5)
+    # 扣除joy币
+    sql_update_emby(Emby.tg == user_id, iv=e.iv - fee)
     
     # 添加到游戏
     game['participants'][user_id] = {
@@ -428,7 +485,7 @@ async def join_multiplayer_f1(_, call):
     text = (
         f"🏎️ **多人F1竞速赛**\n\n"
         f"🎯 发起者: {game['participants'][game['creator']]['name']}\n"
-        f"💰 参与费用: 5 {sakura_b}\n"
+        f"💰 参与费用: {fee} {sakura_b}\n"
         f"👥 当前玩家: {participant_count}/∞\n\n"
         f"📋 参与玩家:\n"
         f"{participant_list}\n\n"
@@ -436,7 +493,7 @@ async def join_multiplayer_f1(_, call):
     
     if participant_count >= 2:
         text += "✅ 已满足最低人数，发起者可以开始游戏\n"
-        text += f"🏆 奖池: {participant_count * 5} {sakura_b}\n"
+        text += f"🏆 奖池: {participant_count * fee} {sakura_b}\n"
         text += "⏰ 5分钟后将自动开始游戏"
     else:
         text += "⚠️ 至少需要2名玩家才能开始游戏\n"
@@ -444,7 +501,7 @@ async def join_multiplayer_f1(_, call):
         text += "🏆 获胜者将赢得所有投入的joy币！"
     
     await editMessage(call, text, buttons=buttons)
-    await callAnswer(call, f'✅ 成功加入游戏！已扣除 5 {sakura_b}', False)
+    await callAnswer(call, f'✅ 成功加入游戏！已扣除 {fee} {sakura_b}', False)
 
 
 @bot.on_callback_query(filters.regex(r'f1_start_(.+)'))
@@ -636,13 +693,16 @@ async def auto_start_or_cancel_game(game_id):
             # 不满足条件，取消游戏并退款
             LOGGER.info(f"【F1多人游戏】自动取消游戏 - game_id: {game_id}, 参与人数: {participant_count}")
             
+            # 获取游戏费用
+            fee = game['fee']
+            
             # 给所有参与者退款
             refunded_count = 0
             failed_refunds = []
             for user_id in game['participants'].keys():
                 e = sql_get_emby(user_id)
                 if e:
-                    sql_update_emby(Emby.tg == user_id, iv=e.iv + 5)
+                    sql_update_emby(Emby.tg == user_id, iv=e.iv + fee)
                     refunded_count += 1
                 else:
                     # 记录退款失败的用户
@@ -661,7 +721,7 @@ async def auto_start_or_cancel_game(game_id):
                 f"❌ 参与人数不足（需要至少2人）\n\n"
                 f"📋 参与玩家:\n"
                 f"{participant_list}\n\n"
-                f"💰 已退还所有参与者的 5 {sakura_b}"
+                f"💰 已退还所有参与者的 {fee} {sakura_b}"
             )
             
             try:
@@ -698,8 +758,11 @@ async def end_multiplayer_f1_game(game_id):
     game = multiplayer_f1_games[game_id]
     game['game_active'] = False
     
+    # 获取游戏费用
+    fee = game['fee']
+    
     # 计算总奖池
-    total_prize = len(game['participants']) * 5
+    total_prize = len(game['participants']) * fee
     
     # 找出最高点击次数
     max_clicks = max(p['clicks'] for p in game['participants'].values())
