@@ -306,7 +306,7 @@ async def end_punch_game(call, user_id):
 
 @bot.on_message(filters.command('f1', prefixes) & filters.chat(group))
 async def start_multiplayer_f1(_, msg):
-    """在群组中发起多人F1游戏 - 显示费用选项"""
+    """在群组中发起多人F1游戏"""
     if not _open.punch_in:
         await sendMessage(msg, '❌ 未开启F1功能，等待！', timer=5)
         await deleteMessage(msg)
@@ -325,198 +325,58 @@ async def start_multiplayer_f1(_, msg):
         await deleteMessage(msg)
         return
     
-    # 创建费用选择按钮
+    # 创建游戏ID
+    game_id = f"f1_mp_{msg.chat.id}_{msg.from_user.id}_{int(datetime.now().timestamp())}"
+    
+    # 创建游戏房间（发起者尚未加入）
+    multiplayer_f1_games[game_id] = {
+        'creator': msg.from_user.id,
+        'participants': {},
+        'started': False,
+        'game_active': False,
+        'chat_id': msg.chat.id,
+        'message_id': None,
+        'auto_start_task': None
+    }
+    
+    # 创建3个费用按钮
     fee_buttons = []
     for fee in F1_FEE_TIERS:
-        if e.iv >= fee:
-            fee_buttons.append([InlineKeyboardButton(f"💰 {fee} {sakura_b}", f"f1_fee_{msg.from_user.id}_{fee}")])
-        else:
-            fee_buttons.append([InlineKeyboardButton(f"💰 {fee} {sakura_b} (余额不足)", f"f1_fee_insufficient")])
+        fee_buttons.append([InlineKeyboardButton(f"💰 {fee} {sakura_b}", f"f1_join_fee_{game_id}_{fee}")])
     
+    fee_buttons.append([InlineKeyboardButton("🏁 开始比赛 (0/2)", f"f1_start_{game_id}")])
     buttons = InlineKeyboardMarkup(fee_buttons)
     
     text = (
         f"🏎️ **多人F1竞速赛**\n\n"
         f"🎯 发起者: {msg.from_user.first_name}\n"
-        f"请选择参与门票档位："
-    )
-    
-    await sendMessage(msg, text=text, buttons=buttons, send=True)
-    await deleteMessage(msg)
-
-
-@bot.on_callback_query(filters.regex('f1_fee_insufficient'))
-async def handle_insufficient_fee(_, call):
-    """处理费用不足的回调"""
-    await callAnswer(call, '❌ 余额不足，请选择其他档位', True)
-
-
-@bot.on_callback_query(filters.regex(r'f1_fee_(\d+)_(\d+)'))
-async def create_multiplayer_f1_with_fee(_, call):
-    """确认费用并创建多人F1游戏"""
-    user_id = int(call.matches[0].group(1))
-    fee = int(call.matches[0].group(2))
-    
-    # 验证用户身份
-    if call.from_user.id != user_id:
-        await callAnswer(call, '❌ 请发起自己的游戏！', True)
-        return
-    
-    # 验证费用档位
-    if fee not in F1_FEE_TIERS:
-        # 记录可能的篡改尝试
-        LOGGER.warning(f"【F1多人游戏】检测到无效费用档位尝试 - user_id: {user_id}, fee: {fee}, 有效档位: {F1_FEE_TIERS}")
-        await callAnswer(call, '❌ 无效的费用档位', True)
-        return
-    
-    e = sql_get_emby(user_id)
-    if not e:
-        await callAnswer(call, '🧮 未查询到数据库', True)
-        return
-    
-    # 检查余额
-    if e.iv < fee:
-        await callAnswer(call, f'❌ 余额不足！参与游戏需要 {fee} {sakura_b}', True)
-        return
-    
-    # 创建游戏ID
-    game_id = f"f1_mp_{call.message.chat.id}_{user_id}_{int(datetime.now().timestamp())}"
-    
-    # 扣除发起者的joy币
-    sql_update_emby(Emby.tg == user_id, iv=e.iv - fee)
-    
-    # 创建游戏房间
-    multiplayer_f1_games[game_id] = {
-        'creator': user_id,
-        'participants': {
-            user_id: {
-                'name': call.from_user.first_name or '玩家',
-                'clicks': 0,
-                'fee': fee
-            }
-        },
-        'started': False,
-        'game_active': False,
-        'chat_id': call.message.chat.id,
-        'message_id': None,
-        'auto_start_task': None
-    }
-    
-    # 创建按钮
-    buttons = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🎮 加入游戏", f"f1_join_{game_id}")],
-        [InlineKeyboardButton("🏁 开始比赛 (1/2)", f"f1_start_{game_id}")]
-    ])
-    
-    text = (
-        f"🏎️ **多人F1竞速赛**\n\n"
-        f"🎯 发起者: {call.from_user.first_name} ({fee} {sakura_b})\n"
-        f"👥 当前玩家: 1/∞\n\n"
-        f"📋 参与玩家:\n"
-        f"1️⃣ {call.from_user.first_name} - {fee} {sakura_b}\n\n"
+        f"👥 当前玩家: 0/∞\n\n"
+        f"💡 点击任意档位按钮加入游戏 (5/10/30 {sakura_b})\n"
         f"⚠️ 至少需要2名玩家才能开始游戏\n"
-        f"💡 参与者可自由选择门票档位 (5/10/30 {sakura_b})\n"
         f"⏰ 5分钟后自动开始（满足人数）或取消（不满足人数）\n"
         f"🏆 获胜者将赢得所有投入的joy币！"
     )
     
-    await editMessage(call, text, buttons=buttons)
-    multiplayer_f1_games[game_id]['message_id'] = call.message.id
+    sent = await sendMessage(msg, text=text, buttons=buttons, send=True)
+    multiplayer_f1_games[game_id]['message_id'] = sent.id
     
     # 启动5分钟自动开始/取消任务
     auto_task = asyncio.create_task(auto_start_or_cancel_game(game_id))
     multiplayer_f1_games[game_id]['auto_start_task'] = auto_task
+    
+    await deleteMessage(msg)
 
 
-@bot.on_callback_query(filters.regex(r'f1_join_(.+)'))
-async def join_multiplayer_f1(_, call):
-    """显示费用选择界面以加入多人F1游戏"""
-    game_id = call.matches[0].group(1)
-    
-    if game_id not in multiplayer_f1_games:
-        await callAnswer(call, '❌ 游戏不存在或已结束', True)
-        return
-    
-    game = multiplayer_f1_games[game_id]
-    user_id = call.from_user.id
-    
-    # 检查游戏是否已开始
-    if game['started']:
-        await callAnswer(call, '❌ 游戏已经开始，无法加入', True)
-        return
-    
-    # 检查是否已经参与
-    if user_id in game['participants']:
-        await callAnswer(call, '✅ 您已经在游戏中了', True)
-        return
-    
-    # 检查数据库
-    e = sql_get_emby(user_id)
-    if not e:
-        await callAnswer(call, '🧮 未查询到数据库', True)
-        return
-    
-    # 检查余额是否足够最低档位
-    min_fee = min(F1_FEE_TIERS)
-    if e.iv < min_fee:
-        await callAnswer(call, f'❌ 余额不足！参与游戏最低需要 {min_fee} {sakura_b}', True)
-        return
-    
-    # 创建费用选择按钮
-    fee_buttons = []
-    for fee in F1_FEE_TIERS:
-        if e.iv >= fee:
-            fee_buttons.append([InlineKeyboardButton(f"💰 {fee} {sakura_b}", f"f1_join_fee_{game_id}_{user_id}_{fee}")])
-        else:
-            fee_buttons.append([InlineKeyboardButton(f"💰 {fee} {sakura_b} (余额不足)", f"f1_fee_insufficient")])
-    
-    # 添加返回按钮
-    fee_buttons.append([InlineKeyboardButton("🔙 返回", f"f1_back_{game_id}")])
-    
-    buttons = InlineKeyboardMarkup(fee_buttons)
-    
-    # 计算当前奖池
-    current_pool = sum(p['fee'] for p in game['participants'].values())
-    
-    text = (
-        f"🏎️ **加入F1竞速赛**\n\n"
-        f"💴 您的余额: {e.iv} {sakura_b}\n"
-        f"🏆 当前奖池: {current_pool} {sakura_b}\n\n"
-        f"请选择您的参与费用档位："
-    )
-    
-    await editMessage(call, text, buttons=buttons)
-
-
-@bot.on_callback_query(filters.regex(r'f1_back_(.+)'))
-async def back_to_game(_, call):
-    """返回游戏主界面"""
-    game_id = call.matches[0].group(1)
-    
-    if game_id not in multiplayer_f1_games:
-        await callAnswer(call, '❌ 游戏不存在或已结束', True)
-        return
-    
-    game = multiplayer_f1_games[game_id]
-    
-    # 更新游戏显示
-    await update_game_display(call, game_id, game)
-
-
-@bot.on_callback_query(filters.regex(r'f1_join_fee_(.+)_(\d+)_(\d+)'))
-async def confirm_join_multiplayer_f1(_, call):
-    """确认费用并加入多人F1游戏"""
+@bot.on_callback_query(filters.regex(r'f1_join_fee_(.+)_(\d+)'))
+async def join_multiplayer_f1_with_fee(_, call):
+    """直接加入多人F1游戏"""
     match = call.matches[0]
     full_match = match.group(0)
     parts = full_match.split('_')
     fee = int(parts[-1])
-    user_id = int(parts[-2])
-    game_id = '_'.join(parts[3:-2])
+    game_id = '_'.join(parts[3:-1])
     
-    # 验证用户身份
-    if call.from_user.id != user_id:
-        await callAnswer(call, '❌ 请加入自己的游戏！', True)
-        return
+    user_id = call.from_user.id
     
     # 验证费用档位
     if fee not in F1_FEE_TIERS:
@@ -549,7 +409,7 @@ async def confirm_join_multiplayer_f1(_, call):
     
     # 检查余额
     if e.iv < fee:
-        await callAnswer(call, f'❌ 余额不足！参与游戏需要 {fee} {sakura_b}', True)
+        await callAnswer(call, f'❌ 余额不足！需要 {fee} {sakura_b}', True)
         return
     
     # 扣除joy币
@@ -572,37 +432,47 @@ async def update_game_display(call, game_id, game):
     participant_count = len(game['participants'])
     
     # 构建参与者列表，显示每个人的费用
-    participant_list = '\n'.join([
-        f"{i+1}️⃣ {p['name']} - {p['fee']} {sakura_b}" 
-        for i, p in enumerate(game['participants'].values())
-    ])
+    if participant_count > 0:
+        participant_list = '\n'.join([
+            f"{i+1}️⃣ {p['name']} - {p['fee']} {sakura_b}" 
+            for i, p in enumerate(game['participants'].values())
+        ])
+        participant_section = f"📋 参与玩家:\n{participant_list}\n\n"
+    else:
+        participant_section = ""
     
     # 计算总奖池
-    total_pool = sum(p['fee'] for p in game['participants'].values())
+    total_pool = sum(p['fee'] for p in game['participants'].values()) if participant_count > 0 else 0
     
-    buttons = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🎮 加入游戏", f"f1_join_{game_id}")],
-        [InlineKeyboardButton(f"🏁 开始比赛 ({participant_count}/2)", f"f1_start_{game_id}")]
-    ])
+    # 创建3个费用按钮
+    fee_buttons = []
+    for fee in F1_FEE_TIERS:
+        fee_buttons.append([InlineKeyboardButton(f"💰 {fee} {sakura_b}", f"f1_join_fee_{game_id}_{fee}")])
     
-    creator_name = game['participants'][game['creator']]['name']
-    creator_fee = game['participants'][game['creator']]['fee']
+    fee_buttons.append([InlineKeyboardButton(f"🏁 开始比赛 ({participant_count}/2)", f"f1_start_{game_id}")])
+    buttons = InlineKeyboardMarkup(fee_buttons)
+    
+    creator_name = game['participants'][game['creator']]['name'] if game['creator'] in game['participants'] else "未加入"
     
     text = (
         f"🏎️ **多人F1竞速赛**\n\n"
-        f"🎯 发起者: {creator_name} ({creator_fee} {sakura_b})\n"
+        f"🎯 发起者: {creator_name}\n"
         f"👥 当前玩家: {participant_count}/∞\n"
-        f"🏆 当前奖池: {total_pool} {sakura_b}\n\n"
-        f"📋 参与玩家:\n"
-        f"{participant_list}\n\n"
     )
+    
+    if total_pool > 0:
+        text += f"🏆 当前奖池: {total_pool} {sakura_b}\n\n"
+    else:
+        text += "\n"
+    
+    text += participant_section
     
     if participant_count >= 2:
         text += "✅ 已满足最低人数，发起者可以开始游戏\n"
         text += "⏰ 5分钟后将自动开始游戏"
     else:
+        text += "💡 点击任意档位按钮加入游戏 (5/10/30 {sakura_b})\n"
         text += "⚠️ 至少需要2名玩家才能开始游戏\n"
-        text += "💡 参与者可自由选择门票档位 (5/10/30 {sakura_b})\n"
         text += "⏰ 5分钟后自动开始（满足人数）或取消（不满足人数）\n"
         text += "🏆 获胜者将赢得所有投入的joy币！"
     
