@@ -365,6 +365,8 @@ async def create_multiplayer_f1_with_fee(_, call):
     
     # 验证费用档位
     if fee not in F1_FEE_TIERS:
+        # 记录可能的篡改尝试
+        LOGGER.warning(f"【F1多人游戏】检测到无效费用档位尝试 - user_id: {user_id}, fee: {fee}, 有效档位: {F1_FEE_TIERS}")
         await callAnswer(call, '❌ 无效的费用档位', True)
         return
     
@@ -774,6 +776,8 @@ async def end_multiplayer_f1_game(game_id):
     ]
     
     # 计算每个获胜者分得的奖励（向下取整）
+    # 注意：使用整数除法可能导致少量Joy币未分配（例如30 Joy被4人平分，每人7 Joy，剩余2 Joy）
+    # 这是有意为之，以保持简单性并避免复杂的分配逻辑
     prize_per_winner = total_prize // len(winners)
     
     # 发放奖励
