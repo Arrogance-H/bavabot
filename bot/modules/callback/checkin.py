@@ -339,12 +339,11 @@ async def start_multiplayer_f1(_, msg):
         'auto_start_task': None
     }
     
-    # 创建3个费用按钮
-    fee_buttons = []
-    for fee in F1_FEE_TIERS:
-        fee_buttons.append([InlineKeyboardButton(f"💰 {fee} {sakura_b}", f"f1_join_fee_{game_id}_{fee}")])
-    
-    fee_buttons.append([InlineKeyboardButton("🏁 开始比赛 (0/2)", f"f1_start_{game_id}")])
+    # 创建3个费用按钮在同一行
+    fee_buttons = [
+        [InlineKeyboardButton(f"💰 {fee} {sakura_b}", f"f1_join_fee_{game_id}_{fee}") for fee in F1_FEE_TIERS],
+        [InlineKeyboardButton("🏁 开始比赛 (0/2)", f"f1_start_{game_id}")]
+    ]
     buttons = InlineKeyboardMarkup(fee_buttons)
     
     text = (
@@ -444,12 +443,11 @@ async def update_game_display(call, game_id, game):
     # 计算总奖池
     total_pool = sum(p['fee'] for p in game['participants'].values()) if participant_count > 0 else 0
     
-    # 创建3个费用按钮
-    fee_buttons = []
-    for fee in F1_FEE_TIERS:
-        fee_buttons.append([InlineKeyboardButton(f"💰 {fee} {sakura_b}", f"f1_join_fee_{game_id}_{fee}")])
-    
-    fee_buttons.append([InlineKeyboardButton(f"🏁 开始比赛 ({participant_count}/2)", f"f1_start_{game_id}")])
+    # 创建3个费用按钮在同一行
+    fee_buttons = [
+        [InlineKeyboardButton(f"💰 {fee} {sakura_b}", f"f1_join_fee_{game_id}_{fee}") for fee in F1_FEE_TIERS],
+        [InlineKeyboardButton(f"🏁 开始比赛 ({participant_count}/2)", f"f1_start_{game_id}")]
+    ]
     buttons = InlineKeyboardMarkup(fee_buttons)
     
     creator_name = game['participants'][game['creator']]['name'] if game['creator'] in game['participants'] else "未加入"
@@ -776,7 +774,8 @@ async def end_multiplayer_f1_game(game_id):
             f"🏎️ **F1竞速赛 - 颁奖台**\n\n"
             f"🏆 获胜者: {winner_names[0]}\n"
             f"💰 奖励: {prize_per_winner} {sakura_b}\n\n"
-            f"🎯 总奖池: {total_prize} {sakura_b}"
+            f"🎯 总奖池: {total_prize} {sakura_b}\n\n"
+            f"📊 排行榜:\n{ranking}"
         )
     else:
         winners_str = '、'.join(winner_names)
@@ -784,7 +783,8 @@ async def end_multiplayer_f1_game(game_id):
             f"🏎️ **F1竞速赛 - 颁奖台**\n\n"
             f"🏆 平局获胜者: {winners_str}\n"
             f"💰 每人奖励: {prize_per_winner} {sakura_b}\n\n"
-            f"🎯 总奖池: {total_prize} {sakura_b}"
+            f"🎯 总奖池: {total_prize} {sakura_b}\n\n"
+            f"📊 排行榜:\n{ranking}"
         )
     
     # 在原有消息上编辑以显示游戏结果
