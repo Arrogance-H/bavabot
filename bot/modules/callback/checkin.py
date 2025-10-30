@@ -256,7 +256,7 @@ async def end_punch_game(call, user_id):
     
     if clicks <= 3:
         reward_text = "💔 **爆胎咯，需要更努力哦!**"
-    elif clicks <= 9:
+    elif clicks <= 8:
         reward = random.randint(1, 3)
         reward_text = f"🎉 **获得奖励**: {reward} {sakura_b}"
     else:
@@ -338,8 +338,7 @@ async def start_multiplayer_f1(_, msg):
     text = (
         f"🏎️ **多人F1竞速赛**\n\n"
         f"🎯 发起者: {msg.from_user.first_name}\n"
-        f"💴 当前余额: {e.iv} {sakura_b}\n\n"
-        f"请选择参与费用档位："
+        f"请选择参与门票档位："
     )
     
     await sendMessage(msg, text=text, buttons=buttons, send=True)
@@ -412,7 +411,7 @@ async def create_multiplayer_f1_with_fee(_, call):
     text = (
         f"🏎️ **多人F1竞速赛**\n\n"
         f"🎯 发起者: {call.from_user.first_name}\n"
-        f"💰 参与费用: {fee} {sakura_b}\n"
+        f"💰 门票档位: {fee} {sakura_b}\n"
         f"👥 当前玩家: 1/∞\n\n"
         f"📋 参与玩家:\n"
         f"1️⃣ {call.from_user.first_name}\n\n"
@@ -487,7 +486,7 @@ async def join_multiplayer_f1(_, call):
     text = (
         f"🏎️ **多人F1竞速赛**\n\n"
         f"🎯 发起者: {game['participants'][game['creator']]['name']}\n"
-        f"💰 参与费用: {fee} {sakura_b}\n"
+        f"💰 门票档位: {fee} {sakura_b}\n"
         f"👥 当前玩家: {participant_count}/∞\n\n"
         f"📋 参与玩家:\n"
         f"{participant_list}\n\n"
@@ -500,7 +499,7 @@ async def join_multiplayer_f1(_, call):
     else:
         text += "⚠️ 至少需要2名玩家才能开始游戏\n"
         text += "⏰ 5分钟后自动开始游戏\n"
-        text += "🏆 获胜者将赢得所有投入的joy币！"
+        text += "🏆 获胜者将赢得所有投入的JOY币！"
     
     await editMessage(call, text, buttons=buttons)
     await callAnswer(call, f'✅ 成功加入游戏！已扣除 {fee} {sakura_b}', False)
@@ -803,7 +802,7 @@ async def end_multiplayer_f1_game(game_id):
     # 构建结果消息
     if len(winners) == 1:
         result_text = (
-            f"🏎️ **多人F1竞速赛 - 结束**\n\n"
+            f"🏎️ **F1竞速赛 - 颁奖台**\n\n"
             f"🏆 获胜者: {winner_names[0]}\n"
             f"💰 奖励: {prize_per_winner} {sakura_b}\n\n"
             f"📊 最终排名:\n{ranking}\n\n"
@@ -812,7 +811,7 @@ async def end_multiplayer_f1_game(game_id):
     else:
         winners_str = '、'.join(winner_names)
         result_text = (
-            f"🏎️ **多人F1竞速赛 - 结束**\n\n"
+            f"🏎️ **F1竞速赛 - 颁奖台**\n\n"
             f"🏆 平局获胜者: {winners_str}\n"
             f"💰 每人奖励: {prize_per_winner} {sakura_b}\n\n"
             f"📊 最终排名:\n{ranking}\n\n"
