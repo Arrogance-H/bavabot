@@ -312,7 +312,29 @@ def get_download_text(download_tasks, request_record):
 def get_request_record_text(request_record):
     text = '📈 点播记录\n'
     for index, item in enumerate(request_record, start=1):
-        text += f"「{index}」：{item.request_name}\n"
+        progress = item.progress
+        progress_text = ''
+        if item.transfer_state is not None:
+            if item.transfer_state:
+                text += f"「{index}」：{item.request_name} \n状态：已入库 📽️\n"
+            else:
+                text += f"「{index}」：{item.request_name} \n状态：入库失败 🚫\n"
+        else:
+            if progress is None:
+                progress_text = '未知'
+            else:
+                progress = round(progress, 1)
+                left_progress = '🟩' * int(progress/10)
+                right_progress = '⬜️' * (10 - int(progress // 10))
+                progress_text = f"{left_progress}{right_progress} {progress}%"
+            download_state_text = '正在排队'
+            if item.download_state == 'downloading':
+                download_state_text = '正在下载'
+            elif item.download_state == 'completed':
+                download_state_text = '已完成'
+            elif item.download_state == 'failed':
+                download_state_text = '下载失败'
+            text += f"「{index}」：{item.request_name} \n状态：{download_state_text} {progress_text}\n 剩余时间：{item.left_time}\n"
     return text
 
 # 添加新的回调处理函数
