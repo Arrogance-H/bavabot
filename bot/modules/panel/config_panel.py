@@ -4,7 +4,7 @@
 部分目前有 导出日志，更改探针，更改emby线路，设置购买按钮
 
 """
-from bot import bot, prefixes, bot_photo, Now, LOGGER, config, save_config, _open, auto_update, moviepilot, sakura_b, m_users, m_welcome_exclude
+from bot import bot, prefixes, bot_photo, Now, LOGGER, config, save_config, _open, auto_update, moviepilot, sakura_b, m_users
 from pyrogram import filters
 
 from bot.func_helper.filters import admins_on_filter
