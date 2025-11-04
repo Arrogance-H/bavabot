@@ -743,17 +743,40 @@ async def end_multiplayer_f1_game(game_id):
         if data['clicks'] == max_clicks
     ]
     
-    # 计算每个获胜者分得的奖励（向下取整）
-    # 注意：使用整数除法可能导致少量Joy币未分配（例如30 Joy被4人平分，每人7 Joy，剩余2 Joy）
-    # 这是有意为之，以保持简单性并避免复杂的分配逻辑
-    prize_per_winner = total_prize // len(winners)
+    # 如果是平局（多个获胜者），按照投入比例分配奖励
+    if len(winners) > 1:
+        # 计算获胜者的总投入
+        winners_total_fee = sum(game['participants'][winner_id]['fee'] for winner_id in winners)
+        
+        # 按照投入比例分配奖励给每个获胜者
+        # 注意：使用int()向下取整可能导致少量Joy币未分配
+        # 例如：30 Joy被3个投入(10,10,10)的人平分，每人10 Joy，剩余0 Joy
+        # 例如：31 Joy被3个投入(10,10,11)的人按比例分，可能有1 Joy未分配
+        # 这是有意为之，以保持简单性并避免浮点数精度问题
+        winner_rewards = {}
+        
+        # 防御性编程：检查除零情况（理论上不应发生，因为参与游戏需要支付费用）
+        if winners_total_fee > 0:
+            for winner_id in winners:
+                winner_fee = game['participants'][winner_id]['fee']
+                # 按照投入比例分配奖池，向下取整
+                prize = int(total_prize * winner_fee / winners_total_fee)
+                winner_rewards[winner_id] = prize
+        else:
+            # 异常情况：所有获胜者费用为0，平分奖池
+            prize_per_winner = total_prize // len(winners)
+            for winner_id in winners:
+                winner_rewards[winner_id] = prize_per_winner
+    else:
+        # 单一获胜者，获得全部奖池
+        winner_rewards = {winners[0]: total_prize}
     
     # 发放奖励
     winner_names = []
-    for winner_id in winners:
+    for winner_id, prize in winner_rewards.items():
         e = sql_get_emby(winner_id)
         if e:
-            sql_update_emby(Emby.tg == winner_id, iv=e.iv + prize_per_winner)
+            sql_update_emby(Emby.tg == winner_id, iv=e.iv + prize)
         winner_names.append(game['participants'][winner_id]['name'])
     
     # 排序参与者
@@ -773,16 +796,21 @@ async def end_multiplayer_f1_game(game_id):
         result_text = (
             f"🏎️ **F1竞速赛 - 颁奖台**\n\n"
             f"🏆 获胜者: {winner_names[0]}\n"
-            f"💰 奖励: {prize_per_winner} {sakura_b}\n"
+            f"💰 奖励: {winner_rewards[winners[0]]} {sakura_b}\n"
             f"🎯 总奖池: {total_prize} {sakura_b}\n\n"
             f"📊 排行榜:\n{ranking}"
         )
     else:
+        # 平局情况，按投入比例显示每人的奖励
         winners_str = '、'.join(winner_names)
+        rewards_detail = '\n'.join([
+            f"  • {game['participants'][winner_id]['name']}: {winner_rewards[winner_id]} {sakura_b} (投入 {game['participants'][winner_id]['fee']} {sakura_b})"
+            for winner_id in winners
+        ])
         result_text = (
             f"🏎️ **F1竞速赛 - 颁奖台**\n\n"
             f"🏆 平局获胜者: {winners_str}\n"
-            f"💰 每人奖励: {prize_per_winner} {sakura_b}\n"
+            f"💰 奖励分配（按投入比例）:\n{rewards_detail}\n"
             f"🎯 总奖池: {total_prize} {sakura_b}\n\n"
             f"📊 排行榜:\n{ranking}"
         )

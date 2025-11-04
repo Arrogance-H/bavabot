@@ -404,24 +404,8 @@ def get_demand_records_keyboard(current_page, total_pages, current_filter="all")
     return InlineKeyboardMarkup(keyboard)
 
 
-@bot.on_message(filters.command('demand', prefixes) & admins_filter)
-async def demand_command(_, msg):
-    """
-    ME点播用户列表命令 - 仅限管理员和Owner使用
-    
-    权限限制：只有管理员(owner、admins)可以访问，群组成员无法使用
-    功能：显示按用户分组的点播统计，点击用户可查看详细记录并编辑状态
-    """
-    try:
-        await deleteMessage(msg)
-        
-        # 直接显示用户列表
-        text, keyboard = await format_user_list(1)
-        await sendMessage(msg, text, send=True, chat_id=msg.chat.id, buttons=keyboard)
-            
-    except Exception as e:
-        LOGGER.error(f"处理demand命令时出错 (用户: {msg.from_user.id}): {str(e)}")
-        await sendMessage(msg, f"❌ 处理命令时出错: {str(e)[:100]}", send=True, chat_id=msg.chat.id)
+# Removed old admin-only demand_command - now using unified handler below
+
 
 
 @bot.on_callback_query(filters.regex(r'^demand_page_(\d+)_(.+)$') & admins_filter)
@@ -1360,6 +1344,28 @@ async def handle_demand_edit_status_cancel(_, call):
     except Exception as e:
         LOGGER.error(f"处理编辑取消失败: {str(e)}")
         await callAnswer(call, "❌ 取消失败", True)
+
+
+# ============== 管理员查看点播记录功能 ==============
+
+@bot.on_message(filters.command('demand', prefixes) & admins_filter)
+async def admin_demand_command(_, msg):
+    """
+    ME点播用户列表命令 - 仅限管理员和Owner使用
+    
+    权限限制：只有管理员(owner、admins)可以访问，群组成员无法使用
+    功能：显示按用户分组的点播统计，点击用户可查看详细记录并编辑状态
+    """
+    try:
+        await deleteMessage(msg)
+        
+        # 管理员：显示所有用户列表
+        text, keyboard = await format_user_list(1)
+        await sendMessage(msg, text, send=True, chat_id=msg.chat.id, buttons=keyboard)
+            
+    except Exception as e:
+        LOGGER.error(f"处理demand命令时出错 (用户: {msg.from_user.id}): {str(e)}")
+        await sendMessage(msg, f"❌ 处理命令时出错: {str(e)[:100]}", send=True, chat_id=msg.chat.id)
 
 
 # Aliases for backward compatibility with imports

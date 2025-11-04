@@ -422,7 +422,6 @@ def config_preparation() -> InlineKeyboardMarkup:
          [('🎬 显/隐指定库', 'set_block'), (f'{fuxx_pt} 皮套人过滤功能', 'set_fuxx_pitao')],
          [('💠 普通用户线路', 'set_line'),('🌟 白名单线路', 'set_whitelist_line')],
          [('Ⓜ️ M尊享线路', 'set_m_line'), ('👥 M用户管理', 'manage_m_users')],
-         [('🚫 M欢迎排除列表', 'manage_m_welcome_exclude')],
          [(f'{leave_ban} 退群封禁', 'leave_ban'), (f'{uplays} 观影奖励结算', 'set_uplays')],
          [(f'{auto_up} 自动更新bot', 'set_update'), (f'{mp_set} Moviepilot点播', 'set_mp')],
          [(f'{red_envelope_status} 红包', 'set_red_envelope_status'), (f'{allow_private} 专属红包', 'set_red_envelope_allow_private')],
@@ -671,9 +670,23 @@ def tmdb_search_page_ikb(has_prev: bool, has_next: bool, page: int, results_coun
 
 # Independent TMDB search buttons (not connected to download center)
 tmdb_main_ikb = ikb([
-    [('🔍 开始搜索', 'tmdb_search')],
+    [('🔍 开始搜索', 'tmdb_search'), ('📋 点播记录', 'view_my_demands')],
     [('🔙 返回', 'members')]
 ])
+
+def tmdb_main_ikb_with_admin(is_admin=False):
+    """返回TMDB主界面键盘，管理员可见额外按钮"""
+    buttons = [
+        [('🔍 开始搜索', 'tmdb_search'), ('📋 点播记录', 'view_my_demands')]
+    ]
+    
+    # 只有管理员才显示点播管理按钮
+    if is_admin:
+        buttons.append([('🎛️ 点播管理', 'demand_manage')])
+    
+    buttons.append([('🔙 返回', 'members')])
+    
+    return ikb(buttons)
 
 tmdb_search_result_ikb = ikb([
     [('🎬 点播此片', 'me_request_movie')],

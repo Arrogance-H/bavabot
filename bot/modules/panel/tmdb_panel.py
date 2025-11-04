@@ -5,18 +5,20 @@ Independent system with own request recording, admin notifications, and cost man
 """
 
 from pyrogram import filters, enums
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from bot import bot, tmdb, bot_photo, LOGGER, owner, admins, sakura_b
 from bot.func_helper.msg_utils import callAnswer, editMessage, sendMessage, sendPhoto, callListen
 from bot.func_helper.filters import user_in_group_on_filter
-from bot.func_helper.fix_bottons import tmdb_main_ikb, tmdb_search_result_list_ikb, tmdb_search_result_ikb, back_members_ikb, tmdb_season_selection_ikb
+from bot.func_helper.fix_bottons import tmdb_main_ikb, tmdb_main_ikb_with_admin, tmdb_search_result_list_ikb, tmdb_search_result_ikb, back_members_ikb, tmdb_season_selection_ikb
 from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby
-from bot.sql_helper.sql_request_record import sql_add_request_record, sql_check_existing_request_by_title, get_beijing_time
+from bot.sql_helper.sql_request_record import sql_add_request_record, sql_check_existing_request_by_title, get_beijing_time, sql_get_all_request_records
 from bot.func_helper.tmdb import tmdb_service
 from bot.func_helper.emby import emby
 from bot.func_helper.utils import judge_admins
 import asyncio
 import uuid
 import datetime
+import math
 
 # 存储TMDB搜索结果的全局字典
 user_tmdb_data = {}
@@ -69,7 +71,11 @@ async def tmdb_main_handler(_, call):
         "点击下方\"🔍 开始搜索\"按钮开始使用"
     )
     
-    await editMessage(call, welcome_text, buttons=tmdb_main_ikb, parse_mode=enums.ParseMode.MARKDOWN)
+    # 检查是否为管理员
+    is_admin = judge_admins(call.from_user.id)
+    keyboard = tmdb_main_ikb_with_admin(is_admin=is_admin)
+    
+    await editMessage(call, welcome_text, buttons=keyboard, parse_mode=enums.ParseMode.MARKDOWN)
 
 
 @bot.on_callback_query(filters.regex('tmdb_search') & user_in_group_on_filter)
@@ -1587,3 +1593,139 @@ async def return_to_search_results(_, call):
     # 重新显示搜索结果页面（用于普通文本搜索）
     query = user_data['query']
     await tmdb_search_results(call, query, page=1)
+
+
+# ============== 用户查看自己的点播记录功能 ==============
+
+# 常量定义
+RECORDS_PER_PAGE = 5
+
+@bot.on_callback_query(filters.regex('view_my_demands') & user_in_group_on_filter)
+async def view_my_demands(_, call):
+    """用户在TMDB点播中心查看自己的点播记录"""
+    try:
+        await callAnswer(call, '📋 查看我的点播记录')
+        user_id = call.from_user.id
+        
+        text, keyboard = await format_my_demand_records(user_id, 1)
+        await editMessage(call, text, buttons=keyboard)
+        
+    except Exception as e:
+        LOGGER.error(f"查看点播记录失败 (用户: {call.from_user.id}): {str(e)}")
+        await callAnswer(call, "❌ 查看失败", True)
+
+
+async def format_my_demand_records(user_id, current_page=1):
+    """格式化用户自己的点播记录显示（仅显示名称，不显示状态）"""
+    try:
+        all_records, _, _, _ = sql_get_all_request_records(page=1, limit=1000)
+        user_records = [r for r in all_records if r.download_id.startswith('ME') and r.tg == user_id]
+        
+        if not user_records:
+            text = "📋 您还没有点播记录"
+            keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 返回", callback_data="tmdb_main")]])
+            return text, keyboard
+        
+        # 按时间排序，最新的在前
+        user_records.sort(key=lambda x: x.create_at, reverse=True)
+        
+        total_records = len(user_records)
+        total_pages = max(1, math.ceil(total_records / RECORDS_PER_PAGE))
+        
+        if current_page > total_pages:
+            current_page = total_pages
+        if current_page < 1:
+            current_page = 1
+        
+        start_idx = (current_page - 1) * RECORDS_PER_PAGE
+        end_idx = start_idx + RECORDS_PER_PAGE
+        page_records = user_records[start_idx:end_idx]
+        
+        text = f"📋 我的点播记录 (第{current_page}/{total_pages}页，共{total_records}条)\n\n"
+        
+        for idx, record in enumerate(page_records):
+            global_idx = start_idx + idx + 1
+            text += f"「{global_idx}」{record.request_name}\n"
+        
+        # 键盘
+        keyboard_buttons = []
+        
+        # 分页按钮
+        page_row = []
+        if current_page > 1:
+            page_row.append(InlineKeyboardButton("⬅️ 上页", callback_data=f"my_demand_page_{current_page-1}"))
+        if current_page < total_pages:
+            page_row.append(InlineKeyboardButton("下页 ➡️", callback_data=f"my_demand_page_{current_page+1}"))
+        
+        if page_row:
+            keyboard_buttons.append(page_row)
+        
+        # 刷新和返回按钮
+        keyboard_buttons.append([
+            InlineKeyboardButton("🔄 刷新", callback_data="my_demand_refresh"),
+            InlineKeyboardButton("🔙 返回", callback_data="tmdb_main")
+        ])
+        
+        keyboard = InlineKeyboardMarkup(keyboard_buttons)
+        return text, keyboard
+        
+    except Exception as e:
+        LOGGER.error(f"格式化我的点播记录失败: {str(e)}")
+        return "❌ 获取记录失败", None
+
+
+@bot.on_callback_query(filters.regex(r'^my_demand_page_(\d+)$') & user_in_group_on_filter)
+async def handle_my_demand_page(_, call):
+    """处理我的点播记录分页请求"""
+    try:
+        page = int(call.matches[0].group(1))
+        user_id = call.from_user.id
+        
+        text, keyboard = await format_my_demand_records(user_id, page)
+        await editMessage(call, text, buttons=keyboard)
+        await callAnswer(call, f"已切换到第{page}页")
+        
+    except Exception as e:
+        LOGGER.error(f"处理我的点播记录分页失败: {str(e)}")
+        await callAnswer(call, "❌ 分页失败", True)
+
+
+@bot.on_callback_query(filters.regex(r'^my_demand_refresh$') & user_in_group_on_filter)
+async def handle_my_demand_refresh(_, call):
+    """处理我的点播记录刷新请求"""
+    try:
+        user_id = call.from_user.id
+        
+        text, keyboard = await format_my_demand_records(user_id, 1)
+        await editMessage(call, text, buttons=keyboard)
+        await callAnswer(call, "🔄 已刷新")
+        
+    except Exception as e:
+        LOGGER.error(f"处理我的点播记录刷新失败: {str(e)}")
+        await callAnswer(call, "❌ 刷新失败", True)
+
+
+# ============== 管理员点播管理功能 ==============
+
+@bot.on_callback_query(filters.regex('demand_manage') & user_in_group_on_filter)
+async def demand_manage_handler(_, call):
+    """管理员点播管理入口"""
+    try:
+        user_id = call.from_user.id
+        
+        # 检查是否为管理员
+        if not judge_admins(user_id):
+            await callAnswer(call, '❌ 只有管理员可以使用此功能', True)
+            return
+        
+        await callAnswer(call, '🎛️ 点播管理')
+        
+        # 导入demand.py的用户列表格式化函数
+        from bot.modules.commands.demand import format_user_list
+        
+        text, keyboard = await format_user_list(1)
+        await editMessage(call, text, buttons=keyboard)
+        
+    except Exception as e:
+        LOGGER.error(f"管理员点播管理失败 (用户: {call.from_user.id}): {str(e)}")
+        await callAnswer(call, "❌ 操作失败", True)
