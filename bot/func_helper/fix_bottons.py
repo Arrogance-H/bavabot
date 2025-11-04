@@ -586,6 +586,7 @@ def get_resource_ikb(download_name: str):
                 [('❌ 关闭', 'closeit')]])
 re_download_center_ikb = ikb([
     [('🍿 点播', 'get_resource'), ('📶 下载进度', 'download_rate')], 
+    [('📋 点播记录', 'view_my_demands')],
     [('🔙 返回', 'members')]])
 continue_search_ikb = ikb([
     [('🔄 继续搜索', 'continue_search'), ('❌ 取消搜索', 'cancel_search')],

@@ -1346,129 +1346,26 @@ async def handle_demand_edit_status_cancel(_, call):
         await callAnswer(call, "❌ 取消失败", True)
 
 
-# ============== 用户查看自己的点播记录功能 ==============
+# ============== 管理员查看点播记录功能 ==============
 
-@bot.on_message(filters.command('demand', prefixes))
-async def user_demand_command(_, msg):
+@bot.on_message(filters.command('demand', prefixes) & admins_filter)
+async def admin_demand_command(_, msg):
     """
-    用户查看自己的ME点播记录命令
+    ME点播用户列表命令 - 仅限管理员和Owner使用
     
-    功能：普通用户使用此命令查看自己的点播记录（仅显示记录名称，不显示状态）
-    管理员使用此命令查看所有用户的点播记录和管理功能
+    权限限制：只有管理员(owner、admins)可以访问，群组成员无法使用
+    功能：显示按用户分组的点播统计，点击用户可查看详细记录并编辑状态
     """
     try:
-        from bot.func_helper.utils import judge_admins
-        
         await deleteMessage(msg)
-        user_id = msg.from_user.id
         
-        # 判断是否为管理员
-        if judge_admins(user_id):
-            # 管理员：显示所有用户列表
-            text, keyboard = await format_user_list(1)
-            await sendMessage(msg, text, send=True, chat_id=msg.chat.id, buttons=keyboard)
-        else:
-            # 普通用户：只显示自己的点播记录
-            text, keyboard = await format_my_demand_records(user_id, 1)
-            await sendMessage(msg, text, send=True, chat_id=msg.chat.id, buttons=keyboard)
+        # 管理员：显示所有用户列表
+        text, keyboard = await format_user_list(1)
+        await sendMessage(msg, text, send=True, chat_id=msg.chat.id, buttons=keyboard)
             
     except Exception as e:
         LOGGER.error(f"处理demand命令时出错 (用户: {msg.from_user.id}): {str(e)}")
         await sendMessage(msg, f"❌ 处理命令时出错: {str(e)[:100]}", send=True, chat_id=msg.chat.id)
-
-
-async def format_my_demand_records(user_id, current_page=1):
-    """格式化用户自己的点播记录显示（仅显示名称，不显示状态）"""
-    try:
-        all_records, _, _, _ = sql_get_all_request_records(page=1, limit=1000)
-        user_records = [r for r in all_records if r.download_id.startswith('ME') and r.tg == user_id]
-        
-        if not user_records:
-            text = "📋 您还没有点播记录"
-            keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("❌ 关闭", callback_data="closeit")]])
-            return text, keyboard
-        
-        # 按时间排序，最新的在前
-        user_records.sort(key=lambda x: x.create_at, reverse=True)
-        
-        total_records = len(user_records)
-        total_pages = max(1, math.ceil(total_records / RECORDS_PER_PAGE))
-        
-        if current_page > total_pages:
-            current_page = total_pages
-        if current_page < 1:
-            current_page = 1
-        
-        start_idx = (current_page - 1) * RECORDS_PER_PAGE
-        end_idx = start_idx + RECORDS_PER_PAGE
-        page_records = user_records[start_idx:end_idx]
-        
-        text = f"📋 我的点播记录 (第{current_page}/{total_pages}页，共{total_records}条)\n\n"
-        
-        for idx, record in enumerate(page_records):
-            global_idx = start_idx + idx + 1
-            text += f"「{global_idx}」{record.request_name}\n"
-        
-        # 键盘
-        keyboard_buttons = []
-        
-        # 分页按钮
-        page_row = []
-        if current_page > 1:
-            page_row.append(InlineKeyboardButton("⬅️ 上页", callback_data=f"my_demand_page_{current_page-1}"))
-        if current_page < total_pages:
-            page_row.append(InlineKeyboardButton("下页 ➡️", callback_data=f"my_demand_page_{current_page+1}"))
-        
-        if page_row:
-            keyboard_buttons.append(page_row)
-        
-        # 刷新按钮
-        keyboard_buttons.append([
-            InlineKeyboardButton("🔄 刷新", callback_data="my_demand_refresh")
-        ])
-        
-        # 关闭按钮
-        keyboard_buttons.append([
-            InlineKeyboardButton("❌ 关闭", callback_data="closeit")
-        ])
-        
-        keyboard = InlineKeyboardMarkup(keyboard_buttons)
-        return text, keyboard
-        
-    except Exception as e:
-        LOGGER.error(f"格式化我的点播记录失败: {str(e)}")
-        return "❌ 获取记录失败", None
-
-
-@bot.on_callback_query(filters.regex(r'^my_demand_page_(\d+)$'))
-async def handle_my_demand_page(_, call):
-    """处理我的点播记录分页请求"""
-    try:
-        page = int(call.matches[0].group(1))
-        user_id = call.from_user.id
-        
-        text, keyboard = await format_my_demand_records(user_id, page)
-        await editMessage(call, text, buttons=keyboard)
-        await callAnswer(call, f"已切换到第{page}页")
-        
-    except Exception as e:
-        LOGGER.error(f"处理我的点播记录分页失败: {str(e)}")
-        await callAnswer(call, "❌ 分页失败", True)
-
-
-@bot.on_callback_query(filters.regex(r'^my_demand_refresh$'))
-async def handle_my_demand_refresh(_, call):
-    """处理我的点播记录刷新请求"""
-    try:
-        user_id = call.from_user.id
-        
-        text, keyboard = await format_my_demand_records(user_id, 1)
-        await editMessage(call, text, buttons=keyboard)
-        await callAnswer(call, "🔄 已刷新")
-        
-    except Exception as e:
-        LOGGER.error(f"处理我的点播记录刷新失败: {str(e)}")
-        await callAnswer(call, "❌ 刷新失败", True)
 
 
 # Aliases for backward compatibility with imports

@@ -4,12 +4,13 @@ from bot.func_helper.msg_utils import callAnswer, editMessage, sendMessage, send
 from bot.func_helper.filters import user_in_group_on_filter
 from bot.func_helper.fix_bottons import re_download_center_ikb, back_members_ikb, continue_search_ikb, request_record_page_ikb, mp_search_page_ikb
 from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby
-from bot.sql_helper.sql_request_record import sql_add_request_record, sql_get_request_record_by_tg
+from bot.sql_helper.sql_request_record import sql_add_request_record, sql_get_request_record_by_tg, sql_get_all_request_records
 from bot.func_helper.moviepilot import search, add_download_task 
 from bot.func_helper.emby import emby
 from bot.func_helper.utils import judge_admins
 import asyncio
 import math
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # 添加全局字典来存储用户搜索记录
 user_search_data = {}
@@ -370,3 +371,113 @@ async def handle_select_download(_, call):
     
     await callAnswer(call, '💾 进入资源选择')
     await handle_resource_selection(call, user_data['all_result'])
+
+
+# ============== 用户查看自己的点播记录功能 ==============
+
+# 常量定义
+RECORDS_PER_PAGE = 5
+
+@bot.on_callback_query(filters.regex('view_my_demands') & user_in_group_on_filter)
+async def view_my_demands(_, call):
+    """用户在点播中心查看自己的点播记录"""
+    try:
+        await callAnswer(call, '📋 查看我的点播记录')
+        user_id = call.from_user.id
+        
+        text, keyboard = await format_my_demand_records(user_id, 1)
+        await editMessage(call, text, buttons=keyboard)
+        
+    except Exception as e:
+        LOGGER.error(f"查看点播记录失败 (用户: {call.from_user.id}): {str(e)}")
+        await callAnswer(call, "❌ 查看失败", True)
+
+
+async def format_my_demand_records(user_id, current_page=1):
+    """格式化用户自己的点播记录显示（仅显示名称，不显示状态）"""
+    try:
+        all_records, _, _, _ = sql_get_all_request_records(page=1, limit=1000)
+        user_records = [r for r in all_records if r.download_id.startswith('ME') and r.tg == user_id]
+        
+        if not user_records:
+            text = "📋 您还没有点播记录"
+            keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 返回", callback_data="download_center")]])
+            return text, keyboard
+        
+        # 按时间排序，最新的在前
+        user_records.sort(key=lambda x: x.create_at, reverse=True)
+        
+        total_records = len(user_records)
+        total_pages = max(1, math.ceil(total_records / RECORDS_PER_PAGE))
+        
+        if current_page > total_pages:
+            current_page = total_pages
+        if current_page < 1:
+            current_page = 1
+        
+        start_idx = (current_page - 1) * RECORDS_PER_PAGE
+        end_idx = start_idx + RECORDS_PER_PAGE
+        page_records = user_records[start_idx:end_idx]
+        
+        text = f"📋 我的点播记录 (第{current_page}/{total_pages}页，共{total_records}条)\n\n"
+        
+        for idx, record in enumerate(page_records):
+            global_idx = start_idx + idx + 1
+            text += f"「{global_idx}」{record.request_name}\n"
+        
+        # 键盘
+        keyboard_buttons = []
+        
+        # 分页按钮
+        page_row = []
+        if current_page > 1:
+            page_row.append(InlineKeyboardButton("⬅️ 上页", callback_data=f"my_demand_page_{current_page-1}"))
+        if current_page < total_pages:
+            page_row.append(InlineKeyboardButton("下页 ➡️", callback_data=f"my_demand_page_{current_page+1}"))
+        
+        if page_row:
+            keyboard_buttons.append(page_row)
+        
+        # 刷新和返回按钮
+        keyboard_buttons.append([
+            InlineKeyboardButton("🔄 刷新", callback_data="my_demand_refresh"),
+            InlineKeyboardButton("🔙 返回", callback_data="download_center")
+        ])
+        
+        keyboard = InlineKeyboardMarkup(keyboard_buttons)
+        return text, keyboard
+        
+    except Exception as e:
+        LOGGER.error(f"格式化我的点播记录失败: {str(e)}")
+        return "❌ 获取记录失败", None
+
+
+@bot.on_callback_query(filters.regex(r'^my_demand_page_(\d+)$') & user_in_group_on_filter)
+async def handle_my_demand_page(_, call):
+    """处理我的点播记录分页请求"""
+    try:
+        page = int(call.matches[0].group(1))
+        user_id = call.from_user.id
+        
+        text, keyboard = await format_my_demand_records(user_id, page)
+        await editMessage(call, text, buttons=keyboard)
+        await callAnswer(call, f"已切换到第{page}页")
+        
+    except Exception as e:
+        LOGGER.error(f"处理我的点播记录分页失败: {str(e)}")
+        await callAnswer(call, "❌ 分页失败", True)
+
+
+@bot.on_callback_query(filters.regex(r'^my_demand_refresh$') & user_in_group_on_filter)
+async def handle_my_demand_refresh(_, call):
+    """处理我的点播记录刷新请求"""
+    try:
+        user_id = call.from_user.id
+        
+        text, keyboard = await format_my_demand_records(user_id, 1)
+        await editMessage(call, text, buttons=keyboard)
+        await callAnswer(call, "🔄 已刷新")
+        
+    except Exception as e:
+        LOGGER.error(f"处理我的点播记录刷新失败: {str(e)}")
+        await callAnswer(call, "❌ 刷新失败", True)
