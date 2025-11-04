@@ -754,11 +754,19 @@ async def end_multiplayer_f1_game(game_id):
         # 例如：31 Joy被3个投入(10,10,11)的人按比例分，可能有1 Joy未分配
         # 这是有意为之，以保持简单性并避免浮点数精度问题
         winner_rewards = {}
-        for winner_id in winners:
-            winner_fee = game['participants'][winner_id]['fee']
-            # 按照投入比例分配奖池，向下取整
-            prize = int(total_prize * winner_fee / winners_total_fee)
-            winner_rewards[winner_id] = prize
+        
+        # 防御性编程：检查除零情况（理论上不应发生，因为参与游戏需要支付费用）
+        if winners_total_fee > 0:
+            for winner_id in winners:
+                winner_fee = game['participants'][winner_id]['fee']
+                # 按照投入比例分配奖池，向下取整
+                prize = int(total_prize * winner_fee / winners_total_fee)
+                winner_rewards[winner_id] = prize
+        else:
+            # 异常情况：所有获胜者费用为0，平分奖池
+            prize_per_winner = total_prize // len(winners)
+            for winner_id in winners:
+                winner_rewards[winner_id] = prize_per_winner
     else:
         # 单一获胜者，获得全部奖池
         winner_rewards = {winners[0]: total_prize}
