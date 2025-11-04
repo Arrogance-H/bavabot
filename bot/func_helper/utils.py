@@ -76,16 +76,24 @@ async def members_info(tg=None, name=None):
         preserve_mode = getattr(data, 'preserve_mode', 'active')  # 默认为活跃保号
         preserve_mode_changed = getattr(data, 'preserve_mode_changed', 0)
         
-        # Update ex display logic based on user's preserve_mode instead of global schedall settings
+        # Update ex display logic based on user's preserve_mode and admin settings
         # This implements preserve mode specific logic for displaying expiration information:
         # - M尊享 and whitelist users: show infinity symbol
-        # - 'expire' mode: shows formatted expiration date (到期保号)
-        # - 'active' mode: shows activity warning message (活跃保号) 
+        # - When admin disables corresponding check: show "无需保号"
+        # - 'expire' mode with check enabled: shows formatted expiration date (到期保号)
+        # - 'active' mode with check enabled: shows activity warning message (活跃保号) 
         # - no account: shows default message
         if lv in ['白名单', 'M尊享']:
             ex = '+ ∞'
         elif name != '无账户信息':
-            if preserve_mode == 'expire':
+            # Check if admin has disabled the corresponding preserve check
+            if preserve_mode == 'expire' and not schedall.check_ex:
+                # Admin disabled expire check (到期保号检测), show "无需保号"
+                ex = '__无需保号，放心食用__'
+            elif preserve_mode == 'active' and not schedall.low_activity:
+                # Admin disabled activity check (活跃保号检测), show "无需保号"
+                ex = '__无需保号，放心食用__'
+            elif preserve_mode == 'expire':
                 # For 'expire' mode (到期保号), show the formatted expiration date
                 if data.ex:
                     ex = data.ex.strftime("%Y-%m-%d %H:%M:%S")

@@ -67,7 +67,6 @@ tmdb = config.tmdb
 auto_update = config.auto_update
 api = config.api
 m_users = config.m_users
-m_welcome_exclude = config.m_welcome_exclude
 save_config()
 
 LOGGER.info("配置文件加载完毕")
@@ -81,7 +80,7 @@ user_p = [
     BotCommand("red", "[用户/禁言] 发红包"),
     BotCommand("srank", "[用户/禁言] 查看计分"),
     BotCommand("f1", "[用户] F1竞速游戏"),
-    BotCommand("mzj", "[M尊享] M尊享赠礼")]
+    BotCommand("mydemand", "[用户] 查看我的点播记录")]
     # Hunt game commands removed
 
 # 取消 BotCommand("exchange", "[私聊] 使用注册码")
