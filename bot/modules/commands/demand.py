@@ -1369,6 +1369,7 @@ async def admin_demand_command(_, msg):
 
 
 # Aliases for backward compatibility with imports
+demand_command = admin_demand_command
 demand_page_callback = handle_demand_page
 demand_filter_callback = handle_demand_filter
 demand_refresh_callback = handle_demand_refresh
