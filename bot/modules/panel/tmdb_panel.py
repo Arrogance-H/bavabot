@@ -9,7 +9,7 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from bot import bot, tmdb, bot_photo, LOGGER, owner, admins, sakura_b
 from bot.func_helper.msg_utils import callAnswer, editMessage, sendMessage, sendPhoto, callListen
 from bot.func_helper.filters import user_in_group_on_filter
-from bot.func_helper.fix_bottons import tmdb_main_ikb, tmdb_search_result_list_ikb, tmdb_search_result_ikb, back_members_ikb, tmdb_season_selection_ikb
+from bot.func_helper.fix_bottons import tmdb_main_ikb, tmdb_main_ikb_with_admin, tmdb_search_result_list_ikb, tmdb_search_result_ikb, back_members_ikb, tmdb_season_selection_ikb
 from bot.sql_helper.sql_emby import sql_get_emby, sql_update_emby, Emby
 from bot.sql_helper.sql_request_record import sql_add_request_record, sql_check_existing_request_by_title, get_beijing_time, sql_get_all_request_records
 from bot.func_helper.tmdb import tmdb_service
@@ -71,7 +71,11 @@ async def tmdb_main_handler(_, call):
         "点击下方\"🔍 开始搜索\"按钮开始使用"
     )
     
-    await editMessage(call, welcome_text, buttons=tmdb_main_ikb, parse_mode=enums.ParseMode.MARKDOWN)
+    # 检查是否为管理员
+    is_admin = judge_admins(call.from_user.id)
+    keyboard = tmdb_main_ikb_with_admin(is_admin=is_admin)
+    
+    await editMessage(call, welcome_text, buttons=keyboard, parse_mode=enums.ParseMode.MARKDOWN)
 
 
 @bot.on_callback_query(filters.regex('tmdb_search') & user_in_group_on_filter)

@@ -670,10 +670,23 @@ def tmdb_search_page_ikb(has_prev: bool, has_next: bool, page: int, results_coun
 
 # Independent TMDB search buttons (not connected to download center)
 tmdb_main_ikb = ikb([
-    [('🔍 开始搜索', 'tmdb_search')],
-    [('📋 点播记录', 'view_my_demands'), ('🎛️ 点播管理', 'demand_manage')],
+    [('🔍 开始搜索', 'tmdb_search'), ('📋 点播记录', 'view_my_demands')],
     [('🔙 返回', 'members')]
 ])
+
+def tmdb_main_ikb_with_admin(is_admin=False):
+    """返回TMDB主界面键盘，管理员可见额外按钮"""
+    buttons = [
+        [('🔍 开始搜索', 'tmdb_search'), ('📋 点播记录', 'view_my_demands')]
+    ]
+    
+    # 只有管理员才显示点播管理按钮
+    if is_admin:
+        buttons.append([('🎛️ 点播管理', 'demand_manage')])
+    
+    buttons.append([('🔙 返回', 'members')])
+    
+    return ikb(buttons)
 
 tmdb_search_result_ikb = ikb([
     [('🎬 点播此片', 'me_request_movie')],
