@@ -586,7 +586,6 @@ def get_resource_ikb(download_name: str):
                 [('❌ 关闭', 'closeit')]])
 re_download_center_ikb = ikb([
     [('🍿 点播', 'get_resource'), ('📶 下载进度', 'download_rate')], 
-    [('📋 点播记录', 'view_my_demands')],
     [('🔙 返回', 'members')]])
 continue_search_ikb = ikb([
     [('🔄 继续搜索', 'continue_search'), ('❌ 取消搜索', 'cancel_search')],
@@ -672,6 +671,7 @@ def tmdb_search_page_ikb(has_prev: bool, has_next: bool, page: int, results_coun
 # Independent TMDB search buttons (not connected to download center)
 tmdb_main_ikb = ikb([
     [('🔍 开始搜索', 'tmdb_search')],
+    [('📋 点播记录', 'view_my_demands'), ('🎛️ 点播管理', 'demand_manage')],
     [('🔙 返回', 'members')]
 ])
 
