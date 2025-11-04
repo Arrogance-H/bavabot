@@ -7,6 +7,9 @@ from cacheout import Cache
 
 cache = Cache()
 
+# Constants for expiry time display
+NO_PRESERVE_NEEDED_MSG = '__无需保号，放心食用__'
+
 
 def judge_admins(uid):
     """
@@ -89,10 +92,10 @@ async def members_info(tg=None, name=None):
             # Check if admin has disabled the corresponding preserve check
             if preserve_mode == 'expire' and not schedall.check_ex:
                 # Admin disabled expire check (到期保号检测), show "无需保号"
-                ex = '__无需保号，放心食用__'
+                ex = NO_PRESERVE_NEEDED_MSG
             elif preserve_mode == 'active' and not schedall.low_activity:
                 # Admin disabled activity check (活跃保号检测), show "无需保号"
-                ex = '__无需保号，放心食用__'
+                ex = NO_PRESERVE_NEEDED_MSG
             elif preserve_mode == 'expire':
                 # For 'expire' mode (到期保号), show the formatted expiration date
                 if data.ex:
@@ -104,7 +107,7 @@ async def members_info(tg=None, name=None):
                 ex = f'__若{config.activity_check_days}天无观看将封禁__'
             else:
                 # For any other preserve_mode, show the default message
-                ex = '__无需保号，放心食用__'
+                ex = NO_PRESERVE_NEEDED_MSG
         else:
             ex = data.ex or '无账户信息'
         

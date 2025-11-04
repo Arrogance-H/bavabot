@@ -749,6 +749,10 @@ async def end_multiplayer_f1_game(game_id):
         winners_total_fee = sum(game['participants'][winner_id]['fee'] for winner_id in winners)
         
         # 按照投入比例分配奖励给每个获胜者
+        # 注意：使用int()向下取整可能导致少量Joy币未分配
+        # 例如：30 Joy被3个投入(10,10,10)的人平分，每人10 Joy，剩余0 Joy
+        # 例如：31 Joy被3个投入(10,10,11)的人按比例分，可能有1 Joy未分配
+        # 这是有意为之，以保持简单性并避免浮点数精度问题
         winner_rewards = {}
         for winner_id in winners:
             winner_fee = game['participants'][winner_id]['fee']

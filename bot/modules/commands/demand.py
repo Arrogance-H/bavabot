@@ -1372,7 +1372,6 @@ async def mydemand_command(_, msg):
     功能：显示当前用户的所有点播请求记录
     """
     try:
-        await deleteMessage(msg)
         user_id = msg.from_user.id
         
         # 获取该用户的所有ME点播请求
@@ -1383,6 +1382,10 @@ async def mydemand_command(_, msg):
             text = "📋 您还没有点播记录"
             keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("❌ 关闭", callback_data="closeit")]])
             await sendMessage(msg, text, send=True, chat_id=msg.chat.id, buttons=keyboard)
+            try:
+                await deleteMessage(msg)
+            except Exception:
+                pass  # Ignore deletion failures
             return
         
         # 按时间排序，最新的在前
@@ -1390,6 +1393,12 @@ async def mydemand_command(_, msg):
         
         text, keyboard = await format_my_demands(user_records, 1)
         await sendMessage(msg, text, send=True, chat_id=msg.chat.id, buttons=keyboard)
+        
+        # Delete the command message after sending response
+        try:
+            await deleteMessage(msg)
+        except Exception:
+            pass  # Ignore deletion failures
             
     except Exception as e:
         LOGGER.error(f"处理mydemand命令时出错 (用户: {msg.from_user.id}): {str(e)}")
