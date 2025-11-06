@@ -76,7 +76,7 @@ async def sync_emby_group(_, msg):
                           text=f"**⚡群组成员同步任务 结束！**\n  共检索出 {b} 个账户，处刑 {a} 个账户，耗时：{times:.3f}s")
     else:
         await sendMessage(msg, text="** 群组成员同步任务 结束！没人偷跑~**")
-   LOGGER.info(f"【群组同步任务结束】 - {sign_name} 共检索出 {b} 个账户，处刑 {a} 个账户，耗时：{times:.3f}s")
+    LOGGER.info(f"【群组同步任务结束】 - {sign_name} 共检索出 {b} 个账户，处刑 {a} 个账户，耗时：{times:.3f}s")
 
 @bot.on_message(filters.command('syncunbound', prefixes) & admins_on_filter)
 async def sync_emby_unbound(_, msg):
@@ -223,7 +223,7 @@ async def kick_not_emby(_, msg):
         return await sendMessage(msg,
                                  '注意: 此操作会将 当前群组中无emby账户的选手kick, 如确定使用请输入 `/kick_not_emby true`')
     if open_kick == 'true':
-               sign_name = f'{msg.sender_chat.title}' if msg.sender_chat else f'{msg.from_user.first_name}'
+        sign_name = f'{msg.sender_chat.title}' if msg.sender_chat else f'{msg.from_user.first_name}'
         LOGGER.info(f"{sign_name} 执行了踢出非emby用户的操作")
         embyusers = get_all_emby(Emby.embyid is not None and Emby.embyid != '')
         # get tgid
