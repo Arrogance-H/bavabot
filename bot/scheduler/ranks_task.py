@@ -102,52 +102,6 @@ def split_long_message(content, max_length=1000):
 
     return messages
 
-
-async def send_multi_message(chat_id, photo_path, caption, parse_mode, pin_first=True):
-    """
-    发送可能需要分割的长消息，第一条带图片，后续为纯文本
-    
-    Args:
-        chat_id: 聊天ID
-        photo_path: 图片路径
-        caption: 消息内容
-        parse_mode: 解析模式
-        pin_first: 是否置顶第一条消息
-    
-    Returns:
-        list: 发送的消息信息列表
-    """
-    message_parts = split_long_message(caption)
-    sent_messages = []
-
-    # 发送第一条消息（带图片）
-    first_message = await bot.send_photo(
-        chat_id=chat_id, 
-        photo=open(photo_path, "rb"), 
-        caption=message_parts[0],
-        parse_mode=parse_mode
-    )
-    sent_messages.append(first_message)
-
-    # 如果需要置顶第一条消息
-    if pin_first:
-        await bot.pin_chat_message(
-            chat_id=first_message.chat.id, 
-            message_id=first_message.id, 
-            disable_notification=True
-        )
-
-    # 发送后续消息（纯文本）
-    for i, part in enumerate(message_parts[1:], 2):
-        message = await bot.send_message(
-            chat_id=chat_id,
-            text=f"{part}",
-            parse_mode=parse_mode
-        )
-        sent_messages.append(message)
-
-    return sent_messages
-
 async def day_ranks(pin_mode=True):
     draw = ranks_draw.RanksDraw(ranks.logo, backdrop=ranks.backdrop)
     LOGGER.info("【ranks_task】定时任务 正在推送日榜")
