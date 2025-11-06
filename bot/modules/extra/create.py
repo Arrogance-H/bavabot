@@ -91,20 +91,25 @@ async def urm_user(_, msg):
 
 @bot.on_message(filters.command('uinfo', prefixes) & admins_on_filter)
 async def uun_info(_, msg, name = None):
-    try:
-        if name:
-            n = name
-        else:
-            n = msg.command[1]
-    except IndexError:
-        return await asyncio.gather(msg.delete(), sendMessage(msg, "⭕ 用法：/uinfo + emby用户名"))
+    if msg.reply_to_message is None:
+        try:
+            if name:
+                user_id = name
+            else:
+                user_id = msg.command[1]
+        except (IndexError, ValueError):
+            user_id = None
+    else:
+        user_id = msg.reply_to_message.from_user.id
+    if not user_id:
+        return await asyncio.gather(msg.delete(), sendMessage(msg, "⭕ 用法：/uinfo + emby用户名或tgid 或回复用户消息"))
     else:
         text = ''
-        e = sql_get_emby(n)
+        e = sql_get_emby(user_id)
         if not e:
-            e2 = sql_get_emby2(n)
+            e2 = sql_get_emby2(user_id)
             if not e2:
-                return await sendMessage(msg, f'数据库中未查询到 {n}，请手动确认')
+                return await sendMessage(msg, f'数据库中未查询到 {user_id}，请手动确认')
             e = e2
     try:
         a = f'**· 🆔 查询 TG** | {e.tg}\n'
@@ -149,17 +154,22 @@ async def uun_info(_, msg, name = None):
 @bot.on_callback_query(filters.regex('userip') & admins_on_filter)
 @bot.on_message(filters.command('userip', prefixes) & admins_on_filter)
 async def user_cha_ip(_, msg, name = None):
-    try:
-        if isinstance(msg, CallbackQuery):
-            user_id = msg.data.split('-')[1]
-            msg = msg.message
+    if isinstance(msg, CallbackQuery):
+        user_id = msg.data.split('-')[1]
+        msg = msg.message
+    else:
+        if msg.reply_to_message is None:
+            try:
+                if name:
+                    user_id = name
+                else:
+                    user_id = msg.command[1]
+            except (IndexError, ValueError):
+                user_id = None
         else:
-            if name:
-                user_id = name
-            else:
-                user_id = msg.command[1]
-    except IndexError:
-        return await sendMessage(msg, "⭕ 用法：/userip + emby用户名或tgid")
+            user_id = msg.reply_to_message.from_user.id
+    if not user_id:
+        return await sendMessage(msg, "⭕ 用法：/userip + emby用户名或tgid 或回复用户消息")
         
     e = sql_get_emby(user_id)
     if not e:
@@ -200,8 +210,6 @@ async def user_cha_ip(_, msg, name = None):
             if not chunk_text.strip():
                 continue
             await sendMessage(msg, chunk_text)
-
-
 
 @bot.on_message(filters.command('udeviceid', prefixes) & admins_on_filter)
 async def get_user_by_deviceid(_, msg, deviceid = None):
