@@ -1,4 +1,4 @@
-# from . import emby_libs, pro_rev, renew, renewall, rmemby, score_coins, syncs, start
+# from . import emby_libs, pro_rev, renew, renewall, rmemby, score_coins, syncs, start, audit
 
 from .emby_libs import extraembylibs_blockall, extraembylibs_unblockall, embylibs_blockall, embylibs_unblockall
 from .pro_rev import pro_admin, pro_user, rev_user, del_admin
@@ -10,7 +10,7 @@ from .start import ui_g_command, my_info, count_info, p_start, b_start, store_al
 from .syncs import sync_emby_group, sync_emby_unbound, bindall_id, reload_admins
 from .view_user import list_whitelist, whitelist_page, list_normaluser, normaluser_page
 from .demand import demand_command, demand_page_callback, demand_filter_callback, demand_refresh_callback
-
+from .audit import audit_ip_command, audit_device_name_command, audit_client_name_command
 # Hunt game commands removed
 
 
