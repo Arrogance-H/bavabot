@@ -94,11 +94,10 @@ async def p_start(_, msg):
             text += f"**· 💠 账号名称** | [{name}](tg://user?id={msg.from_user.id})\n" \
                    f"**· 🚨 到期时间** | {ex}\n"
             
-            # 保号方式显示（白名单和M尊享用户不显示）
+            # 保号方式显示（白名单、M尊享和无账号用户不显示）
             if not is_premium:
                 preserve_mode_text = '活跃保号' if preserve_mode == 'active' else '到期保号'
-                can_switch = preserve_mode_changed == 0
-                preserve_info = f"**· 🛡️ 保号方式** | {preserve_mode_text}" + (" (可切换)" if can_switch else " (已切换)")
+                preserve_info = f"**· 🛡️ 保号方式** | {preserve_mode_text}"
                 text += f"{preserve_info}\n"
         
         # 添加注册相关信息

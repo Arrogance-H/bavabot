@@ -25,7 +25,7 @@ class Emby(Base):
     us = Column(Integer, default=0)
     iv = Column(Integer, default=0)
     ch = Column(DateTime, nullable=True)
-    preserve_mode = Column(String(10), default='active')  # 'active' or 'expire'
+    preserve_mode = Column(String(10), default='expire')  # 'active' or 'expire'
     preserve_mode_changed = Column(Integer, default=0)  # 0 = not changed, 1 = changed once
     m_welcome_date = Column(DateTime, nullable=True)  # Last M-tier welcome date
     mzj_claim_date = Column(DateTime, nullable=True)  # Last mzj monthly claim date

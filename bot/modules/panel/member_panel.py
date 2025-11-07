@@ -18,8 +18,7 @@ from bot.func_helper.filters import user_in_group_on_filter
 from bot.func_helper.utils import members_info, tem_adduser, cr_link_one, judge_admins, tem_deluser, pwd_create, compare_user_level
 from bot.func_helper.fix_bottons import members_ikb, back_members_ikb, re_create_ikb, del_me_ikb, re_delme_ikb, \
     re_reset_ikb, re_changetg_ikb, emby_block_ikb, user_emby_block_ikb, user_emby_unblock_ikb, re_exchange_b_ikb, \
-    store_ikb, re_bindtg_ikb, close_it_ikb, store_query_page, re_born_ikb, send_changetg_ikb, favorites_page_ikb, \
-    preserve_switch_confirm_ikb
+    store_ikb, re_bindtg_ikb, close_it_ikb, store_query_page, re_born_ikb, send_changetg_ikb, favorites_page_ikb
 from bot.func_helper.msg_utils import callAnswer, editMessage, callListen, sendMessage, ask_return, deleteMessage
 from bot.modules.commands import p_start
 from bot.modules.commands.exchange import rgs_code
@@ -70,18 +69,18 @@ async def create_user(_, call, us, stats):
                 eid = data[0]
                 ex = data[2]
                 
-                # 数据库操作，新用户默认为活跃保号模式
+                # 数据库操作，新用户默认为到期保号模式
                 if stats:
-                    sql_update_emby(Emby.tg == tg, embyid=eid, name=emby_name, pwd=pwd, pwd2=emby_pwd2, lv='b', cr=datetime.now(), ex=ex, preserve_mode='active') 
+                    sql_update_emby(Emby.tg == tg, embyid=eid, name=emby_name, pwd=pwd, pwd2=emby_pwd2, lv='b', cr=datetime.now(), ex=ex, preserve_mode='expire') 
                 else:
-                    sql_update_emby(Emby.tg == tg, embyid=eid, name=emby_name, pwd=pwd, pwd2=emby_pwd2, lv='b', cr=datetime.now(), ex=ex, us=0, preserve_mode='active')
+                    sql_update_emby(Emby.tg == tg, embyid=eid, name=emby_name, pwd=pwd, pwd2=emby_pwd2, lv='b', cr=datetime.now(), ex=ex, us=0, preserve_mode='expire')
                 
                 # 在锁内更新计数器
                 tem_adduser()
                 
-                # Display ex value based on user's preserve_mode (new users default to 'active')
-                # Since new users are created with 'active' preserve_mode, show activity warning
-                ex = f'__若{config.activity_check_days}天无观看将封禁__'
+                # Display ex value based on user's preserve_mode (new users default to 'expire')
+                # Since new users are created with 'expire' preserve_mode, show the formatted expiration date
+                ex = f'__{ex}__'
                     
                 await editMessage(send,
                                   f'**▎创建用户成功🎉**\n\n'
@@ -109,13 +108,11 @@ async def members(_, call):
     # 检查是否为白名单或M尊享用户
     is_premium = lv in ['白名单', 'M尊享']
     
-    # 保号方式显示（白名单和M尊享用户不显示）
+    # 保号方式显示（白名单、M尊享和无账号用户不显示）
     preserve_info = ""
-    can_switch = False
-    if not is_premium:
+    if not is_premium and embyid:
         preserve_mode_text = '活跃保号' if preserve_mode == 'active' else '到期保号'
-        can_switch = preserve_mode_changed == 0
-        preserve_info = f"**· 🛡️ 保号方式** | {preserve_mode_text}" + (" (可切换)" if can_switch else " (已切换)") + "\n"
+        preserve_info = f"**· 🛡️ 保号方式** | {preserve_mode_text}\n"
     
     text = f"▎__欢迎进入用户面板！{call.from_user.first_name}__\n\n" \
            f"**· 🆔 用户のID** | `{call.from_user.id}`\n" \
@@ -124,7 +121,7 @@ async def members(_, call):
            f"**· 💠 账号名称** | [{name}](tg://user?id={call.from_user.id})\n" \
            f"**· 🚨 到期时间** | {ex}"
     
-    # 只有非白名单和非M尊享用户才添加保号信息
+    # 只有非白名单、非M尊享且有账号的用户才添加保号信息
     if preserve_info:
         text += f"\n{preserve_info.rstrip()}"
     
@@ -132,9 +129,7 @@ async def members(_, call):
         is_admin = judge_admins(call.from_user.id)
         await editMessage(call, text, members_ikb(is_admin, False))
     else:
-        # 白名单和M尊享用户不显示保号切换按钮
-        can_switch_preserve = can_switch and not is_premium
-        await editMessage(call, text, members_ikb(account=True, can_switch_preserve=can_switch_preserve))
+        await editMessage(call, text, members_ikb(account=True))
 
 
 # 创建账户
@@ -739,92 +734,19 @@ async def do_store_query(_, call):
     await editMessage(call, text=a[number - 1], buttons=await store_query_page(b, number))
 
 
-@bot.on_callback_query(filters.regex('switch_preserve_mode') & user_in_group_on_filter)
-async def switch_preserve_mode(_, call):
-    """用户切换保号方式"""
-    e = sql_get_emby(tg=call.from_user.id)
-    if not e or not e.embyid:
-        return await callAnswer(call, '⚠️ 您还没有账户，无法切换保号方式', True)
-    
-    # 检查是否为白名单或M尊享用户
-    if e.lv in ['a', 'm']:
-        return await callAnswer(call, '⚠️ 白名单用户和M尊享用户无需保号，无法切换保号方式', True)
-    
-    # 检查是否已经切换过
-    if getattr(e, 'preserve_mode_changed', 0) >= 1:
-        return await callAnswer(call, '⚠️ 您已经切换过保号方式，每个用户只能切换一次', True)
-    
-    current_mode = getattr(e, 'preserve_mode', 'active')
-    new_mode = 'expire' if current_mode == 'active' else 'active'
-    mode_name = {'active': '活跃保号', 'expire': '到期保号'}
-    
-    # 显示确认对话框
-    await callAnswer(call, '🛡️ 保号方式切换确认')
-    confirm_buttons = preserve_switch_confirm_ikb(new_mode)
-    
-    await editMessage(call,
-        f'🛡️ **保号方式切换确认**\n\n'
-        f'**当前保号方式**: {mode_name[current_mode]}\n'
-        f'**即将切换到**: {mode_name[new_mode]}\n\n'
-        f'📋 **保号方式说明：**\n'
-        f'• **活跃保号**: 根据观看活跃度判断，{config.activity_check_days}天无观看将被封禁\n'
-        f'• **到期保号**: 根据到期时间判断，到期后自动续期或封禁\n\n'
-        f'⚠️ **重要提醒**: 每个用户只有一次切换机会，请谨慎选择！\n'
-        f'✅ 确认后将立即生效，无法撤销。',
-        buttons=confirm_buttons
-    )
+# User preserve mode switching has been disabled - only admins can manage preserve modes
+# Users can no longer switch their own preserve mode
+# 
+# @bot.on_callback_query(filters.regex('switch_preserve_mode') & user_in_group_on_filter)
+# async def switch_preserve_mode(_, call):
+#     """用户切换保号方式 - DISABLED"""
+#     return await callAnswer(call, '⚠️ 保号方式切换已禁用，请联系管理员', True)
 
 
-@bot.on_callback_query(filters.regex('confirm_preserve_switch_') & user_in_group_on_filter)
-async def confirm_preserve_switch(_, call):
-    """确认保号方式切换"""
-    new_mode = call.data.split('_')[-1]  # 从 confirm_preserve_switch_active 或 confirm_preserve_switch_expire 获取模式
-    
-    e = sql_get_emby(tg=call.from_user.id)
-    if not e or not e.embyid:
-        return await callAnswer(call, '⚠️ 您还没有账户，无法切换保号方式', True)
-    
-    # 再次检查是否已经切换过（防止重复提交）
-    if getattr(e, 'preserve_mode_changed', 0) >= 1:
-        return await callAnswer(call, '⚠️ 您已经切换过保号方式，每个用户只能切换一次', True)
-    
-    current_mode = getattr(e, 'preserve_mode', 'active')
-    mode_name = {'active': '活跃保号', 'expire': '到期保号'}
-    
-    await callAnswer(call, f'🔄 正在切换到{mode_name[new_mode]}...')
-    
-    # 准备更新的字段
-    update_fields = {'preserve_mode': new_mode, 'preserve_mode_changed': 1}
-    
-    # 根据切换类型设置相应的时间参数
-    switch_date = datetime.now()
-    if new_mode == 'expire':
-        # 活跃保号 → 到期保号：设置30天后到期
-        new_expiry = switch_date + timedelta(days=30)
-        update_fields['ex'] = new_expiry
-        time_info = f'\n🕐 **到期时间已重置**: {new_expiry.strftime("%Y-%m-%d %H:%M:%S")} (从切换日起30天)'
-    else:
-        # 到期保号 → 活跃保号：活跃检测将从切换日开始计算（Emby服务器自动处理）
-        time_info = f'\n🕐 **活跃检测重置**: 从切换日 {switch_date.strftime("%Y-%m-%d")} 开始计算活跃天数'
-    
-    # 更新数据库
-    if sql_update_emby(Emby.tg == call.from_user.id, **update_fields):
-        await editMessage(call, 
-            f'✅ **保号方式切换成功！**\n\n'
-            f'🔄 从 **{mode_name[current_mode]}** 切换到 **{mode_name[new_mode]}**\n'
-            f'{time_info}\n\n'
-            f'📋 **保号方式说明：**\n'
-            f'• **活跃保号**: 根据观看活跃度判断，{config.activity_check_days}天无观看将被封禁\n'
-            f'• **到期保号**: 根据到期时间判断，到期后自动续期或封禁\n\n'
-            f'⚠️ **注意**: 每个用户只能切换一次保号方式',
-            buttons=back_members_ikb
-        )
-        LOGGER.info(f"【保号切换】用户 {call.from_user.id} 从 {current_mode} 切换到 {new_mode}, 时间重置: {time_info}")
-    else:
-        await editMessage(call, 
-            '❌ **切换失败**\n\n数据库更新出错，请稍后重试或联系管理员',
-            buttons=back_members_ikb
-        )
+# @bot.on_callback_query(filters.regex('confirm_preserve_switch_') & user_in_group_on_filter)
+# async def confirm_preserve_switch(_, call):
+#     """确认保号方式切换 - DISABLED"""
+#     return await callAnswer(call, '⚠️ 保号方式切换已禁用，请联系管理员', True)
 
 
 @bot.on_callback_query(filters.regex('^my_favorites|^page_my_favorites:'))

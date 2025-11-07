@@ -260,7 +260,7 @@ async def kk_preserve_switch(_, call):
         return await editMessage(call, f'⚠️ 该用户为白名单或M尊享用户，无需保号，无法切换保号方式。', timer=60)
     
     # 获取当前保号方式并切换
-    current_mode = getattr(e, 'preserve_mode', 'active')
+    current_mode = getattr(e, 'preserve_mode', 'expire')
     new_mode = 'expire' if current_mode == 'active' else 'active'
     mode_name = {'active': '活跃保号', 'expire': '到期保号'}
     

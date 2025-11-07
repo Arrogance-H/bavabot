@@ -127,7 +127,7 @@ async def uun_info(_, msg, name = None):
     lv_name = lv_dict.get(e.lv, '未知')
     
     if e.name:
-        preserve_mode = getattr(e, 'preserve_mode', 'active')
+        preserve_mode = getattr(e, 'preserve_mode', 'expire')
         # M尊享 and whitelist users show infinity
         if e.lv in ['m', 'a']:
             ex = '+ ∞'
