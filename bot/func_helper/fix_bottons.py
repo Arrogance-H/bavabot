@@ -124,13 +124,6 @@ def emby_block_ikb(embyid) -> InlineKeyboardMarkup:
 user_emby_block_ikb = ikb([[('✅ 已隐藏', 'members')]])
 user_emby_unblock_ikb = ikb([[('❎ 已显示', 'members')]])
 
-# User preserve mode switching has been disabled - this function is no longer used
-# def preserve_switch_confirm_ikb(new_mode: str) -> InlineKeyboardMarkup:
-#     """保号方式切换确认按钮"""
-#     return ikb([
-#         [('✅ 确认切换', f'confirm_preserve_switch_{new_mode}'), ('❌ 取消', 'members')]
-#     ])
-
 
 def preserve_manage_ikb() -> InlineKeyboardMarkup:
     """管理员保号方式管理面板按钮"""

@@ -734,21 +734,6 @@ async def do_store_query(_, call):
     await editMessage(call, text=a[number - 1], buttons=await store_query_page(b, number))
 
 
-# User preserve mode switching has been disabled - only admins can manage preserve modes
-# Users can no longer switch their own preserve mode
-# 
-# @bot.on_callback_query(filters.regex('switch_preserve_mode') & user_in_group_on_filter)
-# async def switch_preserve_mode(_, call):
-#     """用户切换保号方式 - DISABLED"""
-#     return await callAnswer(call, '⚠️ 保号方式切换已禁用，请联系管理员', True)
-
-
-# @bot.on_callback_query(filters.regex('confirm_preserve_switch_') & user_in_group_on_filter)
-# async def confirm_preserve_switch(_, call):
-#     """确认保号方式切换 - DISABLED"""
-#     return await callAnswer(call, '⚠️ 保号方式切换已禁用，请联系管理员', True)
-
-
 @bot.on_callback_query(filters.regex('^my_favorites|^page_my_favorites:'))
 async def my_favorite(_, call):
     # 获取页码
