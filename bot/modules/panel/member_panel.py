@@ -78,8 +78,8 @@ async def create_user(_, call, us, stats):
                 # 在锁内更新计数器
                 tem_adduser()
                 
-                # Display ex value based on user's preserve_mode (new users default to 'expire')
-                # Since new users are created with 'expire' preserve_mode, show the formatted expiration date
+                # Display ex value for new user with 'expire' preserve_mode (default)
+                # Wrap the expiration date in markdown formatting for display
                 ex = f'__{ex}__'
                     
                 await editMessage(send,
@@ -108,7 +108,8 @@ async def members(_, call):
     # 检查是否为白名单或M尊享用户
     is_premium = lv in ['白名单', 'M尊享']
     
-    # 保号方式显示（白名单、M尊享和无账号用户不显示）
+    # 保号方式显示（仅对非白名单、非M尊享且有emby账号的用户显示）
+    # embyid is None for users without accounts, a string UUID for users with accounts
     preserve_info = ""
     if not is_premium and embyid:
         preserve_mode_text = '活跃保号' if preserve_mode == 'active' else '到期保号'
