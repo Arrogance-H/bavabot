@@ -139,7 +139,7 @@ async def day_ranks(pin_mode=True):
             tmp += str(i + 1) + ". " + name + "\n播放次数: " + str(count) + "  时长:" + time + "\n"
         payload += tmp
 
-    payload = f"**【{ranks.logo} 播放周榜】**\n\n" + payload + "\n#WeekRanks" + "  " + date.today().strftime('%Y-%m-%d')
+    payload = f"**【{ranks.logo} 播放日榜】**\n\n" + payload + "\n#DayRanks" + "  " + date.today().strftime('%Y-%m-%d')
 
     # 使用多消息发送功能
     sent_messages = await send_multi_message(
