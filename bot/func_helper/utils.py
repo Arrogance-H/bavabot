@@ -76,7 +76,7 @@ async def members_info(tg=None, name=None):
         lv = lv_dict.get(data.lv, '未知')
         
         # 获取保号方式信息
-        preserve_mode = getattr(data, 'preserve_mode', 'active')  # 默认为活跃保号
+        preserve_mode = getattr(data, 'preserve_mode', 'expire')  # 默认为到期保号
         preserve_mode_changed = getattr(data, 'preserve_mode_changed', 0)
         
         # Update ex display logic based on user's preserve_mode and admin settings

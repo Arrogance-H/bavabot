@@ -42,7 +42,7 @@ def auto_migrate_preserve_mode_fields():
                 logger.info("➕ 自动添加 preserve_mode 字段...")
                 conn.execute(text("""
                     ALTER TABLE emby 
-                    ADD COLUMN preserve_mode VARCHAR(10) DEFAULT 'active' 
+                    ADD COLUMN preserve_mode VARCHAR(10) DEFAULT 'expire' 
                     COMMENT '保号方式: active=活跃保号, expire=到期保号'
                 """))
                 conn.commit()
@@ -116,7 +116,7 @@ def auto_migrate_preserve_mode_fields():
                 logger.info("🔄 更新现有记录的默认值...")
                 conn.execute(text("""
                     UPDATE emby 
-                    SET preserve_mode = 'active' 
+                    SET preserve_mode = 'expire' 
                     WHERE preserve_mode IS NULL
                 """))
                 conn.execute(text("""

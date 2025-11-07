@@ -56,7 +56,7 @@ judge_group_ikb = ikb([[('🌟 频道入口 ', f't.me/{chanel}', 'url'),
 """members ↓"""
 
 
-def members_ikb(is_admin: bool = False, account: bool = False, can_switch_preserve: bool = False) -> InlineKeyboardMarkup:
+def members_ikb(is_admin: bool = False, account: bool = False) -> InlineKeyboardMarkup:
     """
     判断用户面板
     """
@@ -69,15 +69,10 @@ def members_ikb(is_admin: bool = False, account: bool = False, can_switch_preser
         if moviepilot.status:
             normal.append([('🍿 点播中心', 'download_center')])
         
-        # 将保号切换按钮与ME点播按钮放在同一行
-        last_row = []
+        # ME点播按钮
         if tmdb.api_key:
-            last_row.append(('🍿 ME点播', 'tmdb_main'))
-        if can_switch_preserve:
-            last_row.append(('🛡️ 保号切换', 'switch_preserve_mode'))
+            normal.append([('🍿 ME点播', 'tmdb_main')])
         
-        if last_row:
-            normal.append(last_row)
         normal.append([('♻️ 主界面', 'back_start')])
         return ikb(normal)
     else:
@@ -128,12 +123,6 @@ def emby_block_ikb(embyid) -> InlineKeyboardMarkup:
 
 user_emby_block_ikb = ikb([[('✅ 已隐藏', 'members')]])
 user_emby_unblock_ikb = ikb([[('❎ 已显示', 'members')]])
-
-def preserve_switch_confirm_ikb(new_mode: str) -> InlineKeyboardMarkup:
-    """保号方式切换确认按钮"""
-    return ikb([
-        [('✅ 确认切换', f'confirm_preserve_switch_{new_mode}'), ('❌ 取消', 'members')]
-    ])
 
 
 def preserve_manage_ikb() -> InlineKeyboardMarkup:

@@ -130,7 +130,7 @@ async def preserve_user_query(_, call):
         return
     
     # 获取保号信息
-    preserve_mode = getattr(e, 'preserve_mode', 'active')
+    preserve_mode = getattr(e, 'preserve_mode', 'expire')
     preserve_mode_changed = getattr(e, 'preserve_mode_changed', 0)
     
     mode_name = {

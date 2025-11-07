@@ -196,7 +196,7 @@ class Uplaysinfo:
                             LOGGER.info(f"【活跃检测】- 删除账户失败 {user['Name']} #id{e.tg}")
             elif e.lv == 'b':
                 # 只对设置为活跃保号的用户进行活跃检测
-                user_preserve_mode = getattr(e, 'preserve_mode', 'active')
+                user_preserve_mode = getattr(e, 'preserve_mode', 'expire')
                 if user_preserve_mode != 'active':
                     continue  # 跳过非活跃保号用户
                     
