@@ -25,10 +25,6 @@ class Emby(Base):
     us = Column(Integer, default=0)
     iv = Column(Integer, default=0)
     ch = Column(DateTime, nullable=True)
-    preserve_mode = Column(String(10), default='expire')  # 'active' or 'expire'
-    preserve_mode_changed = Column(Integer, default=0)  # 0 = not changed, 1 = changed once
-    m_welcome_date = Column(DateTime, nullable=True)  # Last M-tier welcome date
-    mzj_claim_date = Column(DateTime, nullable=True)  # Last mzj monthly claim date
 
 
 Emby.__table__.create(bind=engine, checkfirst=True)
@@ -82,24 +78,43 @@ def sql_clear_emby_iv():
 def sql_delete_emby(tg=None, embyid=None, name=None):
     """
     根据tg, embyid或name删除一条emby记录
+    至少需要提供一个参数，如果所有参数都为None，则返回False
     """
     with Session() as session:
         try:
-            # 构造一个or_条件，只要有一个参数不为None就可以匹配
-            condition = or_(Emby.tg == tg, Emby.embyid == embyid, Emby.name == name)
-            # 用filter来过滤，注意要加括号
+            # 构建条件列表，只包含非None的参数
+            conditions = []
+            if tg is not None:
+                conditions.append(Emby.tg == tg)
+            if embyid is not None:
+                conditions.append(Emby.embyid == embyid)
+            if name is not None:
+                conditions.append(Emby.name == name)
+            
+            # 如果所有参数都为None，返回False
+            if not conditions:
+                LOGGER.warning("sql_delete_emby: 所有参数都为None，无法删除记录")
+                return False
+            
+            # 使用or_组合所有条件
+            condition = or_(*conditions)
+            LOGGER.debug(f"删除数据库记录，条件: tg={tg}, embyid={embyid}, name={name}")
+            
+            # 用filter来过滤，使用with_for_update锁定记录
             emby = session.query(Emby).filter(condition).with_for_update().first()
             if emby:
+                LOGGER.info(f"删除数据库记录 {emby.name} - {emby.embyid} - {emby.tg}")
                 session.delete(emby)
                 try:
                     session.commit()
+                    LOGGER.info(f"成功删除数据库记录: tg={tg}, embyid={embyid}, name={name}")
                     return True
                 except Exception as e:
                     LOGGER.error(f"删除数据库记录时提交事务失败 {e}")
                     session.rollback()
                     return False
             else:
-                LOGGER.info(f"数据库记录不存在 {tg}")
+                LOGGER.info(f"数据库记录不存在: tg={tg}, embyid={embyid}, name={name}")
                 return False
         except Exception as e:
             LOGGER.error(f"删除数据库记录时发生异常 {e}")
@@ -223,9 +238,9 @@ def sql_update_emby(condition, **kwargs):
 
 def sql_count_emby():
     """
-    # 检索有tg和embyid的emby记录的数量，以及Emby.lv =='a'和Emby.lv =='m'条件下的数量
+    # 检索有tg和embyid的emby记录的数量，以及Emby.lv =='a'条件下的数量
     # count = sql_count_emby()
-    :return: int, int, int, int (tg_count, embyid_count, lv_a_count, lv_m_count)
+    :return: int, int, int
     """
     with Session() as session:
         try:
@@ -233,11 +248,10 @@ def sql_count_emby():
             count = session.query(
                 func.count(Emby.tg).label("tg_count"),
                 func.count(Emby.embyid).label("embyid_count"),
-                func.count(case((Emby.lv == "a", 1))).label("lv_a_count"),
-                func.count(case((Emby.lv == "m", 1))).label("lv_m_count")
+                func.count(case((Emby.lv == "a", 1))).label("lv_a_count")
             ).first()
         except Exception as e:
             # print(e)
-            return None, None, None, None
+            return None, None, None
         else:
-            return count.tg_count, count.embyid_count, count.lv_a_count, count.lv_m_count
+            return count.tg_count, count.embyid_count, count.lv_a_count
