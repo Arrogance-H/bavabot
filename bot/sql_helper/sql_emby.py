@@ -238,9 +238,13 @@ def sql_update_emby(condition, **kwargs):
 
 def sql_count_emby():
     """
-    # 检索有tg和embyid的emby记录的数量，以及Emby.lv =='a'条件下的数量
-    # count = sql_count_emby()
-    :return: int, int, int
+    检索emby表中的各项统计数量:
+    - tg_count: 所有tg记录数量
+    - embyid_count: 有embyid的记录数量
+    - lv_a_count: lv='a'(白名单)的记录数量
+    - lv_m_count: lv='m'(M尊享)的记录数量
+    
+    :return: (tg_count: int, embyid_count: int, lv_a_count: int, lv_m_count: int)
     """
     with Session() as session:
         try:
@@ -248,10 +252,11 @@ def sql_count_emby():
             count = session.query(
                 func.count(Emby.tg).label("tg_count"),
                 func.count(Emby.embyid).label("embyid_count"),
-                func.count(case((Emby.lv == "a", 1))).label("lv_a_count")
+                func.count(case((Emby.lv == "a", 1))).label("lv_a_count"),
+                func.count(case((Emby.lv == "m", 1))).label("lv_m_count")
             ).first()
         except Exception as e:
             # print(e)
-            return None, None, None
+            return None, None, None, None
         else:
-            return count.tg_count, count.embyid_count, count.lv_a_count
+            return count.tg_count, count.embyid_count, count.lv_a_count, count.lv_m_count
