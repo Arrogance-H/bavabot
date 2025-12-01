@@ -182,8 +182,7 @@ async def tmdb_id_search_results_with_context(call, tmdb_id: int, result: dict):
             'display_results': [result],
             'total_results': 1,
             'is_tmdb_id_search': True,
-            'tmdb_id': tmdb_id,
-            'checked_emby': checked_emby
+            'tmdb_id': tmdb_id
         }
 
         # 构建影片详情文本（类似 show_tmdb_item_details 的格式）
@@ -233,7 +232,7 @@ async def tmdb_id_search_results_with_context(call, tmdb_id: int, result: dict):
                 buttons=tmdb_search_result_ikb,
                 parse_mode=enums.ParseMode.MARKDOWN
             )
-            LOGGER.info(f"TMDB ID影片详情显示成功: 用户{call.from_user.id}, TMDB ID={tmdb_id}, 标题={title}, 已检查Emby={checked_emby}")
+            LOGGER.info(f"TMDB ID影片详情显示成功: 用户{call.from_user.id}, TMDB ID={tmdb_id}, 标题={title}")
         except Exception as edit_error:
             LOGGER.error(f"TMDB ID影片详情编辑消息失败: 用户{call.from_user.id}, 错误={str(edit_error)}")
             # 如果编辑消息失败，尝试发送一个简化的消息
