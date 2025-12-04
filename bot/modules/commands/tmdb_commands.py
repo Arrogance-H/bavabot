@@ -4,6 +4,7 @@ TMDB trending and popular commands
 /popular - Get popular (streaming) movies and TV shows from TMDB (10 items)
 """
 
+from datetime import datetime
 from pyrogram import filters
 from bot import bot, prefixes, LOGGER, tmdb
 from bot.func_helper.filters import user_in_group_on_filter
@@ -50,12 +51,11 @@ async def trend_command(_, msg):
             await sendMessage(msg, "❌ 获取趋势内容失败，请稍后再试", timer=30)
             return
         
-        # Format the response
-        text = "🔥 **TMDB 今日趋势 (每日)**\n\n"
+        # Format the response with current date
+        today = datetime.now().strftime("%Y-%m-%d")
+        text = f"🔥 **TMDB 今日趋势 ({today})**\n\n"
         for idx, item in enumerate(results, 1):
             text += format_media_item(item, idx)
-        
-        text += f"\n📊 共 {len(results)} 条结果"
         
         await sendMessage(msg, text, timer=120)
         
@@ -84,12 +84,11 @@ async def popular_command(_, msg):
             await sendMessage(msg, "❌ 获取流行内容失败，请稍后再试", timer=30)
             return
         
-        # Format the response
-        text = "🌟 **TMDB 流行内容 (流媒体)**\n\n"
+        # Format the response with current date
+        today = datetime.now().strftime("%Y-%m-%d")
+        text = f"🌟 **TMDB 流行内容 ({today})**\n\n"
         for idx, item in enumerate(results, 1):
             text += format_media_item(item, idx)
-        
-        text += f"\n📊 共 {len(results)} 条结果"
         
         await sendMessage(msg, text, timer=120)
         
