@@ -15,14 +15,11 @@ from bot.func_helper.tmdb import tmdb_service
 def format_media_item(item: dict, index: int) -> str:
     """Format a single media item for display"""
     title = item.get("title", "未知标题")
-    original_title = item.get("original_title", "")
     year = item.get("year", "未知")
     media_type = item.get("media_type_cn", "未知")
     vote_average = item.get("vote_average", 0)
     
     text = f"**{index}.** 🎬 {title}"
-    if original_title and original_title != title:
-        text += f" ({original_title})"
     text += f"\n   📺 {media_type} | 📅 {year}"
     if vote_average > 0:
         text += f" | ⭐ {vote_average:.1f}"
