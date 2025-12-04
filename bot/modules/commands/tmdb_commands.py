@@ -8,10 +8,12 @@ TMDB trending and popular commands
 from datetime import datetime
 from pyrogram import filters, enums
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from pyromod.helpers import ikb
 from bot import bot, prefixes, LOGGER, tmdb
 from bot.func_helper.filters import user_in_group_on_filter
 from bot.func_helper.msg_utils import sendMessage, deleteMessage
 from bot.func_helper.tmdb import tmdb_service
+from bot.func_helper.fix_bottons import tmdb_search_result_list_ikb, tmdb_main_ikb
 from bot.sql_helper.sql_emby import sql_get_emby
 
 
@@ -130,7 +132,6 @@ async def search_command(_, msg):
     Usage: /search 阿凡达
     """
     from bot.modules.panel.tmdb_panel import user_tmdb_data
-    from bot.func_helper.fix_bottons import tmdb_search_result_list_ikb, tmdb_main_ikb
     
     try:
         await deleteMessage(msg)
@@ -217,7 +218,7 @@ async def search_command(_, msg):
             
             # Add genres if available
             if tmdb_result.get('genres'):
-                result_text += f"🎭 **类型**: {tmdb_result['genres']}\n"
+                result_text += f"🏷️ **分类**: {tmdb_result['genres']}\n"
             
             # Add runtime/seasons info
             if tmdb_result.get('runtime') and tmdb_result['runtime'] > 0:
@@ -232,7 +233,6 @@ async def search_command(_, msg):
             result_text += "💡 点击下方按钮点播此影片"
             
             # Create keyboard with request button
-            from pyromod.helpers import ikb
             keyboard = ikb([
                 [('🎬 点播此片', 'me_request_movie')],
                 [('🔙 返回', 'tmdb_main')]
