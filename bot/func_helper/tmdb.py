@@ -140,6 +140,136 @@ class TMDBService:
         data = await self._make_request(f"tv/{tv_id}")
         return data
 
+    async def get_trending(self, time_window: str = "day", limit: int = 10) -> Tuple[bool, List[Dict]]:
+        """
+        Get trending movies and TV shows
+        Args:
+            time_window: Time window for trending (day or week)
+            limit: Number of results to return (default: 10)
+        Returns:
+            (success, results_list)
+        """
+        data = await self._make_request(f"trending/all/{time_window}")
+        if not data:
+            return False, []
+        
+        results = []
+        for item in data.get("results", [])[:limit]:
+            media_type = item.get("media_type")
+            
+            # Skip person results
+            if media_type not in ["movie", "tv"]:
+                continue
+            
+            if media_type == "movie":
+                result = {
+                    "id": item.get("id"),
+                    "title": item.get("title", ""),
+                    "original_title": item.get("original_title", ""),
+                    "release_date": item.get("release_date", ""),
+                    "year": item.get("release_date", "")[:4] if item.get("release_date") else "",
+                    "overview": item.get("overview", ""),
+                    "poster_path": item.get("poster_path", ""),
+                    "vote_average": item.get("vote_average", 0),
+                    "popularity": item.get("popularity", 0),
+                    "media_type": "movie",
+                    "media_type_cn": "电影"
+                }
+            else:  # tv
+                result = {
+                    "id": item.get("id"),
+                    "title": item.get("name", ""),
+                    "original_title": item.get("original_name", ""),
+                    "release_date": item.get("first_air_date", ""),
+                    "year": item.get("first_air_date", "")[:4] if item.get("first_air_date") else "",
+                    "overview": item.get("overview", ""),
+                    "poster_path": item.get("poster_path", ""),
+                    "vote_average": item.get("vote_average", 0),
+                    "popularity": item.get("popularity", 0),
+                    "media_type": "tv",
+                    "media_type_cn": "电视剧"
+                }
+            
+            if result["poster_path"]:
+                result["poster_url"] = f"{self.image_base_url}{result['poster_path']}"
+            else:
+                result["poster_url"] = ""
+            
+            results.append(result)
+        
+        LOGGER.info(f"TMDB trending fetched: {len(results)} results")
+        return True, results
+
+    async def get_popular(self, media_type: str = "all", limit: int = 10) -> Tuple[bool, List[Dict]]:
+        """
+        Get popular movies and TV shows (streaming)
+        Args:
+            media_type: Type of media (movie, tv, or all)
+            limit: Number of results to return (default: 10)
+        Returns:
+            (success, results_list)
+        """
+        results = []
+        
+        if media_type in ["all", "movie"]:
+            # Get popular movies
+            movie_data = await self._make_request("movie/popular")
+            if movie_data:
+                movie_limit = limit if media_type == "movie" else limit // 2
+                for item in movie_data.get("results", [])[:movie_limit]:
+                    result = {
+                        "id": item.get("id"),
+                        "title": item.get("title", ""),
+                        "original_title": item.get("original_title", ""),
+                        "release_date": item.get("release_date", ""),
+                        "year": item.get("release_date", "")[:4] if item.get("release_date") else "",
+                        "overview": item.get("overview", ""),
+                        "poster_path": item.get("poster_path", ""),
+                        "vote_average": item.get("vote_average", 0),
+                        "popularity": item.get("popularity", 0),
+                        "media_type": "movie",
+                        "media_type_cn": "电影"
+                    }
+                    if result["poster_path"]:
+                        result["poster_url"] = f"{self.image_base_url}{result['poster_path']}"
+                    else:
+                        result["poster_url"] = ""
+                    results.append(result)
+        
+        if media_type in ["all", "tv"]:
+            # Get popular TV shows
+            tv_data = await self._make_request("tv/popular")
+            if tv_data:
+                tv_limit = limit if media_type == "tv" else limit // 2
+                for item in tv_data.get("results", [])[:tv_limit]:
+                    result = {
+                        "id": item.get("id"),
+                        "title": item.get("name", ""),
+                        "original_title": item.get("original_name", ""),
+                        "release_date": item.get("first_air_date", ""),
+                        "year": item.get("first_air_date", "")[:4] if item.get("first_air_date") else "",
+                        "overview": item.get("overview", ""),
+                        "poster_path": item.get("poster_path", ""),
+                        "vote_average": item.get("vote_average", 0),
+                        "popularity": item.get("popularity", 0),
+                        "media_type": "tv",
+                        "media_type_cn": "电视剧"
+                    }
+                    if result["poster_path"]:
+                        result["poster_url"] = f"{self.image_base_url}{result['poster_path']}"
+                    else:
+                        result["poster_url"] = ""
+                    results.append(result)
+        
+        if not results:
+            return False, []
+        
+        # Sort by popularity
+        results.sort(key=lambda x: x["popularity"], reverse=True)
+        
+        LOGGER.info(f"TMDB popular fetched: {len(results)} results")
+        return True, results[:limit]
+
     async def search_by_tmdb_id(self, tmdb_id: int, media_type: str = None) -> Tuple[bool, Optional[Dict]]:
         """
         Search for a movie or TV show by its TMDB ID
