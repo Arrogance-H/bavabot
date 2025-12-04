@@ -81,7 +81,8 @@ user_p = [
     BotCommand("srank", "[用户/禁言] 查看计分"),
     BotCommand("f1", "[用户] F1竞速游戏"),
     BotCommand("trend", "[用户] TMDB每日趋势"),
-    BotCommand("popular", "[用户] TMDB流行内容")]
+    BotCommand("popular", "[用户] TMDB流行内容"),
+    BotCommand("search", "[用户] TMDB搜索点播")]
     # Hunt game commands removed
 
 # 取消 BotCommand("exchange", "[私聊] 使用注册码")
