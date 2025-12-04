@@ -11,7 +11,7 @@ from .syncs import sync_emby_group, sync_emby_unbound, bindall_id, reload_admins
 from .view_user import list_whitelist, whitelist_page, list_normaluser, normaluser_page
 from .demand import demand_command, demand_page_callback, demand_filter_callback, demand_refresh_callback
 from .audit import audit_ip_command, audit_device_name_command, audit_client_name_command
-from .tmdb_commands import trend_command, popular_command
+from .tmdb_commands import trend_command, popular_command, search_command
 # Hunt game commands removed
 
 
