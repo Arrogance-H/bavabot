@@ -25,6 +25,10 @@ class Emby(Base):
     us = Column(Integer, default=0)
     iv = Column(Integer, default=0)
     ch = Column(DateTime, nullable=True)
+    preserve_mode = Column(String(10), default='expire')
+    preserve_mode_changed = Column(Integer, default=0)
+    m_welcome_date = Column(DateTime, nullable=True)
+    mzj_claim_date = Column(DateTime, nullable=True)
 
 
 Emby.__table__.create(bind=engine, checkfirst=True)
