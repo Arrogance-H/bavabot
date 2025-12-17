@@ -3,6 +3,10 @@
 此处为控制面板2，主要是为了在bot中能够设置一些变量
 部分目前有 导出日志，更改探针，更改emby线路，设置购买按钮
 
+用户级别说明:
+- 'b': Basic 普通用户
+- 'a': Admin/Whitelist 白名单用户  
+- 'm': M VIP M尊享用户（最高级别）
 """
 from bot import bot, prefixes, bot_photo, Now, LOGGER, config, save_config, _open, auto_update, moviepilot, sakura_b, m_users
 from pyrogram import filters
