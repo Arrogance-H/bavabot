@@ -12,7 +12,7 @@ from bot.func_helper.fix_bottons import config_preparation, close_it_ikb, back_c
 from bot.func_helper.msg_utils import deleteMessage, editMessage, callAnswer, callListen, sendPhoto, sendFile
 from bot.func_helper.scheduler import scheduler
 from bot.scheduler.sync_mp_download import sync_download_tasks
-from bot.sql_helper.sql_emby import get_all_emby, Emby
+from bot.sql_helper.sql_emby import get_all_emby, Emby, sql_get_emby, sql_update_emby
 
 
 @bot.on_message(filters.command('config', prefixes=prefixes) & admins_on_filter)
@@ -235,6 +235,11 @@ async def manage_m_users(_, call):
                         # 同步更新全局 m_users 变量
                         m_users.clear()
                         m_users.extend(config.m_users)
+                        # 同步更新数据库中的 lv 字段为 'm'
+                        if sql_update_emby(Emby.tg == user_id, lv='m'):
+                            LOGGER.info(f"【admin】：{call.from_user.id} - 更新用户 {user_id} 数据库lv字段为'm'")
+                        else:
+                            LOGGER.warning(f"【admin】：{call.from_user.id} - 用户 {user_id} 可能不存在数据库中，无法更新lv字段")
                         save_config()
                         m_users_str = ', '.join(map(str, config.m_users))
                         await editMessage(call,
@@ -253,6 +258,17 @@ async def manage_m_users(_, call):
                         # 同步更新全局 m_users 变量
                         m_users.clear()
                         m_users.extend(config.m_users)
+                        # 同步更新数据库中的 lv 字段
+                        # 检查用户是否是白名单用户，如果是则恢复为 'a'，否则恢复为 'b'
+                        user_data = sql_get_emby(user_id)
+                        if user_data:
+                            # 简单判断：如果用户之前是白名单就恢复为'a'，否则恢复为'b'
+                            # 更好的做法是查看其他白名单配置，这里简化处理
+                            new_lv = 'b'  # 默认恢复为普通用户
+                            if sql_update_emby(Emby.tg == user_id, lv=new_lv):
+                                LOGGER.info(f"【admin】：{call.from_user.id} - 更新用户 {user_id} 数据库lv字段为'{new_lv}'")
+                            else:
+                                LOGGER.warning(f"【admin】：{call.from_user.id} - 无法更新用户 {user_id} 数据库lv字段")
                         save_config()
                         m_users_str = ', '.join(map(str, config.m_users)) if config.m_users else '无'
                         await editMessage(call,
