@@ -4,7 +4,7 @@
 """
 from datetime import datetime, timezone, timedelta
 from pyrogram import filters
-from bot import bot, emby_line, emby_whitelist_line, emby_m_line
+from bot import bot, emby_line, emby_whitelist_line, emby_m_line, config
 from bot.func_helper.emby import emby
 from bot.func_helper.filters import user_in_group_on_filter
 from bot.sql_helper.sql_emby import sql_get_emby
@@ -34,19 +34,26 @@ async def server(_, call):
 
     pwd = '空' if not data.pwd else data.pwd
     line = ''
-    if data.lv == 'b':
-        line = f'{emby_line}'
-    elif data.lv == 'a':
-        line = f'{emby_line}'
-        if emby_whitelist_line:
-            line += f'\n{emby_whitelist_line}'
-    elif data.lv == 'm':
+    # Check if user is M尊享 - either from database lv field OR from config.m_users list
+    is_m_user = data.lv == 'm' or call.from_user.id in config.m_users
+    
+    if is_m_user:
+        # M尊享 users get all lines
         line = f'{emby_line}'
         if emby_whitelist_line:
             line += f'\n{emby_whitelist_line}'
         if emby_m_line:
             line += f'\n{emby_m_line}'
+    elif data.lv == 'a':
+        # Whitelist users get base line + whitelist line
+        line = f'{emby_line}'
+        if emby_whitelist_line:
+            line += f'\n{emby_whitelist_line}'
+    elif data.lv == 'b':
+        # Regular users get only base line
+        line = f'{emby_line}'
     else:
+        # No permission
         line = ' - **无权查看**'
     try:
         online = await emby.get_current_playing_count()
