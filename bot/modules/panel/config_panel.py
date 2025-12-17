@@ -231,22 +231,27 @@ async def manage_m_users(_, call):
                 
                 if cmd == 'add':
                     if user_id not in config.m_users:
-                        config.m_users.append(user_id)
-                        # 同步更新全局 m_users 变量
-                        m_users.clear()
-                        m_users.extend(config.m_users)
-                        # 同步更新数据库中的 lv 字段为 'm'
+                        # 首先尝试更新数据库中的 lv 字段为 'm'
                         if sql_update_emby(Emby.tg == user_id, lv='m'):
                             LOGGER.info(f"【admin】：{call.from_user.id} - 更新用户 {user_id} 数据库lv字段为'm'")
+                            # 数据库更新成功后，再更新配置文件
+                            config.m_users.append(user_id)
+                            # 同步更新全局 m_users 变量
+                            m_users.clear()
+                            m_users.extend(config.m_users)
+                            save_config()
+                            m_users_str = ', '.join(map(str, config.m_users))
+                            await editMessage(call,
+                                            f"✅ 已添加用户 `{user_id}` 到M尊享列表\n\n"
+                                            f"当前列表：\n`{m_users_str}`\n\n操作完成！",
+                                            buttons=back_config_p_ikb)
+                            LOGGER.info(f"【admin】：{call.from_user.id} - 添加M用户 {user_id}")
                         else:
-                            LOGGER.warning(f"【admin】：{call.from_user.id} - 用户 {user_id} 可能不存在数据库中，无法更新lv字段")
-                        save_config()
-                        m_users_str = ', '.join(map(str, config.m_users))
-                        await editMessage(call,
-                                        f"✅ 已添加用户 `{user_id}` 到M尊享列表\n\n"
-                                        f"当前列表：\n`{m_users_str}`\n\n操作完成！",
-                                        buttons=back_config_p_ikb)
-                        LOGGER.info(f"【admin】：{call.from_user.id} - 添加M用户 {user_id}")
+                            LOGGER.warning(f"【admin】：{call.from_user.id} - 用户 {user_id} 不存在数据库中或更新失败")
+                            await editMessage(call,
+                                            f"⚠️ 无法添加用户 `{user_id}`\n\n"
+                                            f"该用户可能不存在于数据库中，请确保用户已注册",
+                                            buttons=back_set_ikb('manage_m_users'))
                     else:
                         await editMessage(call,
                                         f"⚠️ 用户 `{user_id}` 已在M尊享列表中",
@@ -254,11 +259,7 @@ async def manage_m_users(_, call):
                 
                 elif cmd == 'del':
                     if user_id in config.m_users:
-                        config.m_users.remove(user_id)
-                        # 同步更新全局 m_users 变量
-                        m_users.clear()
-                        m_users.extend(config.m_users)
-                        # 同步更新数据库中的 lv 字段
+                        # 首先尝试更新数据库中的 lv 字段
                         # 注意：根据现有系统设计（参考/revm命令），M用户被移除时降级为'b'（普通用户）
                         # 这与用户的原始级别无关，因为M是最高级别
                         # 如果需要保留原始白名单状态，需要额外的逻辑来跟踪用户的历史级别
@@ -267,15 +268,30 @@ async def manage_m_users(_, call):
                             new_lv = 'b'  # 降级为普通用户，与/revm命令行为一致
                             if sql_update_emby(Emby.tg == user_id, lv=new_lv):
                                 LOGGER.info(f"【admin】：{call.from_user.id} - 更新用户 {user_id} 数据库lv字段为'{new_lv}'")
+                                # 数据库更新成功后，再更新配置文件
+                                config.m_users.remove(user_id)
+                                # 同步更新全局 m_users 变量
+                                m_users.clear()
+                                m_users.extend(config.m_users)
+                                save_config()
+                                m_users_str = ', '.join(map(str, config.m_users)) if config.m_users else '无'
+                                await editMessage(call,
+                                                f"✅ 已从M尊享列表移除用户 `{user_id}`\n\n"
+                                                f"当前列表：\n`{m_users_str}`\n\n操作完成！",
+                                                buttons=back_config_p_ikb)
+                                LOGGER.info(f"【admin】：{call.from_user.id} - 删除M用户 {user_id}")
                             else:
                                 LOGGER.warning(f"【admin】：{call.from_user.id} - 无法更新用户 {user_id} 数据库lv字段")
-                        save_config()
-                        m_users_str = ', '.join(map(str, config.m_users)) if config.m_users else '无'
-                        await editMessage(call,
-                                        f"✅ 已从M尊享列表移除用户 `{user_id}`\n\n"
-                                        f"当前列表：\n`{m_users_str}`\n\n操作完成！",
-                                        buttons=back_config_p_ikb)
-                        LOGGER.info(f"【admin】：{call.from_user.id} - 删除M用户 {user_id}")
+                                await editMessage(call,
+                                                f"⚠️ 无法从数据库更新用户 `{user_id}` 的级别\n\n"
+                                                f"请稍后重试",
+                                                buttons=back_set_ikb('manage_m_users'))
+                        else:
+                            LOGGER.warning(f"【admin】：{call.from_user.id} - 用户 {user_id} 不存在于数据库中")
+                            await editMessage(call,
+                                            f"⚠️ 用户 `{user_id}` 不存在于数据库中\n\n"
+                                            f"无法完成操作",
+                                            buttons=back_set_ikb('manage_m_users'))
                     else:
                         await editMessage(call,
                                         f"⚠️ 用户 `{user_id}` 不在M尊享列表中",
