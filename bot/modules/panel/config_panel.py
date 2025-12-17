@@ -259,12 +259,12 @@ async def manage_m_users(_, call):
                         m_users.clear()
                         m_users.extend(config.m_users)
                         # 同步更新数据库中的 lv 字段
-                        # 检查用户是否是白名单用户，如果是则恢复为 'a'，否则恢复为 'b'
+                        # 注意：根据现有系统设计（参考/revm命令），M用户被移除时降级为'b'（普通用户）
+                        # 这与用户的原始级别无关，因为M是最高级别
+                        # 如果需要保留原始白名单状态，需要额外的逻辑来跟踪用户的历史级别
                         user_data = sql_get_emby(user_id)
                         if user_data:
-                            # 简单判断：如果用户之前是白名单就恢复为'a'，否则恢复为'b'
-                            # 更好的做法是查看其他白名单配置，这里简化处理
-                            new_lv = 'b'  # 默认恢复为普通用户
+                            new_lv = 'b'  # 降级为普通用户，与/revm命令行为一致
                             if sql_update_emby(Emby.tg == user_id, lv=new_lv):
                                 LOGGER.info(f"【admin】：{call.from_user.id} - 更新用户 {user_id} 数据库lv字段为'{new_lv}'")
                             else:
