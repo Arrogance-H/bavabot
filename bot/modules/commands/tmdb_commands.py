@@ -236,7 +236,9 @@ async def search_command(_, msg):
                 result_text += f"\n📝 **简介**: {overview}\n\n"
                 result_text += "💡 点击下方按钮点播此影片"
                 
-                # Create keyboard with request button (no return button for /search command)
+                # Create keyboard with request button
+                # Note: No return button for /search command to prevent photo loss issue
+                # The /search command creates a text-only message, not part of the photo-based panel flow
                 keyboard = ikb([
                     [('🎬 点播此片', 'me_request_movie')]
                 ])
