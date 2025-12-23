@@ -236,10 +236,9 @@ async def search_command(_, msg):
                 result_text += f"\n📝 **简介**: {overview}\n\n"
                 result_text += "💡 点击下方按钮点播此影片"
                 
-                # Create keyboard with request button
+                # Create keyboard with request button (no return button for /search command)
                 keyboard = ikb([
-                    [('🎬 点播此片', 'me_request_movie')],
-                    [('🔙 返回', 'tmdb_main')]
+                    [('🎬 点播此片', 'me_request_movie')]
                 ])
                 
                 await sendMessage(msg, result_text, buttons=keyboard, parse_mode=enums.ParseMode.MARKDOWN)
