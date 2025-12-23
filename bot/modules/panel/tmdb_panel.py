@@ -348,6 +348,8 @@ async def tmdb_id_search_results(call, tmdb_id: int):
         
         else:
             # Multiple results (both movie and TV), show selection list
+            from bot.func_helper.fix_bottons import ikb
+            
             user_tmdb_data[call.from_user.id] = {
                 'query': f'TMDB ID: {tmdb_id}',
                 'display_results': results,
@@ -409,6 +411,8 @@ async def tmdb_id_search_results(call, tmdb_id: int):
 async def tmdb_id_search_results_multi(call, tmdb_id: int, results: list):
     """Display TMDB ID search results when multiple results (movie and TV) are found"""
     try:
+        from bot.func_helper.fix_bottons import ikb
+        
         # Save all results to user data
         user_tmdb_data[call.from_user.id] = {
             'query': f'TMDB ID: {tmdb_id}',
