@@ -259,7 +259,9 @@ async def search_command(_, msg):
                 
                 result_text += "💡 点击下方编号选择影片进行点播"
                 
-                await sendMessage(msg, result_text, buttons=tmdb_search_result_list_ikb(len(tmdb_results)), parse_mode=enums.ParseMode.MARKDOWN)
+                # Create keyboard with number buttons
+                keyboard = tmdb_search_result_list_ikb(len(tmdb_results))
+                await sendMessage(msg, result_text, buttons=keyboard, parse_mode=enums.ParseMode.MARKDOWN)
             
             return
         
@@ -324,7 +326,9 @@ async def search_command(_, msg):
         
         result_text += "💡 点击下方编号选择影片进行点播"
         
-        await sendMessage(msg, result_text, buttons=tmdb_search_result_list_ikb(len(display_results)), parse_mode=enums.ParseMode.MARKDOWN)
+        # Create keyboard with number buttons
+        keyboard = tmdb_search_result_list_ikb(len(display_results))
+        await sendMessage(msg, result_text, buttons=keyboard, parse_mode=enums.ParseMode.MARKDOWN)
         
     except Exception as e:
         LOGGER.error(f"处理 /search 命令时出错: {str(e)}")
