@@ -177,68 +177,88 @@ async def search_command(_, msg):
             tmdb_id = tmdb_service.extract_tmdb_id(search_query)
             
             # Get movie/TV details from TMDB
-            success, tmdb_result = await tmdb_service.search_by_tmdb_id(tmdb_id)
-            if not success or not tmdb_result:
+            success, tmdb_results = await tmdb_service.search_by_tmdb_id(tmdb_id)
+            if not success or not tmdb_results:
                 await sendMessage(msg, f"🤷‍♂️ TMDB ID {tmdb_id} 未找到对应的影视作品", timer=30)
                 return
             
-            # Store the result for later use
+            # Store the results for later use
             user_tmdb_data[msg.from_user.id] = {
-                'selected_item': tmdb_result,
-                'search_title': f"{tmdb_result.get('title', '未知')} {tmdb_result.get('year', '')}".strip(),
+                'display_results': tmdb_results,
                 'query': f'TMDB ID: {tmdb_id}',
-                'display_results': [tmdb_result],
-                'total_results': 1,
+                'total_results': len(tmdb_results),
                 'is_tmdb_id_search': True,
                 'tmdb_id': tmdb_id
             }
             
-            # Format the result
-            title = tmdb_result.get("title", "未知标题")
-            original_title = tmdb_result.get("original_title", "")
-            year = tmdb_result.get("year", "未知")
-            media_type = tmdb_result.get("media_type_cn", "未知")
-            overview = tmdb_result.get("overview", "暂无简介")
-            vote_average = tmdb_result.get("vote_average", 0)
-            vote_count = tmdb_result.get("vote_count", 0)
-            
-            result_text = f"🆔 **TMDB ID 精确查找**\n\n"
-            result_text += f"📺 **类型**: {media_type}\n"
-            result_text += f"🎭 **标题**: {title}\n"
-            
-            if original_title and original_title != title:
-                result_text += f"🔤 **原名**: {original_title}\n"
+            # If only one result, format and display it
+            if len(tmdb_results) == 1:
+                tmdb_result = tmdb_results[0]
+                user_tmdb_data[msg.from_user.id]['selected_item'] = tmdb_result
+                user_tmdb_data[msg.from_user.id]['search_title'] = f"{tmdb_result.get('title', '未知')} {tmdb_result.get('year', '')}".strip()
                 
-            if year:
-                result_text += f"📅 **年份**: {year}\n"
+                # Format the result
+                title = tmdb_result.get("title", "未知标题")
+                original_title = tmdb_result.get("original_title", "")
+                year = tmdb_result.get("year", "未知")
+                media_type = tmdb_result.get("media_type_cn", "未知")
+                overview = tmdb_result.get("overview", "暂无简介")
+                vote_average = tmdb_result.get("vote_average", 0)
+                vote_count = tmdb_result.get("vote_count", 0)
                 
-            if vote_average > 0:
-                stars = "⭐" * min(int(vote_average/2), 5)
-                result_text += f"⭐ **评分**: {vote_average:.1f}/10 {stars} ({vote_count}票)\n"
+                result_text = f"🆔 **TMDB ID 精确查找**\n\n"
+                result_text += f"📺 **类型**: {media_type}\n"
+                result_text += f"🎭 **标题**: {title}\n"
+                
+                if original_title and original_title != title:
+                    result_text += f"🔤 **原名**: {original_title}\n"
+                    
+                if year:
+                    result_text += f"📅 **年份**: {year}\n"
+                    
+                if vote_average > 0:
+                    stars = "⭐" * min(int(vote_average/2), 5)
+                    result_text += f"⭐ **评分**: {vote_average:.1f}/10 {stars} ({vote_count}票)\n"
+                
+                # Add genres if available
+                if tmdb_result.get('genres'):
+                    result_text += f"🏷️ **分类**: {tmdb_result['genres']}\n"
+                
+                # Add runtime/seasons info
+                if tmdb_result.get('runtime') and tmdb_result['runtime'] > 0:
+                    result_text += f"⏱️ **时长**: {tmdb_result['runtime']} 分钟\n"
+                elif tmdb_result.get('number_of_seasons') and tmdb_result['number_of_seasons'] > 0:
+                    result_text += f"📺 **季数**: {tmdb_result['number_of_seasons']} 季\n"
+                
+                # Add overview
+                if overview and len(overview) > 200:
+                    overview = overview[:197] + "..."
+                result_text += f"\n📝 **简介**: {overview}\n\n"
+                result_text += "💡 点击下方按钮点播此影片"
+                
+                # Create keyboard with request button
+                keyboard = ikb([
+                    [('🎬 点播此片', 'me_request_movie')],
+                    [('🔙 返回', 'tmdb_main')]
+                ])
+                
+                await sendMessage(msg, result_text, buttons=keyboard, parse_mode=enums.ParseMode.MARKDOWN)
             
-            # Add genres if available
-            if tmdb_result.get('genres'):
-                result_text += f"🏷️ **分类**: {tmdb_result['genres']}\n"
+            else:
+                # Multiple results (both movie and TV show found)
+                result_text = f"🆔 **TMDB ID 精确查找**\n\n"
+                result_text += f"🔍 TMDB ID: `{tmdb_id}`\n"
+                result_text += f"✅ 找到 {len(tmdb_results)} 个匹配的影视作品\n\n"
+                result_text += f"📺 该ID同时存在电影和电视剧，请选择:\n\n"
+                
+                # Format each result
+                for i, item in enumerate(tmdb_results, 1):
+                    result_text += format_media_item(item, i)
+                
+                result_text += "\n💡 请使用 /tmdb 命令进入面板模式进行详细查看和点播"
+                
+                await sendMessage(msg, result_text, parse_mode=enums.ParseMode.MARKDOWN, timer=90)
             
-            # Add runtime/seasons info
-            if tmdb_result.get('runtime') and tmdb_result['runtime'] > 0:
-                result_text += f"⏱️ **时长**: {tmdb_result['runtime']} 分钟\n"
-            elif tmdb_result.get('number_of_seasons') and tmdb_result['number_of_seasons'] > 0:
-                result_text += f"📺 **季数**: {tmdb_result['number_of_seasons']} 季\n"
-            
-            # Add overview
-            if overview and len(overview) > 200:
-                overview = overview[:197] + "..."
-            result_text += f"\n📝 **简介**: {overview}\n\n"
-            result_text += "💡 点击下方按钮点播此影片"
-            
-            # Create keyboard with request button
-            keyboard = ikb([
-                [('🎬 点播此片', 'me_request_movie')],
-                [('🔙 返回', 'tmdb_main')]
-            ])
-            
-            await sendMessage(msg, result_text, buttons=keyboard, parse_mode=enums.ParseMode.MARKDOWN)
             return
         
         # Regular text search

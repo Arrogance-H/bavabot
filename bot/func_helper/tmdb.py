@@ -270,57 +270,68 @@ class TMDBService:
         LOGGER.info(f"TMDB popular fetched: {len(results)} results")
         return True, results[:limit]
 
-    async def search_by_tmdb_id(self, tmdb_id: int, media_type: str = None) -> Tuple[bool, Optional[Dict]]:
+    async def search_by_tmdb_id(self, tmdb_id: int, media_type: str = None) -> Tuple[bool, List[Dict]]:
         """
         Search for a movie or TV show by its TMDB ID
         Args:
             tmdb_id: TMDB ID (numeric)
-            media_type: 'movie' or 'tv'. If None, try both starting with movie
+            media_type: 'movie' or 'tv'. If None, try both and return all found
         Returns:
-            (success, formatted_result)
+            (success, list_of_formatted_results) - list may contain 0, 1, or 2 items
         """
         if not tmdb_id or not (0 < tmdb_id < 10000000):
             LOGGER.warning(f"Invalid TMDB ID: {tmdb_id}")
-            return False, None
+            return False, []
         
         try:
-            # If media_type is specified, try that specific type
+            results = []
+            
+            # If media_type is specified, try that specific type only
             if media_type:
                 if media_type == "movie":
                     data = await self.get_movie_details(tmdb_id)
+                    if data:
+                        LOGGER.info(f"TMDB ID {tmdb_id} found as movie: {data.get('title', 'Unknown')}")
+                        results.append(self._format_tmdb_detail_result(data, "movie"))
                 elif media_type == "tv":
                     data = await self.get_tv_details(tmdb_id)
+                    if data:
+                        LOGGER.info(f"TMDB ID {tmdb_id} found as TV show: {data.get('name', 'Unknown')}")
+                        results.append(self._format_tmdb_detail_result(data, "tv"))
                 else:
                     LOGGER.error(f"Invalid media_type: {media_type}")
-                    return False, None
+                    return False, []
                     
-                if data:
-                    LOGGER.info(f"TMDB ID {tmdb_id} found as {media_type}: {data.get('title' if media_type == 'movie' else 'name', 'Unknown')}")
-                    return True, self._format_tmdb_detail_result(data, media_type)
+                if results:
+                    return True, results
                 else:
                     LOGGER.info(f"TMDB ID {tmdb_id} not found as {media_type}")
-                    return False, None
+                    return False, []
             
-            # If no media_type specified, try movie first, then TV
-            # Try movie first
+            # If no media_type specified, try both movie and TV
+            # Try movie
             movie_data = await self.get_movie_details(tmdb_id)
             if movie_data:
                 LOGGER.info(f"TMDB ID {tmdb_id} found as movie: {movie_data.get('title', 'Unknown')}")
-                return True, self._format_tmdb_detail_result(movie_data, "movie")
+                results.append(self._format_tmdb_detail_result(movie_data, "movie"))
             
             # Try TV show
             tv_data = await self.get_tv_details(tmdb_id)
             if tv_data:
                 LOGGER.info(f"TMDB ID {tmdb_id} found as TV show: {tv_data.get('name', 'Unknown')}")
-                return True, self._format_tmdb_detail_result(tv_data, "tv")
+                results.append(self._format_tmdb_detail_result(tv_data, "tv"))
             
-            # Not found in either
-            LOGGER.info(f"TMDB ID {tmdb_id} not found in either movies or TV shows")
-            return False, None
+            # Return results (could be 0, 1, or 2 items)
+            if results:
+                LOGGER.info(f"TMDB ID {tmdb_id} found {len(results)} result(s)")
+                return True, results
+            else:
+                LOGGER.info(f"TMDB ID {tmdb_id} not found in either movies or TV shows")
+                return False, []
             
         except Exception as e:
             LOGGER.error(f"Error searching TMDB ID {tmdb_id}: {str(e)}")
-            return False, None
+            return False, []
     
     def _format_tmdb_detail_result(self, data: Dict, media_type: str) -> Dict:
         """Format TMDB detail API response to match search result format"""
