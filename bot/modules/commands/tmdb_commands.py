@@ -252,13 +252,14 @@ async def search_command(_, msg):
                 result_text += f"✅ 找到 {len(tmdb_results)} 个匹配的影视作品\n\n"
                 result_text += f"📺 该ID同时存在电影和电视剧，请选择:\n\n"
                 
-                # Format each result
+                # Format each result with detailed info
                 for i, item in enumerate(tmdb_results, 1):
-                    result_text += format_media_item(item, i)
+                    result_text += format_search_result(item, i)
+                    result_text += "\n" + "─" * 10 + "\n\n"
                 
-                result_text += "\n💡 请使用 /tmdb 命令进入面板模式进行详细查看和点播"
+                result_text += "💡 点击下方编号选择影片进行点播"
                 
-                await sendMessage(msg, result_text, parse_mode=enums.ParseMode.MARKDOWN, timer=90)
+                await sendMessage(msg, result_text, buttons=tmdb_search_result_list_ikb(len(tmdb_results)), parse_mode=enums.ParseMode.MARKDOWN)
             
             return
         
